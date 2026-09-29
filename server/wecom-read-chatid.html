@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>读取客户群 chatId</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; line-height: 1.6; }
+    #chatId { font-size: 22px; word-break: break-all; margin: 16px 0; }
+    button { font-size: 16px; padding: 10px 16px; }
+    .tip { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>当前客户群 chatId</h1>
+  <p class="tip">必须由群主在企业微信客户群的「聊天工具栏」打开本页。从工作台进入无效。外面的开发者配不了这个。</p>
+  <p id="status">正在读取…</p>
+  <p id="chatId"></p>
+  <button id="copy" hidden>复制 chatId</button>
+
+  <!--
+    使用前：
+    1. 把本页部署到企微应用的可信域名下
+    2. 按企微 JS-SDK 文档注入 wx.config / ww.register
+    3. 把本页配置到「聊天工具栏」
+  -->
+  <script src="https://res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
+  <script src="https://open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js"></script>
+  <script>
+    const statusEl = document.getElementById('status')
+    const chatIdEl = document.getElementById('chatId')
+    const copyBtn = document.getElementById('copy')
+
+    function show(chatId) {
+      statusEl.textContent = '读取成功，复制后填进黎安话事管理端「客户群」。'
+      chatIdEl.textContent = chatId
+      copyBtn.hidden = false
+      copyBtn.onclick = () => navigator.clipboard.writeText(chatId)
+    }
+
+    function fail(message) {
+      statusEl.textContent = message
+    }
+
+    function readChatId() {
+      const api = (window.ww && ww.getCurExternalChat) || (window.wx && wx.invoke)
+      if (!api) {
+        fail('请在企业微信里打开，并先完成 JS-SDK 鉴权。')
+        return
+      }
+
+      if (window.ww && ww.getContext) {
+        ww.getContext({
+          success(ctx) {
+            if (ctx.entry !== 'group_chat_tools') {
+              fail('入口不对。请从客户群聊天工具栏打开，不要从工作台进。当前入口：' + (ctx.entry || '未知'))
+              return
+            }
+            ww.getCurExternalChat({
+              success(res) { show(res.chatId) },
+              fail(err) { fail('读取失败：' + (err.errMsg || JSON.stringify(err))) }
+            })
+          },
+          fail() {
+            fail('读不到入口信息，确认已用应用身份完成 JS-SDK 注册。')
+          }
+        })
+        return
+      }
+
+      wx.invoke('getCurExternalChat', {}, (res) => {
+        if (res.err_msg === 'getCurExternalChat:ok') show(res.chatId)
+        else fail('读取失败：' + res.err_msg)
+      })
+    }
+
+    readChatId()
+  </script>
+</body>
+</html>

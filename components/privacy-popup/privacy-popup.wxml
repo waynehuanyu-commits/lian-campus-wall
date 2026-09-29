@@ -1,0 +1,27 @@
+<view wx:if="{{show}}" class="privacy-mask" catchtouchmove="noop">
+  <view class="privacy-sheet">
+    <view class="privacy-title">用户隐私保护提示</view>
+    <view class="privacy-body">
+      在使用头像、相册等功能前，请阅读并同意
+      <text class="privacy-link" bindtap="openContract">{{privacyContractName}}</text>
+      。站内完整说明见
+      <text class="privacy-link" bindtap="openAgreement">《用户协议及隐私政策》</text>。
+    </view>
+    <view class="privacy-actions">
+      <button class="privacy-btn ghost" bindtap="onDisagree">不同意</button>
+      <button
+        wx:if="{{canAgreePrivacy}}"
+        id="agree-privacy-btn"
+        class="privacy-btn primary"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onAgree"
+      >同意并继续</button>
+      <button
+        wx:else
+        id="agree-privacy-btn"
+        class="privacy-btn primary"
+        bindtap="onAgree"
+      >同意并继续</button>
+    </view>
+  </view>
+</view>

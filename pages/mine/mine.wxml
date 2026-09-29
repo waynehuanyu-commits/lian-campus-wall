@@ -1,0 +1,175 @@
+<view class="mine-page">
+  <view class="hero">
+    <view class="hero-bg">
+      <view class="hero-wash"></view>
+      <view class="hero-orb hero-orb-a"></view>
+      <view class="hero-orb hero-orb-b"></view>
+    </view>
+    <view class="brand-mark">黎安话事</view>
+
+    <view class="profile">
+      <view class="avatar-wrap" bindtap="openAvatarSheet" hover-class="avatar-wrap-hover">
+        <image
+          class="avatar-lg"
+          src="{{avatarSrc || '/images/avatar-default.png'}}"
+          mode="aspectFill"
+          binderror="onAvatarError"
+        />
+        <view class="avatar-edit">
+          <view class="avatar-edit-icon"></view>
+        </view>
+      </view>
+      <view class="profile-main">
+        <view class="nickname-row" bindtap="goEditNickname" hover-class="nickname-row-hover">
+          <view class="nickname-text">{{user.nickname || '填写昵称'}}</view>
+          <view class="nickname-edit">修改</view>
+        </view>
+        <input
+          class="bio-input"
+          maxlength="40"
+          value="{{user.bio}}"
+          placeholder="写一句个性签名"
+          placeholder-class="ph"
+          bindblur="onBioBlur"
+        />
+        <view class="pill-row">
+          <view
+            wx:if="{{!user.officialLogin}}"
+            class="school-pill {{user.schoolLocked ? 'done' : 'need'}}"
+            bindtap="goSchool"
+          >{{user.schoolLocked ? (schoolText || '已认证') : '去认证学校'}}</view>
+          <view wx:if="{{user.officialLogin}}" class="soft-pill ok">官方账号</view>
+          <view wx:if="{{user.appAdmin}}" class="soft-pill ok">小程序管理员</view>
+          <view wx:if="{{studentAuthBadge}}" class="soft-pill {{studentAuthBadgeClass}}">{{studentAuthBadge}}</view>
+          <view wx:if="{{accountStatus === 'banned'}}" class="soft-pill danger">已封禁</view>
+          <view wx:elif="{{accountStatus === 'muted'}}" class="soft-pill danger">禁言中</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{accountTip}}" class="notice">
+    <view class="notice-title">账号提醒</view>
+    <view class="notice-desc">{{accountTip}}</view>
+  </view>
+
+  <view class="nav-block">
+    <view class="nav-item" bindtap="goMyPosts" hover-class="nav-item-hover">
+      <view class="nav-left">
+        <view class="nav-dot posts"></view>
+        <view class="nav-copy">
+          <view class="nav-title">我的帖子</view>
+          <view class="nav-desc">互助广场与学习分享</view>
+        </view>
+      </view>
+      <view class="nav-arrow">›</view>
+    </view>
+    <view class="nav-item" bindtap="goMyEngage" hover-class="nav-item-hover">
+      <view class="nav-left">
+        <view class="nav-dot engage"></view>
+        <view class="nav-copy">
+          <view class="nav-title-row">
+            <view class="nav-title">我的点赞 / 评论</view>
+          </view>
+          <view class="nav-desc">含别人评论我的</view>
+        </view>
+      </view>
+      <view class="nav-tail">
+        <view wx:if="{{engageUnread}}" class="nav-reddot {{engageUnread > 1 ? 'num' : ''}}">{{engageUnread > 1 ? (engageUnread > 99 ? '99+' : engageUnread) : ''}}</view>
+        <view class="nav-arrow">›</view>
+      </view>
+    </view>
+    <view class="nav-item" bindtap="goMyMessages" hover-class="nav-item-hover">
+      <view class="nav-left">
+        <view class="nav-dot msg"></view>
+        <view class="nav-copy">
+          <view class="nav-title-row">
+            <view class="nav-title">我的私信</view>
+          </view>
+          <view class="nav-desc">站内消息</view>
+        </view>
+      </view>
+      <view class="nav-tail">
+        <view wx:if="{{messageUnread}}" class="nav-reddot {{messageUnread > 1 ? 'num' : ''}}">{{messageUnread > 1 ? (messageUnread > 99 ? '99+' : messageUnread) : ''}}</view>
+        <view class="nav-arrow">›</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{user.schoolLocked}}" class="setting-block">
+    <view class="setting-item">
+      <view class="setting-copy">
+        <view class="setting-title">展示学校标签</view>
+        <view class="setting-desc">开启后发帖旁显示学校</view>
+      </view>
+      <switch checked="{{user.showSchoolTag}}" color="#2F7DFF" bindchange="onShowSchoolTagChange" />
+    </view>
+    <view class="setting-item" bindtap="goSchool" hover-class="nav-item-hover">
+      <view class="setting-copy">
+        <view class="setting-title">学生认证</view>
+        <view class="setting-desc">{{studentAuthText}}</view>
+      </view>
+      <view class="setting-link">{{studentAuthAction}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{user.id && !user.officialLogin}}" class="setting-block">
+    <view class="setting-item" bindtap="copyAccountId" hover-class="nav-item-hover">
+      <view class="setting-copy">
+        <view class="setting-title">账号编号</view>
+        <view class="setting-desc account-id-value">{{user.id}}</view>
+      </view>
+      <view class="setting-link">复制</view>
+    </view>
+  </view>
+
+  <view wx:if="{{user.officialLogin || user.officialLoginAllowed}}" class="setting-block">
+    <view wx:if="{{user.officialLogin}}" class="setting-item" bindtap="leaveOfficial" hover-class="nav-item-hover">
+      <view class="setting-copy">
+        <view class="setting-title">退出黎安校园墙</view>
+        <view class="setting-desc">回到你自己的微信账号</view>
+      </view>
+      <view class="setting-link">退出</view>
+    </view>
+    <view wx:else class="setting-item" bindtap="enterOfficial" hover-class="nav-item-hover">
+      <view class="setting-copy">
+        <view class="setting-title">登录黎安校园墙</view>
+        <view class="setting-desc">发帖和评论会显示为黎安校园墙</view>
+      </view>
+      <view class="setting-link">登录</view>
+    </view>
+  </view>
+
+  <view class="nav-block">
+    <view class="nav-item" bindtap="goAbout" hover-class="nav-item-hover">
+      <view class="nav-left">
+        <view class="nav-dot about"></view>
+        <view class="nav-copy">
+          <view class="nav-title">关于我们</view>
+          <view class="nav-desc">产品介绍与用户协议及隐私政策</view>
+        </view>
+      </view>
+      <view class="nav-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="foot-note">浏览开放 · 发帖评论需学校认证</view>
+
+  <view wx:if="{{avatarSheet}}" class="avatar-mask" catchtouchmove="noop" bindtap="closeAvatarSheet">
+    <view class="avatar-sheet" catchtap="noop">
+      <view class="avatar-group">
+        <button
+          class="avatar-option wx"
+          hover-class="avatar-option-hover"
+          open-type="chooseAvatar"
+          bindchooseavatar="onChooseAvatar"
+        >使用微信头像</button>
+        <view class="avatar-option" hover-class="avatar-option-hover" data-source="album" bindtap="onPickPhoto">从相册选择</view>
+        <view class="avatar-option" hover-class="avatar-option-hover" data-source="camera" bindtap="onPickPhoto">拍照</view>
+      </view>
+      <view class="avatar-option cancel" hover-class="avatar-option-hover" bindtap="closeAvatarSheet">取消</view>
+    </view>
+  </view>
+
+  <privacy-popup />
+</view>

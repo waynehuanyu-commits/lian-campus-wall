@@ -1,0 +1,341 @@
+<view class="admin-page">
+  <view class="admin-top">
+    <view>
+      <view class="admin-kicker">ADMIN CONSOLE</view>
+      <view class="admin-hello">运营工作台</view>
+    </view>
+    <view class="logout" bindtap="onLogout">退出</view>
+  </view>
+
+  <block wx:if="{{nav === 'overview'}}">
+    <view class="stat-grid">
+      <view class="stat-card">
+        <view class="stat-num">{{overview.postCount}}</view>
+        <view class="stat-label">内容总数</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{overview.interceptCount}}</view>
+        <view class="stat-label">已拦截</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{overview.pendingSchool}}</view>
+        <view class="stat-label">待审学校</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{overview.digestCount}}/{{overview.digestSize}}</view>
+        <view class="stat-label">汇总队列</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{overview.bannedCount || 0}}</view>
+        <view class="stat-label">已封禁</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{overview.riskLogCount || 0}}</view>
+        <view class="stat-label">风控日志</view>
+      </view>
+    </view>
+    <view class="panel">
+      <view class="panel-title">今日关注</view>
+      <view class="focus-line">学习分享 {{overview.forumCount}} · 互助广场 {{overview.wallCount}}</view>
+      <view class="focus-line">指定客户群 {{overview.designatedGroups}} / {{overview.groupCount}}</view>
+      <view class="focus-line">分发日志 {{overview.logCount}} 条 · 禁言 {{overview.mutedCount || 0}} · 联系查看 {{overview.contactViewCount || 0}} · 联系反馈 {{overview.contactFeedbackCount || 0}}</view>
+    </view>
+    <view class="panel">
+      <view class="panel-title">快捷操作</view>
+      <view class="quick-grid">
+        <view class="quick" data-id="keywords" bindtap="onNavTap">关键词风控</view>
+        <view class="quick" data-id="digest" bindtap="onNavTap">汇总推送</view>
+        <view class="quick" data-id="weekly" bindtap="onNavTap">每周热榜</view>
+        <view class="quick" data-id="groups" bindtap="onNavTap">客户群</view>
+        <view class="quick" data-id="school" bindtap="onNavTap">学校审核</view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{nav === 'keywords'}}">
+    <view class="panel">
+      <view class="panel-title">拦截词</view>
+      <view class="panel-desc">扫描标题、正文、评论、昵称和签名。空格、符号变体也会命中。必拦词（含代课、代考等）不能删除，公开内容不会放出这些词。</view>
+      <view class="field">
+        <input placeholder="输入关键词，如：刷单" value="{{keywordDraft}}" bindinput="onKeywordInput" confirm-type="done" bindconfirm="onAddKeyword" />
+      </view>
+      <button class="primary-btn" bindtap="onAddKeyword">添加关键词</button>
+      <view class="keyword-list">
+        <view wx:for="{{keywords}}" wx:key="word" class="keyword-chip {{item.locked ? 'locked' : ''}}" data-word="{{item.word}}" bindtap="onRemoveKeyword">{{item.word}}{{item.locked ? ' · 必拦' : ' ×'}}</view>
+      </view>
+      <view wx:if="{{!keywords.length}}" class="empty-line">还没有关键词</view>
+    </view>
+    <view wx:if="{{interceptList.length}}" class="section-label">拦截记录</view>
+    <view class="list">
+      <view wx:for="{{interceptList}}" wx:key="id" class="panel item">
+        <view class="row between">
+          <view class="tag">{{item.typeText}} · {{item.channel}}</view>
+          <view class="status danger">已拦截</view>
+        </view>
+        <view class="item-title">{{item.headline}}</view>
+        <view class="item-meta">{{item.content}}</view>
+        <view class="item-meta">命中：{{item.hitText}}</view>
+        <view class="item-meta">{{item.authorName}} · {{item.timeText}}</view>
+      </view>
+    </view>
+    <view wx:if="{{!interceptList.length}}" class="empty-block">暂无拦截记录</view>
+
+    <view class="section-label">账号处置</view>
+    <view class="list">
+      <view wx:for="{{accounts}}" wx:key="id" class="panel item">
+        <view class="row between">
+          <view class="item-title" style="margin-top: 0;">{{item.nickname}}</view>
+          <view class="status {{item.statusClass}}">{{item.statusText}}</view>
+        </view>
+        <view class="item-meta">{{item.schoolText}}</view>
+        <view class="item-meta">{{item.riskText}}</view>
+        <view wx:if="{{item.banReason}}" class="item-meta">原因：{{item.banReason}}</view>
+        <view class="row gap actions">
+          <button class="ghost-btn" data-id="{{item.id}}" bindtap="onMuteAccount">禁言</button>
+          <button class="ghost-btn" data-id="{{item.id}}" bindtap="onBanAccount">封禁</button>
+          <button class="primary-btn half" data-id="{{item.id}}" bindtap="onUnbanAccount">解除</button>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{!accounts.length}}" class="empty-block">暂无账号</view>
+
+    <view class="section-label">异常监测</view>
+    <view class="list">
+      <view wx:for="{{securityLogs}}" wx:key="id" class="panel item">
+        <view class="row between">
+          <view class="tag">{{item.levelText}} · {{item.type}}</view>
+          <view class="item-meta" style="margin-top: 0;">{{item.timeText}}</view>
+        </view>
+        <view class="item-title">{{item.userNickname || '系统'}}</view>
+        <view class="item-meta">{{item.detail}}</view>
+        <view wx:if="{{item.hitText}}" class="item-meta">命中：{{item.hitText}}</view>
+      </view>
+    </view>
+    <view wx:if="{{!securityLogs.length}}" class="empty-block">暂无异常记录</view>
+  </block>
+
+  <block wx:elif="{{nav === 'weekly'}}">
+    <view class="panel">
+      <view class="panel-title">每周精选热榜</view>
+      <view class="panel-desc">独立板块，管理员决定上架与排序，类似热榜。与群发汇总推送互不影响。</view>
+      <view class="field-label">标题</view>
+      <view class="field">
+        <input value="{{weeklyBoard.title}}" bindinput="onWeeklyTitleInput" />
+      </view>
+      <view class="field-label">副标题</view>
+      <view class="field">
+        <input value="{{weeklyBoard.subtitle}}" bindinput="onWeeklySubtitleInput" />
+      </view>
+      <view class="row between" style="margin-top: 16rpx;">
+        <view class="accent">{{weeklyBoard.enabled ? '已对用户端展示' : '已对用户端隐藏'}} · {{weeklyBoard.count || 0}}/{{weeklyMax}}</view>
+        <view class="link" bindtap="onWeeklyEnabledTap">{{weeklyBoard.enabled ? '关闭展示' : '开启展示'}}</view>
+      </view>
+      <button class="primary-btn" bindtap="onWeeklySaveMeta">保存设置</button>
+    </view>
+    <view class="section-label">当前热榜顺序</view>
+    <view wx:if="{{weeklyBoard.items.length}}" class="list">
+      <view wx:for="{{weeklyBoard.items}}" wx:key="key" class="panel item">
+        <view class="tag">#{{item.rank}} · {{item.contentType === 'forum' ? '学习分享' : '互助广场'}} · {{item.tag}}</view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="item-meta">{{item.oneLiner || item.summary}}</view>
+        <view class="row gap-12" style="margin-top: 12rpx;">
+          <button size="mini" data-id="{{item.contentId}}" data-type="{{item.contentType || 'wall'}}" data-direction="up" bindtap="onWeeklyMove">上移</button>
+          <button size="mini" data-id="{{item.contentId}}" data-type="{{item.contentType || 'wall'}}" data-direction="down" bindtap="onWeeklyMove">下移</button>
+          <button size="mini" data-id="{{item.contentId}}" data-type="{{item.contentType || 'wall'}}" bindtap="onWeeklyRemove">移除</button>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="empty-block">还没有上架内容</view>
+    <view class="section-label">添加学习分享 / 互助广场内容</view>
+    <view class="panel">
+      <view class="field">
+        <input placeholder="搜索标题或正文" value="{{weeklyKeyword}}" bindinput="onWeeklyKeywordInput" confirm-type="search" bindconfirm="onWeeklySearch" />
+      </view>
+      <button class="primary-btn" bindtap="onWeeklySearch">搜索可添加内容</button>
+    </view>
+    <view wx:if="{{weeklyCandidates.length}}" class="list">
+      <view wx:for="{{weeklyCandidates}}" wx:key="candKey" class="panel item">
+        <view class="tag">{{item.contentType === 'forum' ? '学习分享' : '互助广场'}} · {{item.tag}}</view>
+        <view class="item-title">{{item.headline || item.title}}</view>
+        <view class="item-meta">{{item.summary || item.content}}</view>
+        <button class="primary-btn" data-id="{{item.id}}" data-type="{{item.contentType || 'wall'}}" bindtap="onWeeklyAdd">加入热榜</button>
+      </view>
+    </view>
+    <view wx:else class="empty-block">没有更多可添加内容</view>
+  </block>
+
+  <block wx:elif="{{nav === 'digest'}}">
+    <view class="panel">
+      <view class="panel-title">黎安话事 10 条半自动群发</view>
+      <view class="panel-desc">必须走企微自动群发。开发者可以不在这家公司，但要用公司里的人给的企业ID、Secret、群主账号去配服务端。</view>
+      <view class="panel-desc">满 10 条后云函数/后台创建群发，群主马飘在企业微信点一次确认。</view>
+      <view class="accent">已入队 {{progress.count}} / {{progress.size}} · 目标群：{{digestGroupText}}</view>
+      <button class="primary-btn" bindtap="onFlushNow">生成汇总</button>
+    </view>
+    <view wx:if="{{progress.queued.length}}" class="list">
+      <view wx:for="{{progress.queued}}" wx:key="contentId" class="panel item">
+        <view class="tag">{{item.index}} / {{progress.size}} · {{item.channel}}</view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="item-meta">摘要：{{item.summary}}</view>
+        <view class="item-meta">小程序入口：{{item.pagepath}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty-block">队列是空的，互助广场发帖通过后会入队</view>
+    <view wx:if="{{digests.length}}" class="section-label">已生成的汇总包</view>
+    <view class="list">
+      <view wx:for="{{digests}}" wx:key="id" class="panel item">
+        <view data-id="{{item.id}}" bindtap="goDigest">
+          <view class="row between">
+            <view class="item-title">{{item.title}}</view>
+            <view class="item-meta">{{item.count}} 条</view>
+          </view>
+          <view class="item-meta">{{item.summary}}</view>
+          <view class="item-meta">{{item.timeText}} · 点击预览</view>
+        </view>
+        <button class="primary-btn share-btn" open-type="share" data-id="{{item.id}}">分享到微信群</button>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{nav === 'groups'}}">
+    <view class="panel">
+      <view class="panel-title">指定客户群</view>
+      <view class="panel-desc">公司里的人提供企业ID、Secret、群主账号；开发者填进 server/.env 和云函数环境变量。</view>
+      <view class="panel-desc">然后运行 node server/list-groups.js，或在独立后台点「拉取并绑定」。</view>
+      <view class="panel-desc">满 10 条会自动建群发，马飘只需在企业微信点确认。</view>
+      <view class="accent">当前指定：{{digestGroupText}}</view>
+    </view>
+    <view class="panel">
+      <view class="panel-title">添加客户群</view>
+      <view class="field-label">群名称</view>
+      <view class="field">
+        <input placeholder="例如：黎安话事客户群" value="{{groupName}}" bindinput="onGroupNameInput" />
+      </view>
+      <view class="field-label">客户群 chatId</view>
+      <view class="field">
+        <input placeholder="从企微客户群详情复制" value="{{groupChatId}}" bindinput="onGroupChatIdInput" />
+      </view>
+      <view class="field-label">群主 userid（可选）</view>
+      <view class="field">
+        <input placeholder="企业微信里的群主账号" value="{{groupSender}}" bindinput="onGroupSenderInput" />
+      </view>
+      <view class="switch-row">
+        <view>
+          <view class="switch-title">接收 10 条汇总</view>
+          <view class="item-meta">打开后，满 10 条就通知这个群的群主</view>
+        </view>
+        <switch checked="{{groupReceiveDigest}}" color="#3B82F6" bindchange="onGroupDigestChange" />
+      </view>
+      <button class="primary-btn" bindtap="onAddGroup">添加并指定</button>
+    </view>
+    <view class="list">
+      <view wx:for="{{groups}}" wx:key="id" class="panel item">
+        <view class="row between">
+          <view>
+            <view class="item-title">{{item.name}}</view>
+            <view class="item-meta">{{item.typeText}}</view>
+            <view wx:if="{{item.designated}}" class="accent">已指定接收汇总</view>
+            <view wx:else class="item-meta">未指定</view>
+          </view>
+          <switch checked="{{item.enabled}}" color="#3B82F6" data-id="{{item.id}}" bindchange="onToggleGroup" />
+        </view>
+        <view class="item-meta">{{item.desc}}</view>
+        <view class="item-meta">{{item.bindText}}</view>
+        <view wx:if="{{item.sender}}" class="item-meta">群主：{{item.sender}}</view>
+        <view class="row gap actions">
+          <button class="ghost-btn" data-id="{{item.id}}" bindtap="onToggleDigestGroup">{{item.designated ? '取消指定' : '指定这个群'}}</button>
+          <button class="ghost-btn" data-id="{{item.id}}" bindtap="onEditGroup">{{editingId === item.id ? '收起' : '填写 chatId'}}</button>
+        </view>
+        <view wx:if="{{editingId === item.id}}" class="edit-bind">
+          <view class="field-label">客户群 chatId</view>
+          <view class="field">
+            <input value="{{editChatId}}" placeholder="粘贴 chatId" bindinput="onEditChatIdInput" />
+          </view>
+          <view class="field-label">群主 userid</view>
+          <view class="field">
+            <input value="{{editSender}}" placeholder="可选" bindinput="onEditSenderInput" />
+          </view>
+          <button class="primary-btn" bindtap="onSaveGroupBind">保存</button>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{nav === 'school'}}">
+    <view class="panel">
+      <view class="panel-title">学校信息审核</view>
+      <view class="panel-desc">学校信息提交后锁定，修改仍需管理员审核。内容发布已改为关键词自动匹配。</view>
+    </view>
+    <scroll-view class="chips" scroll-x>
+      <view
+        wx:for="{{filters}}"
+        wx:key="id"
+        class="chip {{status === item.id ? 'active' : ''}}"
+        data-name="{{item.id}}"
+        bindtap="onFilterTap"
+      >{{item.name}}</view>
+    </scroll-view>
+    <view wx:if="{{schoolList.length}}" class="list">
+      <view wx:for="{{schoolList}}" wx:key="id" class="panel item">
+        <view class="row between">
+          <view class="item-title">{{item.userNickname}}</view>
+          <view class="status {{item.status}}">{{item.statusText}}</view>
+        </view>
+        <view class="item-meta">原学校：{{item.oldSchoolName}}<text wx:if="{{item.oldSchoolCampus}}"> · {{item.oldSchoolCampus}}</text></view>
+        <view class="accent">改为：{{item.newSchoolName}}<text wx:if="{{item.newSchoolCampus}}"> · {{item.newSchoolCampus}}</text></view>
+        <view class="item-meta">原因：{{item.reason}}</view>
+        <view class="item-meta">申请时间：{{item.timeText}}</view>
+        <view wx:if="{{item.status === 'pending'}}" class="row gap actions">
+          <button class="ghost-btn" data-id="{{item.id}}" bindtap="onRejectSchool">驳回</button>
+          <button class="primary-btn half" data-id="{{item.id}}" bindtap="onApproveSchool">通过</button>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="empty-block">暂无申请</view>
+  </block>
+
+  <block wx:else>
+    <view class="panel">
+      <view class="panel-title">群发记录</view>
+      <view class="panel-desc">每次 10 条汇总会记一条。填了 chatId 的是「待群主确认发送」。</view>
+    </view>
+    <view wx:if="{{logs.length}}" class="list">
+      <view wx:for="{{logs}}" wx:key="id" class="panel item">
+        <view data-id="{{item.contentId}}" bindtap="goDigest">
+          <view class="row between">
+            <view class="item-title">{{item.groupName}}</view>
+            <view class="status">{{item.statusText}}</view>
+          </view>
+          <view class="item-meta">{{item.typeText}} · {{item.itemCount}} 条</view>
+          <view class="item-title small">{{item.title}}</view>
+          <view class="item-meta">{{item.summary}}</view>
+          <view class="item-meta">入口：{{item.pagepath}}</view>
+          <view wx:if="{{item.itemPreview}}" class="item-meta">内容预览：{{item.itemPreview}}</view>
+          <view class="item-meta">{{item.timeText}}</view>
+        </view>
+        <button class="primary-btn share-btn" open-type="share" data-id="{{item.contentId}}">分享到微信群</button>
+      </view>
+    </view>
+    <view wx:else class="empty-block">还没有记录。满 10 条或点生成汇总后会出现。</view>
+
+    <view class="panel">
+      <view class="panel-title">谁做什么</view>
+      <view class="panel-desc">公司里能进企微后台的人：把企业ID、Secret、马飘账号发给开发者。</view>
+      <view class="panel-desc">开发者：填环境变量、部署云函数/后台。不用进学生群。</view>
+      <view class="panel-desc">群主马飘：每次只在企业微信点「确认发送」。</view>
+      <view class="panel-desc">同学：在群里点小程序卡片看内容。</view>
+    </view>
+
+    <view class="panel">
+      <view class="panel-title">演示数据</view>
+      <view class="panel-desc">清空本地发布、点赞和评论，并恢复示例内容。用户个人资料会保留。</view>
+      <button class="ghost-btn full" bindtap="onReset">恢复示例数据</button>
+    </view>
+  </block>
+
+  <view class="admin-tabbar">
+    <view wx:for="{{navs}}" wx:key="id" class="tab {{nav === item.id ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onNavTap">
+      <view class="tab-name">{{item.name}}</view>
+    </view>
+  </view>
+</view>

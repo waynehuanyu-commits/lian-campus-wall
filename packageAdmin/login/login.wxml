@@ -1,0 +1,26 @@
+<view class="login-page">
+  <view class="orb orb-a"></view>
+  <view class="orb orb-b"></view>
+
+  <view class="brand">
+    <view class="mark">管</view>
+    <view class="brand-kicker">CAMPUS WALL ADMIN</view>
+    <view class="brand-title">管理控制台</view>
+    <view class="brand-desc">与用户端完全隔离。仅运营人员可进入关键词、汇总分享与学校审核。</view>
+  </view>
+
+  <view class="panel">
+    <view class="field-label">管理员账号</view>
+    <view class="field">
+      <input placeholder="请输入账号" placeholder-class="ph" value="{{account}}" bindinput="onAccountInput" />
+    </view>
+    <view class="field-label">密码</view>
+    <view class="field">
+      <input password placeholder="请输入密码" placeholder-class="ph" value="{{password}}" bindinput="onPasswordInput" confirm-type="done" bindconfirm="onLogin" />
+    </view>
+    <button class="login-btn" bindtap="onLogin" loading="{{loading}}">进入管理端</button>
+    <view class="hint">演示账号 {{demoAccount}} / {{demoPassword}}</view>
+  </view>
+
+  <view class="back" bindtap="goUser">返回用户端</view>
+</view>

@@ -1,0 +1,63 @@
+{
+  "pages": [
+    "pages/forum/forum",
+    "pages/wall/wall",
+    "pages/mine/mine",
+    "pages/edit-nickname/edit-nickname",
+    "pages/forum-detail/forum-detail",
+    "pages/forum-publish/forum-publish",
+    "pages/wall-detail/wall-detail",
+    "pages/wall-publish/wall-publish",
+    "pages/school-auth/school-auth",
+    "pages/digest/digest",
+    "pages/weekly-hot/weekly-hot",
+    "pages/my-posts/my-posts",
+    "pages/my-engage/my-engage",
+    "pages/my-messages/my-messages",
+    "pages/dm-chat/dm-chat",
+    "pages/user-profile/user-profile",
+    "pages/about/about",
+    "pages/agreement/agreement"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTitleText": "黎安话事",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F3F6FB",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8AA0BF",
+    "selectedColor": "#2F7DFF",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/forum/forum",
+        "text": "学习分享",
+        "iconPath": "images/tab/forum-normal.png",
+        "selectedIconPath": "images/tab/forum-active.png"
+      },
+      {
+        "pagePath": "pages/wall/wall",
+        "text": "互助广场",
+        "iconPath": "images/tab/wall-normal.png",
+        "selectedIconPath": "images/tab/wall-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "images/tab/mine-normal.png",
+        "selectedIconPath": "images/tab/mine-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "__usePrivacyCheck__": true,
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup",
+    "report-sheet": "/components/report-sheet/report-sheet"
+  }
+}

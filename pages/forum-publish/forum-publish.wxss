@@ -1,0 +1,15 @@
+.publish-page {
+  padding-bottom: 80rpx;
+  background: #fff;
+  min-height: 100vh;
+}
+
+.field textarea {
+  min-height: 220rpx;
+  line-height: 1.6;
+}
+
+.submit-btn {
+  margin-top: 48rpx;
+  width: 100%;
+}

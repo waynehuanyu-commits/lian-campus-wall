@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "每周精选",
+  "navigationBarBackgroundColor": "#FFFFFF",
+  "backgroundColor": "#F5F6F8",
+  "enablePullDownRefresh": true
+}

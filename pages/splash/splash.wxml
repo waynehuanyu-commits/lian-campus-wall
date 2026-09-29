@@ -1,0 +1,3 @@
+<view class="splash {{ready ? 'ready' : ''}} {{leaving ? 'leaving' : ''}}">
+  <image class="hero" src="/images/splash-campus.jpg" mode="aspectFit" />
+</view>

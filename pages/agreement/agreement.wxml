@@ -1,0 +1,22 @@
+<view class="legal-page">
+  <view class="legal-head">
+    <view class="legal-title">黎安话事用户协议及隐私政策</view>
+    <view class="legal-meta">更新日期：{{updatedAt}}</view>
+    <view class="legal-meta">生效日期：{{effectiveAt}}</view>
+  </view>
+
+  <view
+    wx:for="{{sections}}"
+    wx:key="id"
+    class="legal-block {{item.paragraphs.length ? '' : 'title-only'}}"
+  >
+    <view class="legal-h">{{item.title}}</view>
+    <view
+      wx:for="{{item.paragraphs}}"
+      wx:for-item="p"
+      wx:for-index="pi"
+      wx:key="pi"
+      class="legal-p"
+    >{{p}}</view>
+  </view>
+</view>

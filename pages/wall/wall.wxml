@@ -1,0 +1,162 @@
+<view class="page wall-page">
+  <view class="top-bar">
+    <view class="search-bar">
+      <text class="search-icon">⌕</text>
+      <input
+        placeholder="搜二手、拼车、拼单、求助"
+        placeholder-class="muted"
+        value="{{keyword}}"
+        confirm-type="search"
+        bindinput="onKeywordInput"
+        bindconfirm="onSearch"
+        bindblur="onSearch"
+      />
+    </view>
+    <scroll-view class="chips" scroll-x show-scrollbar="{{false}}">
+      <view
+        wx:for="{{tags}}"
+        wx:key="*this"
+        class="chip {{tag === item ? 'active' : ''}}"
+        data-name="{{item}}"
+        bindtap="onTagTap"
+      >{{item}}</view>
+    </scroll-view>
+    <view class="meta-row">
+      <scroll-view class="status-scroll" scroll-x show-scrollbar="{{false}}">
+        <view class="status-line">
+          <view
+            wx:for="{{dealStatusOptions}}"
+            wx:key="id"
+            class="status-item {{dealStatus === item.id ? 'active' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onDealStatusTap"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+      <view class="sort-row">
+        <view
+          wx:for="{{sortOptions}}"
+          wx:key="id"
+          class="sort-item {{sort === item.id ? 'active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onSortTap"
+        >{{item.name}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{weeklyHot && weeklyHot.preview.length}}" class="hot-board">
+    <view class="hot-board-head" bindtap="goWeeklyHot">
+      <text class="hot-mark">热</text>
+      <text class="hot-board-title">每周精选</text>
+      <text class="hot-board-more">全部</text>
+    </view>
+    <view
+      wx:for="{{weeklyHot.preview}}"
+      wx:key="previewKey"
+      class="hot-line"
+      data-id="{{item.contentId}}"
+      data-type="{{item.contentType}}"
+      catchtap="goHotItem"
+    >
+      <text class="hot-line-rank">{{item.rank}}</text>
+      <text class="hot-line-title">{{item.title || item.oneLiner}}</text>
+    </view>
+  </view>
+  <view wx:if="{{!canSpeak && speakCode === 'NEED_LOGIN'}}" class="guest-tip" bindtap="goLogin">
+    <text>{{guestTip}}</text>
+    <text class="action">去开通</text>
+  </view>
+  <view wx:elif="{{!canSpeak && speakCode === 'NEED_AUTH'}}" class="guest-tip" bindtap="goAuth">
+    <text>{{guestTip}}</text>
+    <text class="action">去认证</text>
+  </view>
+  <view wx:elif="{{!canSpeak}}" class="guest-tip">
+    <text>{{guestTip}}</text>
+  </view>
+
+  <view wx:if="{{loadError}}" class="empty">
+    <view class="empty-title">{{loadError}}</view>
+    <view>下拉页面可重新加载</view>
+  </view>
+
+  <view wx:elif="{{posts.length}}" class="feed">
+    <view
+      wx:for="{{posts}}"
+      wx:key="id"
+      class="feed-item wall-item"
+      data-id="{{item.id}}"
+      bindtap="goDetail"
+    >
+      <view class="row between top">
+        <view class="row gap-12">
+          <view class="tag">{{item.tag}}</view>
+          <view class="status-tag status-{{item.dealStatus || 'open'}}">{{item.dealStatusLabel || '进行中'}}</view>
+        </view>
+        <view class="meta">{{item.timeText}}</view>
+      </view>
+      <view class="wall-title"><text wx:if="{{item.pinned}}" class="pin-tag">置顶</text><text wx:if="{{item.official}}" class="pin-tag official">官方</text>{{item.headline}}</view>
+      <view wx:if="{{item.summary}}" class="wall-summary">{{item.summary}}</view>
+      <view wx:if="{{item.content}}" class="wall-content">{{item.content}}</view>
+      <view wx:if="{{item.images.length}}" class="image-grid cols-{{item.images.length > 2 ? 3 : item.images.length}}">
+        <image
+          wx:for="{{item.images}}"
+          wx:for-item="img"
+          wx:for-index="imgIndex"
+          wx:key="*this"
+          src="{{img}}"
+          mode="aspectFill"
+          lazy-load
+          data-postid="{{item.id}}"
+          data-index="{{imgIndex}}"
+          catchtap="previewImage"
+        />
+      </view>
+      <view class="row between wall-footer">
+        <view
+          class="row gap-12"
+          catchtap="onAuthorTap"
+          data-userid="{{item.authorId}}"
+          data-anonymous="{{item.anonymous}}"
+        >
+          <image class="avatar tiny" src="{{item.authorAvatar}}" mode="aspectFill" lazy-load />
+          <view>
+            <view class="author-name">{{item.authorName}}</view>
+            <view class="contact-hint">{{item.anonymous ? '匿名发布，无法查看主页' : '点头像看主页'}}</view>
+          </view>
+        </view>
+        <view class="stat-row" catchtap="preventBubble">
+          <view
+            class="engage-item {{item.liked ? 'liked' : ''}}"
+            catchtap="onLike"
+            data-id="{{item.id}}"
+          >
+            <view class="engage-ic engage-ic-heart"></view>
+            <text class="engage-num">{{item.likeCount}}</text>
+          </view>
+          <view class="engage-item" catchtap="goDetail" data-id="{{item.id}}">
+            <view class="engage-ic engage-ic-comment"></view>
+            <text class="engage-num">{{item.commentCount}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="empty">
+    <view class="empty-title">加载中…</view>
+  </view>
+
+  <view wx:else class="empty">
+    <view class="empty-title">这个板块还是空的</view>
+    <view>发第一条，帮同学也帮自己</view>
+  </view>
+
+  <view class="fab" bindtap="goPublish" hover-class="fab-hover">
+    <view class="fab-icon">
+      <text class="fab-plus">＋</text>
+      <text class="fab-heart">♥</text>
+    </view>
+    <text class="fab-text">发布</text>
+  </view>
+</view>

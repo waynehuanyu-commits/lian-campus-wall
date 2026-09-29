@@ -1,0 +1,32 @@
+{
+  "env": "wechat-cloudbase",
+  "note": "所有集合对小程序端关闭读写，只允许云函数与独立后台 SDK 访问。",
+  "collections": [
+    "users",
+    "forum_posts",
+    "wall_posts",
+    "comments",
+    "likes",
+    "school_requests",
+    "keywords",
+    "lexicon_terms",
+    "security_logs",
+    "rate_buckets",
+    "contact_views",
+    "contact_feedbacks",
+    "digest_queue",
+    "digests",
+    "weekly_hot",
+    "analytics_events",
+    "conversations",
+    "dm_messages",
+    "distribute_targets",
+    "distribute_logs",
+    "reports",
+    "meta"
+  ],
+  "securityRule": {
+    "read": false,
+    "write": false
+  }
+}

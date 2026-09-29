@@ -1,0 +1,12 @@
+node_modules/
+admin/node_modules/
+admin/.env
+server/.env
+cloudfunctions/**/.env
+cloudfunctions/**/wecom.env
+cloudfunctions/**/env.local.js
+admin/data/
+.DS_Store
+*.log
+.miniprogram/
+归档.zip

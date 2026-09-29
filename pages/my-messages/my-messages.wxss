@@ -1,0 +1,106 @@
+.msg-page {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 20rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.conv-item {
+  display: flex;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10rpx 28rpx rgba(30, 70, 140, 0.05);
+}
+
+.conv-item-hover {
+  background: #f7faff;
+}
+
+.conv-avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: #e8eef8;
+  flex-shrink: 0;
+}
+
+.conv-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.conv-top,
+.conv-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.conv-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.conv-time {
+  font-size: 22rpx;
+  color: #b5a6ab;
+  flex-shrink: 0;
+}
+
+.conv-bottom {
+  margin-top: 10rpx;
+}
+
+.conv-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  color: #8a7a80;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.conv-badge {
+  flex-shrink: 0;
+  min-width: 34rpx;
+  height: 34rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: #2f7dff;
+  color: #fff;
+  font-size: 20rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty {
+  margin-top: 120rpx;
+  text-align: center;
+  padding: 48rpx 24rpx;
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 720;
+  color: #5c4a52;
+  margin-bottom: 12rpx;
+}
+
+.muted {
+  font-size: 24rpx;
+  color: #b5a6ab;
+}

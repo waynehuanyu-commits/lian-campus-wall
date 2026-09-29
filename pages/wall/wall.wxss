@@ -1,0 +1,263 @@
+.wall-page {
+  background: linear-gradient(180deg, #e7f1ff 0%, #f3f6fb 420rpx);
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.status-scroll {
+  flex: 1;
+  width: 0;
+  height: 52rpx;
+  white-space: nowrap;
+}
+
+.status-line {
+  display: inline-flex;
+  align-items: center;
+  height: 52rpx;
+  gap: 24rpx;
+}
+
+.status-item {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #8a9199;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-item.active {
+  color: #2f7dff;
+  font-weight: 700;
+}
+
+.status-tag {
+  display: inline-flex;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 650;
+}
+
+.status-open {
+  color: #1f7a4c;
+  background: #e8f7ef;
+}
+
+.status-received {
+  color: #b45309;
+  background: #fff4e5;
+}
+
+.status-done {
+  color: #1d4ed8;
+  background: #e8eefc;
+}
+
+.status-closed {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.sort-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  height: 36rpx;
+  margin: 0;
+  padding: 0 0 0 16rpx;
+  border-left: 1rpx solid rgba(47, 125, 255, 0.2);
+  background: transparent;
+  box-shadow: none;
+}
+
+.sort-item {
+  min-width: 0;
+  height: 36rpx;
+  padding: 0;
+  font-size: 24rpx;
+  color: #8a9199;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sort-item.active {
+  color: #2f7dff;
+  font-weight: 700;
+  background: transparent;
+  box-shadow: none;
+}
+
+.hot-entry {
+  position: relative;
+  overflow: hidden;
+  margin: 18rpx 24rpx 0;
+  padding: 26rpx 28rpx 20rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(145deg, #f5f8ff 0%, #e3eeff 48%, #eef5ff 100%);
+  border: 1rpx solid rgba(47, 125, 255, 0.12);
+  box-shadow: 0 14rpx 34rpx rgba(47, 125, 255, 0.08);
+}
+
+.hot-entry::before {
+  content: "";
+  position: absolute;
+  right: -40rpx;
+  top: -50rpx;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: rgba(47, 125, 255, 0.1);
+  pointer-events: none;
+}
+
+.hot-entry-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.hot-entry-label {
+  font-size: 20rpx;
+  color: #2f7dff;
+  font-weight: 750;
+  letter-spacing: 2rpx;
+}
+
+.hot-entry-title {
+  margin-top: 8rpx;
+  font-size: 30rpx;
+  font-weight: 760;
+  color: #2a2426;
+}
+
+.hot-entry-right {
+  flex-shrink: 0;
+  color: #2f7dff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.hot-preview {
+  position: relative;
+  z-index: 1;
+  margin-top: 18rpx;
+  padding-top: 8rpx;
+}
+
+.hot-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx 0;
+  color: #4a3f44;
+  font-size: 24rpx;
+  line-height: 1.4;
+  border-bottom: 1rpx solid rgba(47, 125, 255, 0.06);
+}
+
+.hot-preview-item:last-child {
+  border-bottom: none;
+}
+
+.hot-preview-rank {
+  width: 32rpx;
+  flex-shrink: 0;
+  color: #2f7dff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.hot-preview-type {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: rgba(47, 125, 255, 0.12);
+  font-size: 20rpx;
+  color: #2f7dff;
+  font-weight: 650;
+}
+
+.hot-preview-type.wall {
+  background: rgba(90, 70, 80, 0.08);
+  color: #7a6870;
+}
+
+.hot-preview-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #5c4a52;
+}
+
+.wall-item .top {
+  margin-bottom: 16rpx;
+}
+
+.wall-title {
+  font-size: 34rpx;
+  font-weight: 720;
+  color: #1f2329;
+  line-height: 1.4;
+  margin-bottom: 10rpx;
+  letter-spacing: -0.3rpx;
+}
+
+.wall-summary {
+  font-size: 26rpx;
+  color: #2f7dff;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.wall-content {
+  color: #6f5f66;
+  font-size: 28rpx;
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+
+.wall-footer {
+  margin-top: 18rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid #e8eef6;
+}
+
+.author-name {
+  font-size: 24rpx;
+  font-weight: 650;
+  color: #1f2329;
+}
+
+.avatar.tiny {
+  width: 52rpx;
+  height: 52rpx;
+}
+
+.contact-avatar {
+  box-shadow: 0 0 0 3rpx rgba(47, 125, 255, 0.28);
+}
+
+.contact-hint {
+  margin-top: 2rpx;
+  font-size: 20rpx;
+  color: #2f7dff;
+}

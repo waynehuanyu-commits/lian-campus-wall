@@ -1,0 +1,60 @@
+<view class="page padded publish-page">
+  <view wx:if="{{blocked}}" class="empty">
+    <view class="empty-title">{{blockTitle}}</view>
+    <view>{{blockDesc}}</view>
+    <button wx:if="{{blockAction === 'login'}}" class="btn-primary submit-btn" bindtap="goLogin">去开通发言</button>
+    <button wx:elif="{{blockAction === 'auth'}}" class="btn-primary submit-btn" bindtap="goAuth">去认证学校</button>
+  </view>
+
+  <block wx:else>
+  <view class="form-label">分类</view>
+  <scroll-view class="chips" scroll-x>
+    <view
+      wx:for="{{categories}}"
+      wx:key="*this"
+      class="chip {{category === item ? 'active' : ''}}"
+      data-name="{{item}}"
+      bindtap="onCategoryTap"
+    >{{item}}</view>
+  </scroll-view>
+
+  <view class="form-label">标题</view>
+  <view class="field">
+    <input maxlength="40" placeholder="一句话讲清楚主题" value="{{title}}" bindinput="onTitleInput" />
+  </view>
+
+  <view class="form-label">正文（选填）</view>
+  <view class="field">
+    <textarea
+      maxlength="1000"
+      placeholder="分享新鲜事、提问、组队都可以"
+      value="{{content}}"
+      auto-height
+      bindinput="onContentInput"
+    />
+  </view>
+
+  <view class="form-label">图片（最多 9 张，选图会自动压缩）</view>
+  <view class="upload-grid">
+    <view wx:for="{{images}}" wx:key="*this" class="upload-item">
+      <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewImage" />
+      <view class="upload-remove" data-index="{{index}}" catchtap="removeImage">×</view>
+    </view>
+    <view wx:if="{{images.length < 9}}" class="upload-add" bindtap="chooseImages">
+      <text style="font-size: 48rpx; line-height: 1;">＋</text>
+      <text>添加图片</text>
+    </view>
+  </view>
+
+  <view class="switch-row" style="margin-top: 28rpx;">
+    <view>
+      <view class="section-title">匿名发布</view>
+      <view class="meta">其他人将看不到你的昵称</view>
+    </view>
+    <switch checked="{{anonymous}}" color="#2F7DFF" bindchange="onAnonymousChange" />
+  </view>
+
+  <button class="btn-primary submit-btn" bindtap="onSubmit">发布到学习分享</button>
+  </block>
+  <privacy-popup />
+</view>

@@ -1,0 +1,13 @@
+<view wx:if="{{show}}" class="mask" catchtouchmove="noop">
+  <view class="panel">
+    <view class="title">选择举报原因</view>
+    <view
+      wx:for="{{reasons}}"
+      wx:key="id"
+      class="reason"
+      data-id="{{item.id}}"
+      bindtap="onPick"
+    >{{item.label}}</view>
+    <view class="cancel" bindtap="close">取消</view>
+  </view>
+</view>

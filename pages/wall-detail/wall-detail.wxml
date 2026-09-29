@@ -1,0 +1,207 @@
+<view wx:if="{{loading}}" class="page-loading">
+  <view class="page-loading-dot"></view>
+  <view>加载中…</view>
+</view>
+
+<view wx:elif="{{post}}" class="page detail-page">
+  <view class="detail-card">
+    <view class="tag-row">
+      <view class="tag">{{post.tag}}</view>
+      <view class="status-tag status-{{post.dealStatus || 'open'}}">{{post.dealStatusLabel || '进行中'}}</view>
+    </view>
+    <view wx:if="{{post.isOwner && post.reviewStatus === 'approved'}}" class="status-panel">
+      <view class="status-panel-title">更新状态</view>
+      <view class="status-actions">
+        <view
+          wx:for="{{dealStatusOptions}}"
+          wx:key="id"
+          class="status-action {{post.dealStatus === item.id ? 'active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onDealStatusChange"
+        >{{item.label}}</view>
+      </view>
+    </view>
+    <view wx:if="{{post.isOwner && post.reviewStatus && post.reviewStatus !== 'approved'}}" class="meta" style="margin-top: 12rpx;">{{post.reviewStatusLabel || ''}} · {{post.reviewNote || '审核处理中'}}</view>
+    <view class="to-whom"><text wx:if="{{post.pinned}}" class="pin-tag">置顶</text><text wx:if="{{post.official}}" class="pin-tag official">官方</text>{{post.headline}}</view>
+    <view wx:if="{{post.summary}}" class="detail-summary">{{post.summary}}</view>
+    <view wx:if="{{post.tag === '出行拼车' && (post.routeFrom || post.routeTo)}}" class="meta ride-line">
+      <text wx:if="{{post.routeFrom}}">{{post.routeFrom}}</text><text wx:if="{{post.routeFrom && post.routeTo}}"> → </text><text wx:if="{{post.routeTo}}">{{post.routeTo}}</text>
+    </view>
+    <view wx:if="{{post.content}}" class="letter-body">{{post.content}}</view>
+    <view wx:if="{{post.images.length}}" class="image-grid cols-{{post.images.length > 2 ? 3 : post.images.length}}">
+      <image
+        wx:for="{{post.images}}"
+        wx:key="*this"
+        wx:for-index="imgIndex"
+        src="{{item}}"
+        mode="aspectFill"
+        data-index="{{imgIndex}}"
+        data-scope="post"
+        bindtap="previewImage"
+      />
+    </view>
+    <view class="letter-meta">
+      <view class="row gap-12 author-entry" bindtap="onAuthorTap">
+        <image class="avatar sm" src="{{post.authorAvatar}}" mode="aspectFill" />
+        <view class="author-meta">
+          <view class="author-name">{{post.authorName}}</view>
+          <view class="meta">{{post.timeText}} · 浏览 {{post.viewCount}}<text wx:if="{{post.authorSchool}}"> · {{post.authorSchool}}</text></view>
+          <view class="contact-hint">{{post.anonymous ? '匿名发布，无法查看主页' : '点头像看主页'}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="engage-bar">
+      <view class="engage-item {{post.liked ? 'liked' : ''}}" bindtap="onLike">
+        <view class="engage-ic engage-ic-heart"></view>
+        <text class="engage-num">{{post.likeCount}}</text>
+      </view>
+      <view class="engage-item">
+        <view class="engage-ic engage-ic-comment"></view>
+        <text class="engage-num">{{post.commentCount}}</text>
+      </view>
+      <view wx:if="{{post.hasContact && !post.isOwner}}" class="engage-item engage-cta" bindtap="onContactTap">
+        <view class="engage-ic engage-ic-wechat"></view>
+        <text>{{contactRevealed ? '再看' : '微信'}}</text>
+      </view>
+      <view wx:if="{{post.hasContact && contactRevealed && !post.isOwner}}" class="engage-item engage-cta soft" bindtap="openFeedbackSheet">
+        <view class="engage-ic engage-ic-flag"></view>
+        <text>{{feedbackDone ? '已反馈' : '反馈'}}</text>
+      </view>
+      <view class="engage-item">
+        <view class="engage-ic engage-ic-share"></view>
+        <button class="share-hit" open-type="share"></button>
+      </view>
+    </view>
+    <view class="manage-row">
+      <view wx:if="{{post.canManage}}" class="manage-link accent" bindtap="onPin">{{post.pinned ? '取消置顶' : '置顶'}}</view>
+      <view wx:if="{{!post.isOwner}}" class="manage-link" catchtap="onReport">举报</view>
+      <view wx:if="{{post.isOwner || post.canManage}}" class="manage-link danger" bindtap="onDelete">删除</view>
+    </view>
+  </view>
+
+  <view class="comment-head">留言 · {{comments.length}}</view>
+  <view wx:if="{{comments.length}}" class="comment-list">
+    <view wx:for="{{comments}}" wx:key="id" class="comment-card {{item.depthClass}}">
+      <view class="row gap-16">
+        <image
+          class="avatar sm"
+          src="{{item.authorAvatar}}"
+          mode="aspectFill"
+          data-userid="{{item.authorId}}"
+          catchtap="onCommentAuthorTap"
+        />
+        <view class="comment-main">
+          <view class="row between">
+            <text class="comment-name" data-userid="{{item.authorId}}" catchtap="onCommentAuthorTap">{{item.authorName}}</text>
+            <text class="meta">{{item.timeText}}</text>
+          </view>
+          <view wx:if="{{item.replyToName}}" class="comment-reply-to">回复 @{{item.replyToName}}</view>
+          <view wx:if="{{item.content}}" class="comment-text">{{item.content}}</view>
+          <view wx:if="{{item.images.length}}" class="comment-images cols-{{item.images.length > 2 ? 3 : item.images.length}}">
+            <image
+              wx:for="{{item.images}}"
+              wx:for-item="img"
+              wx:for-index="imgIndex"
+              wx:key="*this"
+              src="{{img}}"
+              mode="aspectFill"
+              data-scope="comment"
+              data-cid="{{item.id}}"
+              data-index="{{imgIndex}}"
+              bindtap="previewImage"
+            />
+          </view>
+          <view class="comment-actions">
+            <text class="comment-reply-btn" data-id="{{item.id}}" data-name="{{item.authorName}}" bindtap="onReply">回复</text>
+            <text wx:if="{{item.canDelete}}" class="comment-reply-btn danger" data-id="{{item.id}}" catchtap="onDeleteComment">删除</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty mini">还没有留言，第一个回复吧</view>
+</view>
+
+<view wx:elif="{{loadError}}" class="empty">
+  <view class="empty-title">加载失败</view>
+  <view>{{loadError}}</view>
+</view>
+
+<view wx:else class="empty">这条信息已不存在或已被删除</view>
+
+<view wx:if="{{post && post.reviewStatus === 'approved' && canSpeak}}" class="composer">
+  <view wx:if="{{replyTo}}" class="composer-reply">
+    <text>回复 @{{replyTo.name}}</text>
+    <text class="composer-reply-clear" bindtap="clearReply">取消</text>
+  </view>
+  <view wx:if="{{draftImages.length}}" class="composer-images">
+    <view wx:for="{{draftImages}}" wx:key="*this" class="composer-thumb">
+      <image src="{{item}}" mode="aspectFill" data-scope="draft" data-index="{{index}}" bindtap="previewImage" />
+      <view class="composer-thumb-x" data-index="{{index}}" catchtap="removeDraftImage">×</view>
+    </view>
+  </view>
+  <view class="composer-row">
+    <view class="composer-photo" bindtap="chooseCommentImages">图</view>
+    <input
+      placeholder="{{draftPlaceholder}}"
+      placeholder-class="muted"
+      value="{{draft}}"
+      bindinput="onDraftInput"
+      confirm-type="send"
+      bindconfirm="onSend"
+    />
+    <view class="send" bindtap="onSend">{{submitting ? '…' : '发送'}}</view>
+  </view>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_LOGIN'}}" class="composer guest-bar" bindtap="goLogin">
+  <text>开通后即可留言</text>
+  <text class="accent">去开通</text>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_AUTH'}}" class="composer guest-bar" bindtap="goAuth">
+  <text>认证学校后即可留言</text>
+  <text class="accent">去认证</text>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved'}}" class="composer guest-bar">
+  <text>{{speakMessage || '当前账号暂不能留言'}}</text>
+</view>
+
+<view wx:if="{{contactSheetVisible}}" class="sheet-mask" bindtap="closeContactSheet" catchtouchmove="noop">
+  <view class="sheet" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-title">联系方式</view>
+    <view class="sheet-label">{{contactSheet.label}}</view>
+    <view class="sheet-value">{{contactSheet.value}}</view>
+    <view class="sheet-tip">仅用于本条对接，请勿转发。线下面交选公共场所，谨防诈骗。对接后可反馈对方是否靠谱。</view>
+    <view class="sheet-btn" bindtap="onCopyContact">复制{{contactSheet.label}}</view>
+    <view class="sheet-btn sheet-btn-secondary" bindtap="openFeedbackSheet">联系反馈</view>
+    <view class="sheet-cancel" bindtap="closeContactSheet">取消</view>
+  </view>
+</view>
+
+<view wx:if="{{feedbackSheetVisible}}" class="sheet-mask" bindtap="closeFeedbackSheet" catchtouchmove="noop">
+  <view class="sheet" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-title">联系反馈</view>
+    <view class="sheet-tip">对接体验如何？帮助同学避坑，也可表扬靠谱的人。</view>
+    <view class="feedback-reasons">
+      <view
+        wx:for="{{feedbackReasons}}"
+        wx:key="id"
+        class="feedback-chip {{feedbackReason === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onFeedbackReason"
+      >{{item.label}}</view>
+    </view>
+    <textarea
+      class="feedback-note"
+      placeholder="补充说明（选填；选「其他」时必填）"
+      maxlength="200"
+      value="{{feedbackNote}}"
+      bindinput="onFeedbackNote"
+    />
+    <view class="sheet-btn {{feedbackSubmitting ? 'disabled' : ''}}" bindtap="onSubmitFeedback">{{feedbackSubmitting ? '提交中…' : '提交反馈'}}</view>
+    <view class="sheet-cancel" bindtap="closeFeedbackSheet">取消</view>
+  </view>
+</view>
+<privacy-popup />
+<report-sheet id="report-sheet" />

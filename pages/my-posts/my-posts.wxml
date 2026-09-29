@@ -1,0 +1,53 @@
+<view class="page sub-page">
+  <view class="segment">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="id"
+      class="seg {{tab === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onTabTap"
+    >{{item.name}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="page-loading">
+    <view class="page-loading-dot"></view>
+    <view>加载中…</view>
+  </view>
+
+  <view wx:elif="{{loadError}}" class="empty">
+    <view class="empty-title">加载失败</view>
+    <view>{{loadError}}</view>
+  </view>
+
+  <view wx:elif="{{list.length}}" class="list">
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="feed-item mini"
+      data-id="{{item.id}}"
+      data-type="{{item.type}}"
+      bindtap="goDetail"
+    >
+      <view class="row between">
+        <view class="tag">{{item.badge}}</view>
+        <view class="meta">{{item.timeText}}</view>
+      </view>
+      <view class="mini-title">{{item.title}}</view>
+      <view class="mini-content">{{item.content}}</view>
+      <view class="stat-row">
+        <view class="engage-item">
+          <view class="engage-ic engage-ic-heart"></view>
+          <text class="engage-num">{{item.likeCount}}</text>
+        </view>
+        <view class="engage-item">
+          <view class="engage-ic engage-ic-comment"></view>
+          <text class="engage-num">{{item.commentCount}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty">
+    <view class="empty-title">还没有{{tab === 'wall' ? '互助广场' : '学习分享'}}帖子</view>
+    <view>去发一条吧</view>
+  </view>
+</view>

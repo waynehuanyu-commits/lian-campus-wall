@@ -1,0 +1,62 @@
+<view class="hot-page">
+  <view class="hot-hero">
+    <view class="hot-kicker">HOT RANK</view>
+    <view class="hot-title">{{board.title || '每周精选'}}</view>
+    <view class="hot-sub">{{board.subtitle || '学习分享 + 互助广场热榜'}}</view>
+    <view wx:if="{{board.updatedText}}" class="hot-meta">更新于 {{board.updatedText}}</view>
+  </view>
+
+  <view class="hot-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="id"
+      class="hot-tab {{tab === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onTabTap"
+    >{{item.name}}<text wx:if="{{item.count != null}}" class="tab-count"> {{item.count}}</text></view>
+  </view>
+
+  <view wx:if="{{loading}}" class="page-loading">
+    <view class="page-loading-dot"></view>
+    <view>加载中…</view>
+  </view>
+
+  <view wx:elif="{{loadError}}" class="empty">
+    <view class="empty-title">加载失败</view>
+    <view>{{loadError}}</view>
+  </view>
+
+  <view wx:elif="{{items.length}}" class="hot-list">
+    <view
+      wx:for="{{items}}"
+      wx:key="key"
+      class="hot-item"
+      data-id="{{item.contentId}}"
+      data-type="{{item.contentType}}"
+      bindtap="goDetail"
+    >
+      <view class="rank {{item.rankClass}}">{{item.rank}}</view>
+      <view class="hot-body">
+        <view class="hot-type">{{item.contentType === 'forum' ? '学习分享' : '互助广场'}} · {{item.tag || item.channel}}</view>
+        <view class="hot-item-title">{{item.title}}</view>
+        <view wx:if="{{item.summary}}" class="hot-item-summary">{{item.summary}}</view>
+        <view class="hot-item-meta">
+          <view class="engage-item">
+            <view class="engage-ic engage-ic-heart"></view>
+            <text class="engage-num">{{item.likeCount || 0}}</text>
+          </view>
+          <view class="engage-item">
+            <view class="engage-ic engage-ic-comment"></view>
+            <text class="engage-num">{{item.commentCount || 0}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="hot-go">›</view>
+    </view>
+  </view>
+
+  <view wx:else class="empty">
+    <view class="empty-title">本周暂无精选</view>
+    <view>换个分类看看，或等管理员上架后出现在这里</view>
+  </view>
+</view>

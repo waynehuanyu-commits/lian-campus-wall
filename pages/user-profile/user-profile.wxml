@@ -1,0 +1,94 @@
+<view wx:if="{{loading}}" class="page-loading">
+  <view class="page-loading-dot"></view>
+  <view>加载中…</view>
+</view>
+
+<view wx:elif="{{profile}}" class="profile-page">
+  <view class="hero">
+    <view class="hero-wash"></view>
+    <view class="hero-orb hero-orb-a"></view>
+    <view class="hero-orb hero-orb-b"></view>
+
+    <view class="profile">
+      <image class="avatar-lg" src="{{profile.avatar}}" mode="aspectFill" />
+      <view class="profile-main">
+        <view class="nickname">{{profile.nickname}}</view>
+        <view class="bio">{{profile.bio}}</view>
+        <view class="pill-row">
+          <view wx:if="{{profile.schoolText}}" class="school-pill">{{profile.schoolText}}</view>
+          <view wx:if="{{profile.studentAuthApproved}}" class="soft-pill ok">学生已认证</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="stats-row">
+      <view class="stat">
+        <view class="stat-num">{{stats.postCount}}</view>
+        <view class="stat-label">发布</view>
+      </view>
+      <view class="stat-line"></view>
+      <view class="stat">
+        <view class="stat-num">{{stats.receivedLikes}}</view>
+        <view class="stat-label">获赞</view>
+      </view>
+      <view class="stat-line"></view>
+      <view class="stat">
+        <view class="stat-num">{{stats.receivedComments}}</view>
+        <view class="stat-label">评论</view>
+      </view>
+    </view>
+
+    <view class="profile-actions">
+      <view class="dm-btn" bindtap="onMessageTap">{{messaging ? '连接中…' : '发私信'}}</view>
+      <view class="report-btn" catchtap="onReport">举报该用户</view>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="id"
+      class="tab {{tab === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onTabTap"
+    >{{item.name}}</view>
+  </view>
+
+  <view wx:if="{{list.length}}" class="list">
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="post-card"
+      data-id="{{item.id}}"
+      data-type="{{item.type}}"
+      bindtap="goDetail"
+      hover-class="post-card-hover"
+    >
+      <view class="post-top">
+        <view class="post-tag">{{item.badge}}</view>
+        <view class="post-time">{{item.timeText}}</view>
+      </view>
+      <view class="post-title">{{item.title}}</view>
+      <view class="post-content">{{item.content}}</view>
+      <view class="post-foot">
+        <view class="engage-item">
+          <view class="engage-ic engage-ic-heart"></view>
+          <text class="engage-num">{{item.likeCount || 0}}</text>
+        </view>
+        <view class="engage-item">
+          <view class="engage-ic engage-ic-comment"></view>
+          <text class="engage-num">{{item.commentCount || 0}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty-wrap">
+    <view class="empty-title">还没有公开内容</view>
+    <view class="empty-desc">匿名发布不会出现在主页</view>
+  </view>
+</view>
+
+<view wx:else class="empty-wrap alone">
+  <view class="empty-title">{{error || '用户不存在'}}</view>
+</view>
+<report-sheet id="report-sheet" />

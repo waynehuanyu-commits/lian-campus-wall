@@ -1,0 +1,3 @@
+<view wx:if="{{visible}}" class="splash {{leaving ? 'leaving' : ''}}">
+  <image class="hero" src="/images/splash-campus.jpg" mode="aspectFit" bindload="onLoad" binderror="onError" />
+</view>

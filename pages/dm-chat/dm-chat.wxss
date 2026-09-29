@@ -1,0 +1,140 @@
+.chat-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f3f6fb;
+  box-sizing: border-box;
+}
+
+.chat-scroll {
+  flex: 1;
+  height: 0;
+  padding: 24rpx 20rpx 12rpx;
+  box-sizing: border-box;
+}
+
+.chat-empty {
+  margin-top: 120rpx;
+  text-align: center;
+  color: #b0b0b0;
+  font-size: 26rpx;
+}
+
+.bubble-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-bottom: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bubble-row.peer {
+  justify-content: flex-start;
+}
+
+.bubble-row.mine {
+  justify-content: flex-end;
+}
+
+.bubble-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 10rpx;
+  background: #ddd;
+  flex-shrink: 0;
+}
+
+.bubble-col {
+  max-width: 68%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bubble-row.mine .bubble-col {
+  align-items: flex-end;
+}
+
+.bubble-row.peer .bubble-col {
+  align-items: flex-start;
+}
+
+.bubble {
+  padding: 18rpx 24rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.bubble-row.mine .bubble {
+  background: #d6eaff;
+  border-top-right-radius: 4rpx;
+}
+
+.bubble-row.peer .bubble {
+  border-top-left-radius: 4rpx;
+}
+
+.bubble-text {
+  font-size: 30rpx;
+  line-height: 1.45;
+  color: #111;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.bubble-time {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: #b0b0b0;
+  line-height: 1;
+}
+
+.chat-bottom {
+  height: 24rpx;
+}
+
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+  padding: 12rpx 20rpx calc(12rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1rpx solid #e4ecf6;
+}
+
+.chat-input {
+  flex: 1;
+  min-height: 72rpx;
+  max-height: 280rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  font-size: 28rpx;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.ph {
+  color: #b0b0b0;
+}
+
+.chat-send {
+  flex-shrink: 0;
+  min-width: 112rpx;
+  height: 72rpx;
+  padding: 0 22rpx;
+  border-radius: 8rpx;
+  background: #2f7dff;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-send.disabled {
+  background: #c6c6c6;
+}
