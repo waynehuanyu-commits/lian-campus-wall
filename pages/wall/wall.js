@@ -5,7 +5,17 @@ const track = require('../../utils/track')
 const share = require('../../utils/share')
 const userNav = require('../../utils/user')
 const media = require('../../utils/media')
-const { formatTime } = require('../../utils/util')
+const { formatTime, dedupePostsById } = require('../../utils/util')
+
+function feedBodyOverflows(text) {
+  const raw = String(text || '').replace(/\r\n/g, '\n').trim()
+  if (!raw) return false
+  let lines = 0
+  raw.split('\n').forEach((line) => {
+    lines += Math.max(1, Math.ceil(Array.from(line).length / 24))
+  })
+  return lines > 3
+}
 
 Page({
   data: {
@@ -22,6 +32,7 @@ Page({
     ],
     sort: 'new',
     keyword: '',
+    officialOnly: false,
     posts: [],
     weeklyHot: null,
     canSpeak: false,
@@ -98,29 +109,51 @@ Page({
 
   feedQuery() {
     return {
-      tag: this.data.tag,
+      tag: this.data.officialOnly ? '全部' : this.data.tag,
       keyword: this.data.keyword,
       sort: this.data.sort,
-      dealStatus: this.data.dealStatus
+      dealStatus: this.data.dealStatus,
+      official: !!this.data.officialOnly
     }
   },
 
   renderPosts(feed) {
-    const posts = (feed && feed.posts) || []
+    const open = this._bodyOpen || {}
+    const posts = dedupePostsById((feed && feed.posts) || [])
     this.setData({
-      posts: posts.map((item) => ({
-        ...item,
-        images: item.images || [],
-        timeText: formatTime(item.createdAt)
-      })),
+      posts: posts.map((item) => {
+        const content = String(item.content || '').trim()
+        const summary = String(item.summary || '').trim()
+        const bodyText = content || summary
+        return {
+          ...item,
+          images: item.images || [],
+          timeText: formatTime(item.createdAt),
+          bodyText,
+          bodyLong: feedBodyOverflows(bodyText),
+          bodyOpen: !!open[item.id],
+          showSummary: !!(summary && content && summary !== content),
+          viewCount: item.viewCount || 0
+        }
+      }),
       loading: false,
       loadError: ''
     })
   },
 
+  toggleBody(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    if (!id) return
+    if (!this._bodyOpen) this._bodyOpen = {}
+    this._bodyOpen[id] = !this._bodyOpen[id]
+    const index = (this.data.posts || []).findIndex((item) => String(item.id) === id)
+    if (index < 0) return
+    this.setData({ [`posts[${index}].bodyOpen`]: !!this._bodyOpen[id] })
+  },
+
   async loadPosts(force = false) {
     const payload = this.feedQuery()
-    const home = payload.tag === '全部' && !payload.keyword && payload.sort === 'new' && payload.dealStatus === '全部'
+    const home = !payload.official && payload.tag === '全部' && !payload.keyword && payload.sort === 'new' && payload.dealStatus === '全部'
     const peeked = !force ? repo.peekList('wall', payload) : null
     if (peeked && peeked.data) this.renderPosts(peeked.data)
     else if (!this.data.posts.length) this.setData({ loading: true, loadError: '' })
@@ -200,10 +233,17 @@ Page({
 
   onTagTap(e) {
     const tag = e.currentTarget.dataset.name
-    if (tag === this.data.tag) return
+    if (!this.data.officialOnly && tag === this.data.tag) return
     track.tagFilter({ surface: 'wall', filterType: 'board', tag })
     this._lastRefreshAt = 0
-    this.setData({ tag }, () => this.loadPosts())
+    this.setData({ tag, officialOnly: false }, () => this.loadPosts())
+  },
+
+  onOfficialTap() {
+    if (this.data.officialOnly) return
+    track.tagFilter({ surface: 'wall', filterType: 'official', tag: '官方' })
+    this._lastRefreshAt = 0
+    this.setData({ officialOnly: true }, () => this.loadPosts())
   },
 
   onDealStatusTap(e) {

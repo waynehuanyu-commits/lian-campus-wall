@@ -5,7 +5,17 @@ const track = require('../../utils/track')
 const share = require('../../utils/share')
 const userNav = require('../../utils/user')
 const media = require('../../utils/media')
-const { formatTime } = require('../../utils/util')
+const { formatTime, dedupePostsById } = require('../../utils/util')
+
+function feedBodyOverflows(text) {
+  const raw = String(text || '').replace(/\r\n/g, '\n').trim()
+  if (!raw) return false
+  let lines = 0
+  raw.split('\n').forEach((line) => {
+    lines += Math.max(1, Math.ceil(Array.from(line).length / 24))
+  })
+  return lines > 3
+}
 
 Page({
   data: {
@@ -17,6 +27,7 @@ Page({
     ],
     sort: 'new',
     keyword: '',
+    officialOnly: false,
     posts: [],
     weeklyHot: null,
     canSpeak: false,
@@ -94,18 +105,37 @@ Page({
 
   feedQuery() {
     return {
-      category: this.data.category,
+      category: this.data.officialOnly ? '全部' : this.data.category,
       keyword: this.data.keyword,
-      sort: this.data.sort
+      sort: this.data.sort,
+      official: !!this.data.officialOnly
     }
   },
 
   mapPosts(list) {
-    return (Array.isArray(list) ? list : []).map((item) => ({
-      ...item,
-      images: item.images || [],
-      timeText: formatTime(item.createdAt)
-    }))
+    const open = this._bodyOpen || {}
+    return dedupePostsById(Array.isArray(list) ? list : []).map((item) => {
+      const bodyText = String(item.content || '').trim()
+      return {
+        ...item,
+        images: item.images || [],
+        timeText: formatTime(item.createdAt),
+        bodyText,
+        bodyLong: feedBodyOverflows(bodyText),
+        bodyOpen: !!open[item.id],
+        viewCount: item.viewCount || 0
+      }
+    })
+  },
+
+  toggleBody(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    if (!id) return
+    if (!this._bodyOpen) this._bodyOpen = {}
+    this._bodyOpen[id] = !this._bodyOpen[id]
+    const index = (this.data.posts || []).findIndex((item) => String(item.id) === id)
+    if (index < 0) return
+    this.setData({ [`posts[${index}].bodyOpen`]: !!this._bodyOpen[id] })
   },
 
   renderPosts(list) {
@@ -118,7 +148,7 @@ Page({
 
   async loadPosts(force = false) {
     const payload = this.feedQuery()
-    const home = payload.category === '全部' && !payload.keyword && payload.sort === 'new'
+    const home = !payload.official && payload.category === '全部' && !payload.keyword && payload.sort === 'new'
     const peeked = !force ? repo.peekList('forum', payload) : null
     if (peeked && peeked.data) this.renderPosts(peeked.data)
     else if (!this.data.posts.length) this.setData({ loading: true, loadError: '' })
@@ -200,8 +230,15 @@ Page({
 
   onCategoryTap(e) {
     const category = e.currentTarget.dataset.name
+    if (!this.data.officialOnly && category === this.data.category) return
     track.tagFilter({ surface: 'forum', filterType: 'category', category })
-    this.setData({ category }, () => this.loadPosts())
+    this.setData({ category, officialOnly: false }, () => this.loadPosts())
+  },
+
+  onOfficialTap() {
+    if (this.data.officialOnly) return
+    track.tagFilter({ surface: 'forum', filterType: 'official', category: '官方' })
+    this.setData({ officialOnly: true }, () => this.loadPosts())
   },
 
   onSortTap(e) {

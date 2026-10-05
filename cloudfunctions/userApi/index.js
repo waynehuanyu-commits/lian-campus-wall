@@ -420,6 +420,19 @@ function invalidateFeedCache(collection) {
   })
 }
 
+async function queryOfficialFeed(collection, limit = FEED_LIMIT) {
+  try {
+    const res = await db.collection(collection).where({ authorOfficial: true }).limit(100).get()
+    return (res.data || [])
+      .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, limit)
+  } catch (err) {
+    console.error('[queryOfficialFeed]', collection, err && err.message)
+    return []
+  }
+}
+
 async function queryApprovedFeed(collection, limit = FEED_LIMIT) {
   const slot = feedCache[collection]
   const now = Date.now()
@@ -1287,6 +1300,28 @@ function isRealUser(user) {
   return !!(user && user.id && user.id !== 'guest_readonly')
 }
 
+function postDocId(item) {
+  if (!item) return ''
+  return String(item.id || item._id || '').trim()
+}
+
+function mergeFeedPosts(primary, pinned, mine) {
+  const list = []
+  const seen = new Set()
+  const append = (item, { skipRejected = false } = {}) => {
+    if (!item) return
+    if (skipRejected && (item.reviewStatus === 'rejected' || item.reviewStatus === 'emergency_block')) return
+    const key = postDocId(item)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    list.push(item.id ? item : { ...item, id: key })
+  }
+  ;(primary || []).forEach((item) => append(item))
+  ;(pinned || []).forEach((item) => append(item))
+  ;(mine || []).forEach((item) => append(item, { skipRejected: true }))
+  return list
+}
+
 function compactFeedItem(item) {
   const content = String(item.content || '')
   return {
@@ -1301,10 +1336,11 @@ function compactFeedItem(item) {
 
 async function listPosts(collection, type, user, filter = {}) {
   const real = isRealUser(user)
+  const officialOnly = !!filter.official
   const limit = Math.min(FEED_LIMIT, Math.max(8, Number(filter.limit) || FEED_LIMIT))
   // 我的帖：不要 orderBy，避免缺复合索引时退化成全表 allDocs（极慢）
   const [rows, mine, pinned] = await Promise.all([
-    queryApprovedFeed(collection, limit),
+    officialOnly ? queryOfficialFeed(collection, limit) : queryApprovedFeed(collection, limit),
     real
       ? db.collection(collection).where({ authorId: user.id }).limit(8).get()
         .then((res) => (res.data || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)))
@@ -1312,19 +1348,7 @@ async function listPosts(collection, type, user, filter = {}) {
       : Promise.resolve([]),
     pinnedPosts(collection)
   ])
-  let list = rows.slice()
-  const seen = new Set(list.map((item) => item.id))
-  ;(pinned || []).forEach((item) => {
-    if (!item || seen.has(item.id)) return
-    seen.add(item.id)
-    list.push(item)
-  })
-  ;(mine || []).forEach((item) => {
-    if (!item || seen.has(item.id)) return
-    if (item.reviewStatus === 'rejected' || item.reviewStatus === 'emergency_block') return
-    seen.add(item.id)
-    list.push(item)
-  })
+  let list = mergeFeedPosts(rows, pinned, mine)
   if (type === 'forum' && filter.category && filter.category !== '全部') {
     list = list.filter((item) => item.category === filter.category)
   }
@@ -1333,6 +1357,9 @@ async function listPosts(collection, type, user, filter = {}) {
   }
   if (type === 'wall' && filter.dealStatus && filter.dealStatus !== '全部') {
     list = list.filter((item) => normalizeWallDealStatus(item.dealStatus) === filter.dealStatus)
+  }
+  if (officialOnly) {
+    list = list.filter((item) => item.authorOfficial)
   }
   if (filter.keyword) {
     const q = filter.keyword.trim().toLowerCase()
@@ -2229,10 +2256,17 @@ const handlers = {
     const syncAvatar = Object.prototype.hasOwnProperty.call(safe, 'avatar')
     const syncNickname = Object.prototype.hasOwnProperty.call(safe, 'nickname')
     if (syncAvatar) {
+      const rawAvatar = String(safe.avatar || '').trim()
+      if (rawAvatar.startsWith('wxfile://') || rawAvatar.startsWith('http://tmp') || rawAvatar.startsWith('https://tmp')) {
+        return { ok: false, message: '头像需要先上传到云存储', user: publicUser(user) }
+      }
       try {
         safe.avatar = await persistCloudFile(safe.avatar, 'avatars')
       } catch (err) {
         return { ok: false, message: err.message || '头像上传失败', user: publicUser(user) }
+      }
+      if (safe.avatar.startsWith('wxfile://') || safe.avatar.startsWith('http://tmp') || safe.avatar.startsWith('https://tmp')) {
+        return { ok: false, message: '头像保存失败，请重试', user: publicUser(user) }
       }
     }
     const next = await saveUser({ ...user, ...safe })

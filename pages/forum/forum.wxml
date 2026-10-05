@@ -16,9 +16,16 @@
     <scroll-view class="tabs-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="tabs-line">
         <view
+          class="tab-line {{!officialOnly && category === '全部' ? 'active' : ''}}"
+          data-name="全部"
+          bindtap="onCategoryTap"
+        >全部</view>
+        <view class="tab-line {{officialOnly ? 'active' : ''}}" bindtap="onOfficialTap">官方</view>
+        <view
           wx:for="{{categories}}"
+          wx:if="{{item !== '全部'}}"
           wx:key="*this"
-          class="tab-line {{category === item ? 'active' : ''}}"
+          class="tab-line {{!officialOnly && category === item ? 'active' : ''}}"
           data-name="{{item}}"
           bindtap="onCategoryTap"
         >{{item}}</view>
@@ -35,11 +42,11 @@
     </view>
   </view>
 
-  <view wx:if="{{weeklyHot && weeklyHot.preview.length}}" class="hot-board">
+  <view wx:if="{{!officialOnly && weeklyHot && weeklyHot.preview.length}}" class="hot-board">
     <view class="hot-board-head" bindtap="goWeeklyHot">
       <text class="hot-mark">热</text>
       <text class="hot-board-title">每周精选</text>
-      <text class="hot-board-more">全部</text>
+      <text class="hot-board-more">全部 ›</text>
     </view>
     <view
       wx:for="{{weeklyHot.preview}}"
@@ -49,7 +56,7 @@
       data-type="{{item.contentType}}"
       catchtap="goHotItem"
     >
-      <text class="hot-line-rank">{{item.rank}}</text>
+      <text class="hot-line-rank {{item.rank <= 3 ? 'top' : ''}}">{{item.rank}}</text>
       <text class="hot-line-title">{{item.title || item.oneLiner}}</text>
     </view>
   </view>
@@ -78,17 +85,10 @@
       data-id="{{item.id}}"
       bindtap="goDetail"
     >
-      <view class="row gap-16 head" catchtap="onAuthorTap" data-userid="{{item.authorId}}" data-anonymous="{{item.anonymous}}">
-        <image class="avatar" src="{{item.authorAvatar}}" mode="aspectFill" lazy-load />
-        <view class="author-meta">
-          <view class="author-name">{{item.authorName}}</view>
-          <view class="meta">{{item.timeText}} · {{item.category}}<text wx:if="{{item.authorSchool}}"> · {{item.authorSchool}}</text></view>
-          <view class="contact-hint">{{item.anonymous ? '匿名发布，无法查看主页' : '点头像看主页'}}</view>
-        </view>
-      </view>
       <view class="post-title"><text wx:if="{{item.pinned}}" class="pin-tag">置顶</text><text wx:if="{{item.official}}" class="pin-tag official">官方</text>{{item.title}}</view>
-      <view wx:if="{{item.content}}" class="post-content">{{item.content}}</view>
-      <view wx:if="{{item.images && item.images.length}}" class="image-grid cols-{{item.images.length > 2 ? 3 : item.images.length}}">
+      <view wx:if="{{item.bodyText}}" class="post-content {{item.bodyOpen ? 'open' : ''}}">{{item.bodyText}}</view>
+      <text wx:if="{{item.bodyLong}}" class="body-more" catchtap="toggleBody" data-id="{{item.id}}">{{item.bodyOpen ? '收起' : '展开'}}</text>
+      <view wx:if="{{item.images && item.images.length}}" class="image-grid thumbs {{item.images.length > 1 ? 'multi' : 'single'}}">
         <image
           wx:for="{{item.images}}"
           wx:for-item="img"
@@ -102,22 +102,32 @@
           catchtap="previewImage"
         />
       </view>
-      <view class="engage-row" catchtap="preventBubble">
-        <view class="engage-item">
-          <view class="engage-ic engage-ic-eye"></view>
-          <text class="engage-num">{{item.viewCount}}</text>
+      <view class="feed-foot">
+        <view class="feed-who" catchtap="onAuthorTap" data-userid="{{item.authorId}}" data-anonymous="{{item.anonymous}}">
+          <image class="avatar tiny" src="{{item.authorAvatar}}" mode="aspectFill" lazy-load />
+          <text class="author-name">{{item.authorName}}</text>
+          <text class="meta">{{item.timeText}}</text>
         </view>
-        <view
-          class="engage-item {{item.liked ? 'liked' : ''}}"
-          catchtap="onLike"
-          data-id="{{item.id}}"
-        >
-          <view class="engage-ic engage-ic-heart"></view>
-          <text class="engage-num">{{item.likeCount}}</text>
-        </view>
-        <view class="engage-item" catchtap="goDetail" data-id="{{item.id}}">
-          <view class="engage-ic engage-ic-comment"></view>
-          <text class="engage-num">{{item.commentCount}}</text>
+        <view class="feed-stats" catchtap="preventBubble">
+          <text class="feed-chip">{{item.category}}</text>
+          <view class="stat-row">
+            <view class="engage-item">
+              <view class="engage-ic engage-ic-eye"></view>
+              <text class="engage-num">{{item.viewCount}}</text>
+            </view>
+            <view
+              class="engage-item {{item.liked ? 'liked' : ''}}"
+              catchtap="onLike"
+              data-id="{{item.id}}"
+            >
+              <view class="engage-ic engage-ic-heart"></view>
+              <text class="engage-num">{{item.likeCount}}</text>
+            </view>
+            <view class="engage-item" catchtap="goDetail" data-id="{{item.id}}">
+              <view class="engage-ic engage-ic-comment"></view>
+              <text class="engage-num">{{item.commentCount}}</text>
+            </view>
+          </view>
         </view>
       </view>
     </view>
@@ -128,8 +138,8 @@
   </view>
 
   <view wx:elif="{{!loading}}" class="empty">
-    <view class="empty-title">还没有帖子</view>
-    <view>换个分类，或发第一条吧</view>
+    <view class="empty-title">{{officialOnly ? '还没有官方帖子' : '还没有帖子'}}</view>
+    <view>{{officialOnly ? '官方账号发布后会出现在这里' : '换个分类，或发第一条吧'}}</view>
   </view>
 
   <view class="fab" bindtap="goPublish" hover-class="fab-hover">

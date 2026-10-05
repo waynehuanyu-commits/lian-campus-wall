@@ -32,6 +32,23 @@ function uid(prefix = '') {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+function postDocId(item) {
+  if (!item) return ''
+  return String(item.id || item._id || '').trim()
+}
+
+function dedupePostsById(list) {
+  const seen = new Set()
+  const out = []
+  ;(Array.isArray(list) ? list : []).forEach((item) => {
+    const key = postDocId(item)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    out.push(item.id ? item : { ...item, id: key })
+  })
+  return out
+}
+
 function formatDateTime(ts) {
   const date = new Date(ts)
   return `${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`
@@ -40,5 +57,7 @@ function formatDateTime(ts) {
 module.exports = {
   formatTime,
   formatDateTime,
-  uid
+  uid,
+  postDocId,
+  dedupePostsById
 }

@@ -209,30 +209,31 @@
 }
 
 .wall-title {
-  font-size: 34rpx;
-  font-weight: 720;
-  color: #1f2329;
-  line-height: 1.4;
-  margin-bottom: 10rpx;
-  letter-spacing: -0.3rpx;
-}
-
-.wall-summary {
-  font-size: 26rpx;
-  color: #2f7dff;
-  font-weight: 600;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111111;
+  line-height: 1.35;
   margin-bottom: 8rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .wall-content {
-  color: #6f5f66;
+  color: #868686;
   font-size: 28rpx;
-  line-height: 1.65;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
-  margin-bottom: 8rpx;
+}
+
+.wall-content.open {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .wall-footer {
@@ -248,8 +249,9 @@
 }
 
 .avatar.tiny {
-  width: 52rpx;
-  height: 52rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
 }
 
 .contact-avatar {
@@ -257,7 +259,5 @@
 }
 
 .contact-hint {
-  margin-top: 2rpx;
-  font-size: 20rpx;
-  color: #2f7dff;
+  display: none;
 }

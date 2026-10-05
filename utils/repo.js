@@ -319,10 +319,11 @@ async function getSpeakGate(options = {}) {
   return result.speakGate || { ok: false, code: 'NEED_AUTH', title: '需要先认证学校', message: result.message || '' }
 }
 
-async function getUser() {
+async function getUser(options = {}) {
   if (!config.useCloud) return store.getUser()
+  const force = !!(options && options.force)
   const app = getApp()
-  if (app && app.globalData && app.globalData.user) return app.globalData.user
+  if (!force && app && app.globalData && app.globalData.user) return app.globalData.user
   const result = await callCloud('me')
   return result.user || null
 }
@@ -363,11 +364,16 @@ function visibleInFeed(post) {
   return !post.reviewStatus || post.reviewStatus === 'approved'
 }
 
+function keepOfficial(posts, payload) {
+  if (!payload || !payload.official) return posts || []
+  return (posts || []).filter((item) => item.official || item.authorOfficial)
+}
+
 async function listForum(payload) {
   if (!config.useCloud) return store.listForum(payload)
   return cachedList('forum', payload, async () => {
     const result = await callCloud('listForum', payload)
-    return (result.posts || []).filter(visibleInFeed)
+    return keepOfficial((result.posts || []).filter(visibleInFeed), payload)
   })
 }
 
@@ -381,7 +387,7 @@ async function listWall(payload) {
   return cachedList('wall', payload, async () => {
     const result = await callCloud('listWall', payload)
     return {
-      posts: (result.posts || []).filter(visibleInFeed),
+      posts: keepOfficial((result.posts || []).filter(visibleInFeed), payload),
       digests: result.digests || []
     }
   })

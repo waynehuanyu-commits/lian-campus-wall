@@ -31,6 +31,18 @@
         "value": "cloud"
       },
       {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "folder",
+        "value": ".cursor"
+      },
+      {
+        "type": "folder",
+        "value": ".uix"
+      },
+      {
         "type": "file",
         "value": "README.md"
       },

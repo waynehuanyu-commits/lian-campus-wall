@@ -9,4 +9,5 @@ admin/data/
 .DS_Store
 *.log
 .miniprogram/
+.uix/
 归档.zip

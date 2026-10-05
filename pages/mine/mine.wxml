@@ -56,7 +56,7 @@
   <view class="nav-block">
     <view class="nav-item" bindtap="goMyPosts" hover-class="nav-item-hover">
       <view class="nav-left">
-        <view class="nav-dot posts"></view>
+        <view class="nav-dot posts"><view class="nav-ic ic-post"></view></view>
         <view class="nav-copy">
           <view class="nav-title">我的帖子</view>
           <view class="nav-desc">互助广场与学习分享</view>
@@ -66,7 +66,7 @@
     </view>
     <view class="nav-item" bindtap="goMyEngage" hover-class="nav-item-hover">
       <view class="nav-left">
-        <view class="nav-dot engage"></view>
+        <view class="nav-dot engage"><view class="nav-ic ic-heart"></view></view>
         <view class="nav-copy">
           <view class="nav-title-row">
             <view class="nav-title">我的点赞 / 评论</view>
@@ -81,7 +81,7 @@
     </view>
     <view class="nav-item" bindtap="goMyMessages" hover-class="nav-item-hover">
       <view class="nav-left">
-        <view class="nav-dot msg"></view>
+        <view class="nav-dot msg"><view class="nav-ic ic-msg"></view></view>
         <view class="nav-copy">
           <view class="nav-title-row">
             <view class="nav-title">我的私信</view>
@@ -143,7 +143,7 @@
   <view class="nav-block">
     <view class="nav-item" bindtap="goAbout" hover-class="nav-item-hover">
       <view class="nav-left">
-        <view class="nav-dot about"></view>
+        <view class="nav-dot about"><view class="nav-ic ic-about"></view></view>
         <view class="nav-copy">
           <view class="nav-title">关于我们</view>
           <view class="nav-desc">产品介绍与用户协议及隐私政策</view>

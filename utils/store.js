@@ -1183,13 +1183,16 @@ function sortByTimeAndHeat(list) {
   })
 }
 
-function listForum({ category = '全部', keyword = '', sort = 'new', includePending = false } = {}) {
+function listForum({ category = '全部', keyword = '', sort = 'new', official = false, includePending = false } = {}) {
   let list = getForumPosts()
   if (!includePending) {
     list = list.filter((item) => item.reviewStatus === 'approved')
   }
   if (category && category !== '全部') {
     list = list.filter((item) => item.category === category)
+  }
+  if (official) {
+    list = list.filter((item) => item.authorOfficial || item.official)
   }
   if (keyword) {
     const q = keyword.trim().toLowerCase()
@@ -1199,13 +1202,16 @@ function listForum({ category = '全部', keyword = '', sort = 'new', includePen
   return decorateList(list, 'forum')
 }
 
-function listWall({ tag = '全部', keyword = '', sort = 'new', dealStatus = '全部', includePending = false } = {}) {
+function listWall({ tag = '全部', keyword = '', sort = 'new', dealStatus = '全部', official = false, includePending = false } = {}) {
   let list = getWallPosts()
   if (!includePending) {
     list = list.filter((item) => item.reviewStatus === 'approved')
   }
   if (tag && tag !== '全部') {
     list = list.filter((item) => item.tag === tag)
+  }
+  if (official) {
+    list = list.filter((item) => item.authorOfficial || item.official)
   }
   if (dealStatus && dealStatus !== '全部') {
     list = list.filter((item) => normalizeWallDealStatus(item.dealStatus) === dealStatus)
@@ -1246,7 +1252,8 @@ function decorateList(list, type) {
     const next = {
       ...item,
       liked: liked.includes(item.id),
-      isOwner: item.authorId === user.id
+      isOwner: item.authorId === user.id,
+      official: !!(item.authorOfficial || item.official)
     }
     if (type === 'wall') {
       next.dealStatus = normalizeWallDealStatus(item.dealStatus)

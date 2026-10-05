@@ -2,8 +2,11 @@ const store = require('../../utils/store')
 const repo = require('../../utils/repo')
 const track = require('../../utils/track')
 const inbox = require('../../utils/inbox')
+const media = require('../../utils/media')
 
 const DEFAULT_AVATAR = '/images/avatar-default.png'
+const AVATAR_VIEW_KEY = 'cw_mine_avatar_v1'
+const AVATAR_VIEW_TTL = 7 * 24 * 60 * 60 * 1000
 
 Page({
   data: {
@@ -43,13 +46,42 @@ Page({
     })
   },
 
+  readAvatarViewCache(userId, saved) {
+    try {
+      const row = wx.getStorageSync(AVATAR_VIEW_KEY)
+      if (!row || row.userId !== userId || row.saved !== saved) return ''
+      if (Date.now() - (row.at || 0) > AVATAR_VIEW_TTL) return ''
+      const src = String(row.src || '')
+      if (!src || src === DEFAULT_AVATAR) return ''
+      if (src.startsWith('wxfile://') || src.startsWith('http://tmp') || src.startsWith('https://tmp')) return ''
+      return src
+    } catch (e) {
+      return ''
+    }
+  },
+
+  writeAvatarViewCache(userId, saved, src) {
+    if (!userId || !saved || !src || src === DEFAULT_AVATAR) return
+    if (saved === DEFAULT_AVATAR) return
+    if (src.startsWith('http://tmp') || src.startsWith('https://tmp')) return
+    try {
+      wx.setStorage({
+        key: AVATAR_VIEW_KEY,
+        data: { userId, saved, src, at: Date.now() }
+      })
+    } catch (e) {
+      // ignore
+    }
+  },
+
   paint(user, gate) {
     const status = (user && user.studentAuthStatus) || 'none'
     const savedAvatar = (user && user.avatar) || DEFAULT_AVATAR
     const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
+    const cached = user && user.id ? this.readAvatarViewCache(user.id, savedAvatar) : ''
     const nextGate = gate || {}
     this.setData({
-      avatarSrc: preview || this.data.avatarSrc || DEFAULT_AVATAR,
+      avatarSrc: preview || cached || this.data.avatarSrc || DEFAULT_AVATAR,
       user: {
         ...(user || {}),
         avatar: savedAvatar
@@ -65,13 +97,13 @@ Page({
   },
 
   async refresh() {
-    const user = (await repo.getUser()) || {}
+    const user = (await repo.getUser({ force: true })) || {}
     const gate = await repo.getSpeakGate()
     this.paint(user, gate)
     const savedAvatar = user.avatar || DEFAULT_AVATAR
     const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
-    const avatarSrc = await this.avatarForView(savedAvatar, preview)
-    if (avatarSrc && avatarSrc !== this.data.avatarSrc) this.setData({ avatarSrc })
+    const avatarSrc = await this.avatarForView(user.id, savedAvatar, preview)
+    if (avatarSrc) this.setData({ avatarSrc })
   },
 
   isLocalAvatar(value) {
@@ -82,48 +114,42 @@ Page({
       || raw.startsWith('/images/')
   },
 
-  cloudFileId(value) {
-    const raw = String(value || '').trim()
-    if (/^cloud:\/\//.test(raw)) return raw.split('?')[0]
-    return ''
-  },
-
-  tempAvatarUrl(fileID) {
-    return new Promise((resolve) => {
-      if (!fileID || !wx.cloud || !wx.cloud.getTempFileURL) {
-        resolve('')
-        return
-      }
-      wx.cloud.getTempFileURL({
-        fileList: [fileID],
-        success: (res) => {
-          const row = ((res && res.fileList) || [])[0] || {}
-          const url = row.tempFileURL || ''
-          const ok = url && (row.status === 0 || row.status === '0' || row.status == null)
-          resolve(ok ? url : '')
-        },
-        fail: () => resolve('')
-      })
-    })
-  },
-
-  async avatarForView(saved, preview) {
+  async avatarForView(userId, saved, preview) {
     if (preview && this.isLocalAvatar(preview)) return preview
     const raw = String(saved || '').trim()
     if (!raw || raw === DEFAULT_AVATAR) return DEFAULT_AVATAR
     if (this.isLocalAvatar(raw)) return raw
-    const fileID = this.cloudFileId(raw)
-    if (!fileID) return preview || DEFAULT_AVATAR
-    const local = await this.tempAvatarUrl(fileID)
-    if (local && /^https:\/\//i.test(local) && !/\.tcb\.qcloud\.la\//i.test(local)) return local
-    return preview || DEFAULT_AVATAR
+    const cached = userId ? this.readAvatarViewCache(userId, raw) : ''
+    const resolved = await media.toLocal(raw)
+    const src = resolved && resolved !== raw && !/^cloud:\/\//.test(resolved)
+      ? resolved
+      : (resolved && /^https:\/\//i.test(resolved) ? resolved : '')
+    if (src) {
+      if (userId) this.writeAvatarViewCache(userId, raw, src)
+      return src
+    }
+    if (cached) return cached
+    if (/^https:\/\//i.test(raw)) return raw
+    return DEFAULT_AVATAR
   },
 
-  onAvatarError() {
+  async onAvatarError() {
     if (this.data.avatarSrc === DEFAULT_AVATAR) return
+    const user = this.data.user || {}
+    const saved = user.avatar || DEFAULT_AVATAR
     const preview = this._avatarPreview && this._avatarPreview.src
     if (preview && preview !== this.data.avatarSrc && this.isLocalAvatar(preview)) {
       this.setData({ avatarSrc: preview })
+      return
+    }
+    const cached = user.id ? this.readAvatarViewCache(user.id, saved) : ''
+    if (cached && cached !== this.data.avatarSrc) {
+      this.setData({ avatarSrc: cached })
+      return
+    }
+    const retry = await this.avatarForView(user.id, saved, preview)
+    if (retry && retry !== DEFAULT_AVATAR && retry !== this.data.avatarSrc) {
+      this.setData({ avatarSrc: retry })
       return
     }
     this.setData({ avatarSrc: DEFAULT_AVATAR })
@@ -212,10 +238,12 @@ Page({
     }
     const saved = (result.user && result.user.avatar) || nextAvatar
     this._avatarPreview = { id: saved, src: avatar }
+    const user = result.user || this.data.user
+    if (user && user.id) this.writeAvatarViewCache(user.id, saved, avatar)
     this.setData({
       avatarSrc: avatar,
       user: {
-        ...(result.user || this.data.user),
+        ...user,
         avatar: saved
       }
     })
