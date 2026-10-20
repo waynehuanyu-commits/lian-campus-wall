@@ -373,6 +373,12 @@ const routes = {
     json(res, 200, await service.resolveReport(body.id, body))
   },
 
+  'POST /api/school/set': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const body = await readBody(req)
+    json(res, 200, await service.setUserSchool(body.id || body.userId, body))
+  },
+
   'POST /api/school/review': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const body = await readBody(req)

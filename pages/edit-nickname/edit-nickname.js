@@ -12,37 +12,19 @@ function normalizeNickname(raw) {
 
 Page({
   data: {
-    nickname: '',
+    placeholder: '填写昵称',
     original: '',
-    canSave: false,
     saving: false
   },
 
   async onLoad() {
     await (getApp().globalData.ready || Promise.resolve())
     const user = (await repo.getUser()) || {}
-    const nickname = normalizeNickname(user.nickname) || DEFAULT_NICKNAME
+    const original = normalizeNickname(user.nickname)
     this.setData({
-      nickname,
-      original: nickname,
-      canSave: false
+      original,
+      placeholder: original && original !== DEFAULT_NICKNAME ? original : '填写昵称'
     })
-  },
-
-  onInput(e) {
-    const value = e.detail.value
-    // 点键盘上的「使用微信昵称」时，微信会先回一个空串。写回去会把昵称清掉。
-    if (!value) return
-    const nickname = String(value).slice(0, 20)
-    this.setData({ nickname })
-    this.updateCanSave(nickname)
-  },
-
-  onNicknameBlur(e) {
-    const next = normalizeNickname(e.detail && e.detail.value)
-    if (!next) return
-    this.setData({ nickname: next })
-    this.updateCanSave(next)
   },
 
   onNicknameReview(e) {
@@ -52,22 +34,21 @@ Page({
     }
   },
 
-  updateCanSave(raw) {
-    const next = normalizeNickname(raw)
-    const original = normalizeNickname(this.data.original)
-    this.setData({ canSave: !!next && next !== original })
-  },
-
-  async onSave() {
+  async onSave(e) {
     if (this.data.saving) return
-    const nickname = normalizeNickname(this.data.nickname) || DEFAULT_NICKNAME
+    const fromForm = e && e.detail && e.detail.value ? e.detail.value.nickname : ''
+    const nickname = normalizeNickname(fromForm)
     const original = normalizeNickname(this.data.original)
+    if (!nickname) {
+      wx.showToast({ title: '先填写昵称，或点键盘上的「使用微信昵称」', icon: 'none' })
+      return
+    }
     if (nickname === original) {
       wx.navigateBack()
       return
     }
 
-    this.setData({ saving: true, nickname })
+    this.setData({ saving: true })
     try {
       const result = await repo.updateUser({ nickname })
       if (!result.ok) {

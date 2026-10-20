@@ -60,7 +60,7 @@
       },
       {
         "type": "suffix",
-        "value": ".env.example"
+        "value": ".zip"
       }
     ],
     "include": []

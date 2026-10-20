@@ -50,12 +50,7 @@ Page({
   },
 
   openDetail(type, id) {
-    if (!id) return
-    if (type === 'forum') {
-      wx.navigateTo({ url: `/pages/forum-detail/forum-detail?id=${id}` })
-      return
-    }
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    require('../../utils/post-nav').openPostDetail(type === 'forum' ? 'forum' : 'wall', id)
   },
 
   onShareAppMessage() {

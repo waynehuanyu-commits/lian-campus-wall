@@ -1,0 +1,13 @@
+{
+  "name": "liaan-ops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "黎安话事云数据库运营自动化（Node SDK）",
+  "scripts": {
+    "ping": "node scripts/ping.js",
+    "stats": "node scripts/stats.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.10.1"
+  }
+}

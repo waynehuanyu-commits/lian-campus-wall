@@ -1,5 +1,11 @@
 {
-  "navigationBarTitleText": "互助广场详情",
+  "navigationBarTitleText": "帖子详情",
   "navigationBarBackgroundColor": "#FFFFFF",
-  "backgroundColor": "#F5F6F8"
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#FFFFFF",
+  "usingComponents": {
+    "post-gallery": "/components/post-gallery/post-gallery",
+    "privacy-popup": "/components/privacy-popup/privacy-popup",
+    "report-sheet": "/components/report-sheet/report-sheet"
+  }
 }

@@ -73,6 +73,12 @@
   font-size: 30rpx;
   font-weight: 650;
   box-shadow: 0 10rpx 24rpx rgba(47, 125, 255, 0.24);
+  padding: 0;
+  margin: 0;
+}
+
+.save-btn::after {
+  border: none;
 }
 
 .save-btn-hover {

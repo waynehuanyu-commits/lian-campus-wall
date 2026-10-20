@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/forum/forum",
+    "pages/messages/messages",
     "pages/wall/wall",
     "pages/mine/mine",
     "pages/edit-nickname/edit-nickname",
@@ -13,6 +14,9 @@
     "pages/weekly-hot/weekly-hot",
     "pages/my-posts/my-posts",
     "pages/my-engage/my-engage",
+    "pages/inbox-comments/inbox-comments",
+    "pages/inbox-likes/inbox-likes",
+    "pages/share-poster/share-poster",
     "pages/my-messages/my-messages",
     "pages/dm-chat/dm-chat",
     "pages/user-profile/user-profile",
@@ -23,26 +27,26 @@
     "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTitleText": "黎安话事",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F3F6FB",
+    "backgroundColor": "#FFFFFF",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#8AA0BF",
-    "selectedColor": "#2F7DFF",
+    "color": "#999999",
+    "selectedColor": "#333333",
     "backgroundColor": "#FFFFFF",
-    "borderStyle": "white",
+    "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/forum/forum",
-        "text": "学习分享",
-        "iconPath": "images/tab/forum-normal.png",
-        "selectedIconPath": "images/tab/forum-active.png"
+        "text": "首页",
+        "iconPath": "images/tab/home-normal.png",
+        "selectedIconPath": "images/tab/home-active.png"
       },
       {
-        "pagePath": "pages/wall/wall",
-        "text": "互助广场",
-        "iconPath": "images/tab/wall-normal.png",
-        "selectedIconPath": "images/tab/wall-active.png"
+        "pagePath": "pages/messages/messages",
+        "text": "消息",
+        "iconPath": "images/tab/msg-normal.png",
+        "selectedIconPath": "images/tab/msg-active.png"
       },
       {
         "pagePath": "pages/mine/mine",

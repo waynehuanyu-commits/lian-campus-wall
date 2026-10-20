@@ -1,0 +1,38 @@
+<view class="poster-page">
+  <view wx:if="{{status === 'loading'}}" class="poster-state">
+    <view class="page-loading-dot"></view>
+    <view class="poster-state-title">正在生成分享图</view>
+    <view class="poster-state-desc">生成完成前不可分享或保存</view>
+  </view>
+
+  <view wx:elif="{{status === 'error'}}" class="poster-state">
+    <view class="poster-state-title">{{errorTitle || '生成失败，请重试'}}</view>
+    <view class="poster-state-desc">{{errorDesc || ''}}</view>
+    <view class="poster-retry" bindtap="onRetry">重新生成</view>
+  </view>
+
+  <block wx:else>
+    <scroll-view scroll-y class="poster-scroll" enhanced show-scrollbar="{{false}}">
+      <image
+        wx:if="{{shareUrl || localPath}}"
+        class="poster-image"
+        src="{{shareUrl || localPath}}"
+        mode="widthFix"
+        show-menu-by-longpress="{{!!shareUrl}}"
+        bindtap="onPreview"
+      />
+    </scroll-view>
+
+    <view class="poster-actions">
+      <view class="poster-tip" wx:if="{{shareTip}}">{{shareTip}}</view>
+      <view class="poster-tip" wx:elif="{{shareUrl}}">保存失败时可长按图片，用系统菜单保存</view>
+      <view class="poster-btns">
+        <view class="poster-btn primary {{busy ? 'disabled' : ''}}" bindtap="onShareImage">分享图片</view>
+        <view class="poster-btn ghost {{busy ? 'disabled' : ''}}" bindtap="onSave">{{saving ? '保存中' : '保存图片'}}</view>
+      </view>
+    </view>
+  </block>
+
+  <canvas type="2d" id="sharePosterCanvas" class="poster-canvas"></canvas>
+  <privacy-popup />
+</view>

@@ -2,24 +2,22 @@ const repo = require('../../utils/repo')
 const userNav = require('../../utils/user')
 const auth = require('../../utils/auth')
 const { formatTime } = require('../../utils/util')
-const inbox = require('../../utils/inbox')
 
 Page({
   data: {
     tabs: [
-      { id: 'received', name: '收到的评论' },
-      { id: 'liked', name: '我的点赞' },
-      { id: 'comments', name: '我的评论' }
+      { id: 'liked', name: '我赞过的' },
+      { id: 'comments', name: '我评论过的' }
     ],
-    tab: 'received',
+    tab: 'liked',
     loading: true,
     loadError: '',
     likedList: [],
-    commentList: [],
-    receivedList: []
+    commentList: []
   },
 
   onShow() {
+    // 个人历史不清收到的评论/赞/私信未读
     this.loadList()
   },
 
@@ -30,30 +28,21 @@ Page({
   },
 
   async loadList() {
+    const token = (this._loadToken || 0) + 1
+    this._loadToken = token
     this.setData({ loading: true, loadError: '' })
     const { tab } = this.data
-    if (tab === 'received' && !this._markedCommentsSeen) {
-      this._markedCommentsSeen = true
-      repo.markInboxSeen({ likes: false, comments: true })
-        .then(() => inbox.refresh(true))
-        .catch(() => {})
-    }
-    if (tab === 'liked' && !this._markedLikesSeen) {
-      this._markedLikesSeen = true
-      repo.markInboxSeen({ likes: true, comments: false })
-        .then(() => inbox.refresh(true))
-        .catch(() => {})
-    }
     try {
       if (tab === 'liked') {
         const [forumRows, wallRows] = await Promise.all([
           repo.myLiked('forum'),
           repo.myLiked('wall')
         ])
+        if (token !== this._loadToken) return
         const forumLiked = (forumRows || []).map((item) => ({
           ...item,
           type: 'forum',
-          uniq: `forum_${item.id}`,
+          uniq: `forum:${item.id}`,
           badge: '学习分享',
           title: item.title,
           timeText: formatTime(item.createdAt)
@@ -61,9 +50,9 @@ Page({
         const wallLiked = (wallRows || []).map((item) => ({
           ...item,
           type: 'wall',
-          uniq: `wall_${item.id}`,
+          uniq: `wall:${item.id}`,
           badge: '互助广场',
-          title: item.headline,
+          title: item.headline || item.title,
           timeText: formatTime(item.createdAt)
         }))
         this.setData({
@@ -73,22 +62,15 @@ Page({
         })
         return
       }
-      if (tab === 'comments') {
-        const comments = (await repo.myComments() || []).map((item) => ({
-          ...item,
-          images: item.images || [],
-          timeText: formatTime(item.createdAt)
-        }))
-        this.setData({ loading: false, loadError: '', commentList: comments })
-        return
-      }
-      const received = (await repo.myReceivedComments() || []).map((item) => ({
+      const comments = (await repo.myComments() || []).map((item) => ({
         ...item,
         images: item.images || [],
         timeText: formatTime(item.createdAt)
       }))
-      this.setData({ loading: false, loadError: '', receivedList: received })
+      if (token !== this._loadToken) return
+      this.setData({ loading: false, loadError: '', commentList: comments })
     } catch (err) {
+      if (token !== this._loadToken) return
       this.setData({
         loading: false,
         loadError: (err && err.message) || '加载失败，请返回再进一次'
@@ -97,13 +79,12 @@ Page({
   },
 
   goPost(e) {
-    const { id, type } = e.currentTarget.dataset
-    if (!id) return
-    if (type === 'forum') {
-      wx.navigateTo({ url: `/pages/forum-detail/forum-detail?id=${id}` })
+    const { id, type, exists } = e.currentTarget.dataset
+    if (exists === false || exists === 'false') {
+      wx.showToast({ title: '原帖已不可用', icon: 'none' })
       return
     }
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    require('../../utils/post-nav').openPostDetail(type === 'wall' ? 'wall' : 'forum', id)
   },
 
   goAuthor(e) {

@@ -142,8 +142,8 @@ function weeklyHotCard(board = {}) {
 function homeCard(surface = 'forum') {
   const isWall = surface === 'wall'
   const path = isWall ? '/pages/wall/wall' : '/pages/forum/forum'
-  const section = isWall ? '互助广场' : '学习分享'
-  const hook = isWall ? '拼车闲置拼单，同学互助' : '校园新鲜事，都在这儿聊'
+  const section = '首页'
+  const hook = '校园新鲜事，都在这儿聊'
   return {
     appMessage: {
       title: `${BRAND}｜${section}｜${hook}`,

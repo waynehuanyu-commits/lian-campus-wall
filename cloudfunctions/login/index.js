@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk')
+const defaultProfile = require('./default-profile')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
@@ -8,8 +9,8 @@ function createUser(openid) {
   return {
     id: `u_${openid.slice(-10)}_${now.toString(36)}`,
     openid,
-    nickname: '黎安话事',
-    avatar: '/images/avatar-default.png',
+    nickname: defaultProfile.randomNickname(),
+    avatar: defaultProfile.randomAvatar(),
     bio: '在这里遇见有趣的灵魂',
     createdAt: now,
     schoolName: '',
@@ -73,6 +74,11 @@ exports.main = async () => {
       })
     }
     user = { ...next, id: next.id || next._id }
+    const profilePatch = defaultProfile.defaultProfilePatch(user)
+    if (profilePatch) {
+      await col.doc(user.id).update({ data: profilePatch })
+      user = { ...user, ...profilePatch }
+    }
   }
 
   return { ok: true, user: publicUser(user) }

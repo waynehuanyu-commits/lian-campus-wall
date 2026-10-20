@@ -12,7 +12,10 @@
     <view class="profile">
       <image class="avatar-lg" src="{{profile.avatar}}" mode="aspectFill" />
       <view class="profile-main">
-        <view class="nickname">{{profile.nickname}}</view>
+        <view class="nickname-row">
+          <view class="nickname">{{profile.nickname}}</view>
+          <view class="profile-more" catchtap="openMore">⋯</view>
+        </view>
         <view class="bio">{{profile.bio}}</view>
         <view class="pill-row">
           <view wx:if="{{profile.schoolText}}" class="school-pill">{{profile.schoolText}}</view>
@@ -40,7 +43,6 @@
 
     <view class="profile-actions">
       <view class="dm-btn" bindtap="onMessageTap">{{messaging ? '连接中…' : '发私信'}}</view>
-      <view class="report-btn" catchtap="onReport">举报该用户</view>
     </view>
   </view>
 
@@ -92,3 +94,11 @@
   <view class="empty-title">{{error || '用户不存在'}}</view>
 </view>
 <report-sheet id="report-sheet" />
+
+<view wx:if="{{moreOpen}}" class="share-sheet-mask" catchtouchmove="noop" bindtap="closeMore">
+  <view class="share-sheet" catchtap="noop">
+    <view class="share-sheet-title">更多操作</view>
+    <view class="share-sheet-item" bindtap="onReport">举报</view>
+    <view class="share-sheet-cancel" bindtap="closeMore">取消</view>
+  </view>
+</view>

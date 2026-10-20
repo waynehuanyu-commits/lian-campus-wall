@@ -6,11 +6,16 @@ const media = require('../../utils/media')
 
 Page({
   data: {
-    categories: store.FORUM_CATEGORIES,
-    category: store.FORUM_CATEGORIES[0],
+    topics: store.HOME_TOPICS.concat([store.OTHER_TOPIC]),
+    otherTopic: store.OTHER_TOPIC,
+    tagMode: 'preset',
+    tag: store.DEFAULT_HOME_TAG,
+    customTag: '',
+    otherFocus: false,
     title: '',
     content: '',
     images: [],
+    contactValue: '',
     anonymous: false,
     blocked: false,
     blockTitle: '',
@@ -33,7 +38,16 @@ Page({
         : '发帖还需要填写学校信息。'),
       blockAction
     })
-    track.pageView('forum_publish', { category: this.data.category })
+    track.pageView('forum_publish', { category: this.currentTag() })
+  },
+
+  cleanTag(value) {
+    return String(value || '').replace(/^[#＃]+/, '').replace(/\s+/g, '').trim().slice(0, 8)
+  },
+
+  currentTag() {
+    if (this.data.tagMode === 'other') return this.cleanTag(this.data.customTag)
+    return this.data.tag || store.DEFAULT_HOME_TAG
   },
 
   goAuth() {
@@ -44,15 +58,29 @@ Page({
     auth.goLogin()
   },
 
-  onCategoryTap(e) {
-    const category = e.currentTarget.dataset.name
+  onTopicTap(e) {
+    const tag = e.currentTarget.dataset.name
+    if (tag === store.OTHER_TOPIC) {
+      track.publishTagSelect({
+        surface: 'forum_publish',
+        contentType: 'forum',
+        category: store.OTHER_TOPIC,
+        from: this.currentTag()
+      })
+      this.setData({ tagMode: 'other', otherFocus: true })
+      return
+    }
     track.publishTagSelect({
       surface: 'forum_publish',
       contentType: 'forum',
-      category,
-      from: this.data.category
+      category: tag,
+      from: this.currentTag()
     })
-    this.setData({ category })
+    this.setData({ tagMode: 'preset', tag, otherFocus: false })
+  },
+
+  onCustomInput(e) {
+    this.setData({ customTag: e.detail.value })
   },
 
   onTitleInput(e) {
@@ -67,13 +95,16 @@ Page({
     this.setData({ anonymous: e.detail.value })
   },
 
+  onContactInput(e) {
+    this.setData({ contactValue: e.detail.value })
+  },
+
   chooseImages() {
-    const remain = 9 - this.data.images.length
     media.chooseImages({
-      count: remain,
+      count: 9,
       existing: this.data.images
     }).then((images) => {
-      this.setData({ images: images.slice(0, 9) })
+      this.setData({ images })
     }).catch(() => {
       wx.showToast({ title: '选图失败', icon: 'none' })
     })
@@ -92,27 +123,55 @@ Page({
   },
 
   async onSubmit() {
-    if (this.data.submitting || !auth.ensureCanSpeak()) return
+    if (this._submitLock || this.data.submitting || !auth.ensureCanSpeak()) return
     const title = this.data.title.trim()
     const content = this.data.content.trim()
-    if (!title) {
-      wx.showToast({ title: '请填写标题', icon: 'none' })
+    if (!title && !content && !(this.data.images || []).length) {
+      wx.showToast({ title: '请填写标题或正文', icon: 'none' })
       return
     }
+    const customTag = this.cleanTag(this.data.customTag)
+    if (this.data.tagMode === 'other' && !customTag) {
+      wx.showToast({ title: '请输入话题', icon: 'none' })
+      return
+    }
+    if (this.data.tagMode === 'other' && store.HOME_TOPICS.indexOf(customTag) >= 0) {
+      wx.showToast({ title: '这个话题已在上面，请直接选择', icon: 'none' })
+      return
+    }
+    const tag = this.data.tagMode === 'other'
+      ? customTag
+      : (this.data.tag || store.DEFAULT_HOME_TAG)
+    const contact = store.validateWallContact
+      ? store.validateWallContact('wechat', this.data.contactValue, tag)
+      : { ok: true, contactType: '', contactValue: '' }
+    if (contact && contact.ok === false) {
+      wx.showToast({ title: contact.message || '微信号格式不对', icon: 'none' })
+      return
+    }
+    this._submitLock = true
     this.setData({ submitting: true })
-    const result = await repo.createForumPost({
-      category: this.data.category,
+    let result
+    try {
+      result = await repo.createForumPost({
+      tag,
+      category: tag,
       title,
       content,
       images: this.data.images,
-      anonymous: this.data.anonymous
+      anonymous: this.data.anonymous,
+      contactType: (contact && contact.contactType) || '',
+      contactValue: (contact && contact.contactValue) || ''
     })
-    this.setData({ submitting: false })
+    } finally {
+      this._submitLock = false
+      this.setData({ submitting: false })
+    }
     if (auth.showActionError(result)) {
       track.publishFail({
         surface: 'forum_publish',
         contentType: 'forum',
-        category: this.data.category,
+        category: tag,
         reason: (result && result.code) || 'action_error',
         message: (result && result.message) || ''
       })
@@ -122,7 +181,7 @@ Page({
       surface: 'forum_publish',
       contentType: 'forum',
       contentId: (result && result.post && result.post.id) || '',
-      category: this.data.category,
+      category: tag,
       anonymous: !!this.data.anonymous,
       imageCount: (this.data.images || []).length
     })

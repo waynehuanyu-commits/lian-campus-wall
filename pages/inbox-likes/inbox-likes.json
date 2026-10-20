@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "赞和收藏",
+  "navigationBarBackgroundColor": "#FFFFFF",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#FFFFFF",
+  "enablePullDownRefresh": true
+}

@@ -4,45 +4,69 @@ const track = require('../../utils/track')
 const inbox = require('../../utils/inbox')
 const media = require('../../utils/media')
 
-const DEFAULT_AVATAR = '/images/avatar-default.png'
+const defaultProfile = require('../../utils/default-profile')
+const postNav = require('../../utils/post-nav')
+
+const DEFAULT_AVATAR = defaultProfile.DEFAULT_AVATARS[0]
 const AVATAR_VIEW_KEY = 'cw_mine_avatar_v1'
 const AVATAR_VIEW_TTL = 7 * 24 * 60 * 60 * 1000
 
 Page({
   data: {
-    user: {},
+    user: { nickname: '访客', bio: '', id: '' },
+    isGuest: true,
     schoolText: '',
-    accountTip: '',
+    accountTip: '登录后可发帖、评论和收消息',
     accountStatus: 'active',
     studentAuthText: '',
     studentAuthAction: '去认证',
     studentAuthBadge: '',
     studentAuthBadgeClass: '',
-    engageUnread: 0,
-    messageUnread: 0,
     avatarSrc: DEFAULT_AVATAR,
     avatarSheet: false
   },
 
+  onLoad() {
+    this.paintGuestFirst()
+  },
+
   async onShow() {
-    const app = getApp()
-    const cachedUser = app && app.globalData && app.globalData.user
-    if (cachedUser) this.paint(cachedUser, app.globalData.speakGate)
+    this.paintGuestFirst()
     try {
-      await (app.globalData.ready || Promise.resolve())
+      track.pageView('mine')
+    } catch (err) {
+      // ignore
+    }
+    try {
+      const app = getApp()
+      if (app && app.globalData && app.globalData.ready) {
+        await app.globalData.ready
+      }
     } catch (e) {
       // 登录失败也先把本地资料画出来
     }
-    track.pageView('mine')
-    this.refresh()
-    this.refreshBadges()
+    this.refresh().catch((err) => {
+      console.error('[mine.refresh]', err)
+      this.paintGuestFirst()
+    })
+    inbox.refresh().catch(() => {})
   },
 
-  async refreshBadges() {
-    const badges = await inbox.refresh()
-    this.setData({
-      engageUnread: (Number(badges.unreadLikes) || 0) + (Number(badges.unreadComments) || 0),
-      messageUnread: Number(badges.unreadMessages) || 0
+  paintGuestFirst() {
+    try {
+      const app = getApp()
+      const cachedUser = app && app.globalData && app.globalData.user
+      if (cachedUser && cachedUser.id && cachedUser.id !== 'guest_readonly' && !repo.isLoggedOut()) {
+        this.paint(cachedUser, app.globalData.speakGate)
+        return
+      }
+    } catch (err) {
+      // fall through
+    }
+    this.paint({ id: 'guest_readonly', nickname: '访客', avatar: DEFAULT_AVATAR, bio: '' }, {
+      ok: false,
+      code: 'NEED_LOGIN',
+      message: '登录后可发帖、评论和收消息'
     })
   },
 
@@ -75,35 +99,64 @@ Page({
   },
 
   paint(user, gate) {
-    const status = (user && user.studentAuthStatus) || 'none'
-    const savedAvatar = (user && user.avatar) || DEFAULT_AVATAR
-    const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
-    const cached = user && user.id ? this.readAvatarViewCache(user.id, savedAvatar) : ''
-    const nextGate = gate || {}
-    this.setData({
-      avatarSrc: preview || cached || this.data.avatarSrc || DEFAULT_AVATAR,
-      user: {
-        ...(user || {}),
-        avatar: savedAvatar
-      },
-      schoolText: store.formatSchool(user || {}) || '已认证',
-      accountTip: nextGate.ok ? '' : (nextGate.message || ''),
-      accountStatus: (user && user.status) || 'active',
-      studentAuthText: store.studentAuthStatusText(status),
-      studentAuthAction: status === 'approved' ? '查看' : (status === 'pending' ? '审核中' : '去认证'),
-      studentAuthBadge: status === 'approved' ? '学生已认证' : (status === 'pending' ? '认证审核中' : ''),
-      studentAuthBadgeClass: status === 'approved' ? 'ok' : ''
-    })
+    try {
+      const status = (user && user.studentAuthStatus) || 'none'
+      const savedAvatar = defaultProfile.resolveAvatar((user && user.avatar) || '', (user && user.id) || 'guest')
+      const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
+      const cached = user && user.id ? this.readAvatarViewCache(user.id, savedAvatar) : ''
+      const nextGate = gate || {}
+      const isGuest = !user || !user.id || user.id === 'guest_readonly' || repo.isLoggedOut()
+      this.setData({
+        avatarSrc: isGuest
+          ? DEFAULT_AVATAR
+          : (preview || cached || this.data.avatarSrc || DEFAULT_AVATAR),
+        isGuest,
+        user: {
+          ...(user || {}),
+          avatar: savedAvatar,
+          nickname: isGuest ? '访客' : ((user && user.nickname) || '填写昵称')
+        },
+        schoolText: (store.formatSchool && store.formatSchool(user || {})) || '已认证',
+        accountTip: isGuest
+          ? '登录后可发帖、评论和收消息'
+          : (nextGate.ok ? '' : (nextGate.message || '')),
+        accountStatus: (user && user.status) || 'active',
+        studentAuthText: (store.studentAuthStatusText && store.studentAuthStatusText(status)) || '',
+        studentAuthAction: status === 'approved' ? '查看' : (status === 'pending' ? '审核中' : '去认证'),
+        studentAuthBadge: status === 'approved' ? '学生已认证' : (status === 'pending' ? '认证审核中' : ''),
+        studentAuthBadgeClass: status === 'approved' ? 'ok' : ''
+      })
+    } catch (err) {
+      console.error('[mine.paint]', err)
+      this.setData({
+        isGuest: true,
+        user: { nickname: '访客', bio: '', id: '' },
+        avatarSrc: DEFAULT_AVATAR,
+        accountTip: '登录后可发帖、评论和收消息'
+      })
+    }
   },
 
   async refresh() {
-    const user = (await repo.getUser({ force: true })) || {}
-    const gate = await repo.getSpeakGate()
+    let user = {}
+    let gate = { ok: false, message: '登录后可发帖、评论和收消息' }
+    try {
+      user = (await repo.getUser({ force: true })) || {}
+      gate = await repo.getSpeakGate({ force: true })
+    } catch (err) {
+      console.error('[mine.refresh.user]', err)
+      this.paintGuestFirst()
+      return
+    }
     this.paint(user, gate)
-    const savedAvatar = user.avatar || DEFAULT_AVATAR
-    const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
-    const avatarSrc = await this.avatarForView(user.id, savedAvatar, preview)
-    if (avatarSrc) this.setData({ avatarSrc })
+    try {
+      const savedAvatar = defaultProfile.resolveAvatar(user.avatar, user.id)
+      const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
+      const avatarSrc = await this.avatarForView(user.id, savedAvatar, preview)
+      if (avatarSrc) this.setData({ avatarSrc })
+    } catch (err) {
+      console.error('[mine.refresh.avatar]', err)
+    }
   },
 
   isLocalAvatar(value) {
@@ -167,11 +220,10 @@ Page({
 
   onChooseAvatar(e) {
     const avatar = e.detail && e.detail.avatarUrl
-    this.setData({ avatarSheet: false })
     if (!avatar) {
       wx.showModal({
         title: '没有拿到微信头像',
-        content: '可以改用「从相册选择」或「拍照」。',
+        content: '请先在小程序后台的隐私保护指引里声明「收集你的昵称、头像」，并在弹窗里点同意。也可以点右下角改用相册或拍照。',
         showCancel: false,
         confirmColor: '#2F7DFF'
       })
@@ -293,7 +345,9 @@ Page({
       wx.showModal({ title: '登录失败', content, showCancel: false, confirmColor: '#2F7DFF' })
       return
     }
+    inbox.reset((result.user && result.user.id) || '')
     await this.refresh()
+    inbox.refresh(true).catch(() => {})
     wx.showModal({ title: '已登录', content: '现在发帖和评论会显示为黎安校园墙。', showCancel: false, confirmColor: '#2F7DFF' })
   },
 
@@ -315,10 +369,56 @@ Page({
       })
       return
     }
+    inbox.reset((result.user && result.user.id) || '')
     await this.refresh()
+    inbox.refresh(true).catch(() => {})
+  },
+
+  onLogout() {
+    if (this.data.isGuest) return
+    wx.showModal({
+      title: '退出登录',
+      content: '退出后仍可浏览，发帖和评论需要重新登录。账号数据会保留。',
+      confirmText: '退出',
+      confirmColor: '#e11d48',
+      success: async (res) => {
+        if (!res.confirm) return
+        wx.showLoading({ title: '退出中', mask: true })
+        try {
+          await repo.logout()
+        } catch (err) {
+          // 本地仍切访客
+        }
+        wx.hideLoading()
+        this._avatarPreview = null
+        await this.refresh()
+        wx.showToast({ title: '已退出', icon: 'none' })
+      }
+    })
+  },
+
+  async onLogin() {
+    wx.showLoading({ title: '登录中', mask: true })
+    let result
+    try {
+      result = await repo.login()
+    } catch (err) {
+      result = { ok: false, message: (err && err.message) || '登录失败' }
+    }
+    wx.hideLoading()
+    if (!result || !result.ok) {
+      wx.showToast({ title: (result && result.message) || '登录失败', icon: 'none' })
+      return
+    }
+    await this.refresh()
+    wx.showToast({ title: '已登录', icon: 'success' })
   },
 
   goEditNickname() {
+    if (this.data.isGuest) {
+      this.onLogin()
+      return
+    }
     wx.navigateTo({ url: '/pages/edit-nickname/edit-nickname' })
   },
 
@@ -326,6 +426,38 @@ Page({
     const id = this.data.user && this.data.user.id
     if (!id) return
     wx.setClipboardData({ data: id })
+  },
+
+  openClipboardPost() {
+    const read = () => {
+      postNav.readClipboardText().then((text) => {
+        const hit = postNav.parseClipboardPost(text)
+        if (!hit) {
+          wx.showToast({ title: '剪贴板里没有帖子链接', icon: 'none' })
+          return
+        }
+        postNav.openPostDetail(hit.type, hit.id)
+      }).catch(() => {
+        wx.showToast({ title: '没有读取到剪贴板', icon: 'none' })
+      })
+    }
+    if (typeof wx.getPrivacySetting !== 'function') {
+      read()
+      return
+    }
+    wx.getPrivacySetting({
+      success: (res) => {
+        if (!res || !res.needAuthorization || typeof wx.requirePrivacyAuthorize !== 'function') {
+          read()
+          return
+        }
+        wx.requirePrivacyAuthorize({
+          success: read,
+          fail: () => wx.showToast({ title: '需同意隐私协议后才能读取剪贴板', icon: 'none' })
+        })
+      },
+      fail: read
+    })
   },
 
   goSchool() {
@@ -338,10 +470,6 @@ Page({
 
   goMyEngage() {
     wx.navigateTo({ url: '/pages/my-engage/my-engage' })
-  },
-
-  goMyMessages() {
-    wx.navigateTo({ url: '/pages/my-messages/my-messages' })
   },
 
   goAbout() {

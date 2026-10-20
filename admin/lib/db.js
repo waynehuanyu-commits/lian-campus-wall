@@ -24,12 +24,35 @@ function getDb() {
   return app.database()
 }
 
+function isMissingCollection(err) {
+  const msg = String((err && (err.message || err.errMsg || err.code)) || '')
+  return /COLLECTION_NOT_EXIST|ResourceNotFound|COLLECTION_NOT_FOUND|Db or Table not exist|database collection not exist|集合不存在|表不存在/i.test(msg)
+}
+
 async function ensureCollection(name) {
   if (useLocal()) return
   try {
     await getDb().createCollection(name)
   } catch (err) {
     // 集合已存在时云端会报错，忽略即可
+  }
+}
+
+async function withCollection(name, runner) {
+  try {
+    return await runner()
+  } catch (err) {
+    if (!isMissingCollection(err)) throw err
+    await ensureCollection(name)
+    return runner()
+  }
+}
+
+function cleanForDb(value) {
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch (err) {
+    return value
   }
 }
 
@@ -53,13 +76,37 @@ async function countDocs(name, where) {
   }
 }
 
+function withDocId(row) {
+  if (!row) return row
+  return { ...row, id: row.id || row._id }
+}
+
+/** 云库单次最多 100 条；分页拉全量，避免热榜/审帖漏掉新帖 */
 async function allDocs(name, where) {
   if (useLocal()) return localDb.allDocs(name, where)
-  const db = getDb()
-  let ref = db.collection(name)
-  if (where) ref = ref.where(where)
-  const res = await ref.limit(200).get()
-  return res.data || []
+  const pageSize = 100
+  const maxDocs = 5000
+  const load = async () => {
+    const database = getDb()
+    const out = []
+    let skip = 0
+    while (out.length < maxDocs) {
+      let ref = database.collection(name)
+      if (where) ref = ref.where(where)
+      const res = await ref.skip(skip).limit(pageSize).get()
+      const batch = (res.data || []).map(withDocId)
+      out.push(...batch)
+      if (batch.length < pageSize) break
+      skip += pageSize
+    }
+    return out
+  }
+  try {
+    return await withCollection(name, load)
+  } catch (err) {
+    if (isMissingCollection(err)) return []
+    throw err
+  }
 }
 
 /** 按字段取值查询，只返回命中的文档，避免审帖把整表读回来 */
@@ -80,15 +127,26 @@ async function findByField(name, field, values, limit = 40) {
 
 async function getDoc(name, id) {
   if (useLocal()) return localDb.getDoc(name, id)
-  const db = getDb()
-  const res = await db.collection(name).doc(id).get()
-  const data = res.data
-  if (Array.isArray(data)) return data[0] || null
-  return data || null
+  const docId = String(id || '').trim()
+  if (!docId) return null
+  try {
+    return await withCollection(name, async () => {
+      const res = await getDb().collection(name).doc(docId).get()
+      const data = res.data
+      if (Array.isArray(data)) return data[0] || null
+      return data || null
+    })
+  } catch (err) {
+    if (isMissingCollection(err) || /does not exist|不存在|DOCUMENT_NOT_FOUND/i.test(String(err.message || ''))) {
+      return null
+    }
+    throw err
+  }
 }
 
 function writable(data) {
-  const next = { ...(data || {}) }
+  const next = cleanForDb(data || {})
+  if (!next || typeof next !== 'object') return {}
   delete next._id
   delete next._openid
   return next
@@ -96,22 +154,38 @@ function writable(data) {
 
 async function setDoc(name, id, data) {
   if (useLocal()) return localDb.setDoc(name, id, data)
-  const db = getDb()
+  const docId = String(id || '').trim()
+  if (!docId) throw new Error('缺少文档 id')
   const body = writable(data)
-  await db.collection(name).doc(id).set(body)
-  return { ...body, id }
+  await withCollection(name, async () => {
+    await getDb().collection(name).doc(docId).set(body)
+  })
+  return { ...body, id: docId }
 }
 
 async function updateDoc(name, id, data) {
   if (useLocal()) return localDb.updateDoc(name, id, data)
-  const db = getDb()
-  await db.collection(name).doc(id).update(writable(data))
+  const docId = String(id || '').trim()
+  if (!docId) throw new Error('缺少文档 id')
+  await withCollection(name, async () => {
+    await getDb().collection(name).doc(docId).update(writable(data))
+  })
 }
 
 async function removeDoc(name, id) {
   if (useLocal()) return localDb.removeDoc(name, id)
-  const db = getDb()
-  await db.collection(name).doc(id).remove()
+  const docId = String(id || '').trim()
+  if (!docId) return
+  try {
+    await withCollection(name, async () => {
+      await getDb().collection(name).doc(docId).remove()
+    })
+  } catch (err) {
+    if (isMissingCollection(err) || /does not exist|不存在|DOCUMENT_NOT_FOUND/i.test(String(err.message || ''))) {
+      return
+    }
+    throw err
+  }
 }
 
 function isCloudFileId(value) {

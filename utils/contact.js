@@ -60,7 +60,9 @@ async function openWallContact(postId, options = {}) {
   wx.showLoading({ title: '获取中', mask: true })
   let result
   try {
-    result = await repo.revealWallContact(postId)
+    result = await repo.revealWallContact(postId, {
+      type: options.type === 'forum' ? 'forum' : 'wall'
+    })
   } finally {
     wx.hideLoading()
   }

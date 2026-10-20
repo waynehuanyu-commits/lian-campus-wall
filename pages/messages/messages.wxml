@@ -1,0 +1,57 @@
+<view class="msg-page">
+  <view class="msg-entries">
+    <view class="msg-entry" bindtap="goLikes" hover-class="msg-entry-on">
+      <view class="msg-ico-wrap">
+        <view class="msg-ico like">赞</view>
+        <view wx:if="{{unreadLikes}}" class="msg-dot"></view>
+      </view>
+      <text class="msg-label">赞和收藏</text>
+    </view>
+    <view class="msg-entry" bindtap="goComments" hover-class="msg-entry-on">
+      <view class="msg-ico-wrap">
+        <view class="msg-ico comment">评</view>
+        <view wx:if="{{unreadComments}}" class="msg-dot"></view>
+      </view>
+      <text class="msg-label">评论和@</text>
+    </view>
+  </view>
+
+  <view class="msg-sep"></view>
+  <view class="msg-section-title">私信</view>
+
+  <view wx:if="{{list.length}}" class="msg-chats">
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="msg-chat"
+      data-id="{{item.id}}"
+      bindtap="goChat"
+      hover-class="msg-chat-on"
+    >
+      <view class="msg-avatar-wrap">
+        <image class="msg-avatar" src="{{item.peerAvatar}}" mode="aspectFill" />
+        <view wx:if="{{item.hasUnread}}" class="msg-avatar-dot"></view>
+      </view>
+      <view class="msg-chat-main">
+        <view class="msg-chat-top">
+          <text class="msg-name">{{item.peerName}}</text>
+          <text class="msg-time">{{item.timeText}}</text>
+        </view>
+        <text class="msg-preview">{{item.lastPreview || '暂无消息'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="msg-empty">
+    <view class="msg-empty-title">正在加载私信…</view>
+  </view>
+
+  <view wx:elif="{{loadError}}" class="msg-empty">
+    <view class="msg-empty-title">{{loadError}}</view>
+  </view>
+
+  <view wx:else class="msg-empty">
+    <view class="msg-empty-title">还没有私信</view>
+    <view class="msg-empty-desc">去同学主页点「发私信」开始聊天</view>
+  </view>
+</view>

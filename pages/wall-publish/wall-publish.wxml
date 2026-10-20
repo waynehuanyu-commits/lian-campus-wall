@@ -72,23 +72,18 @@
       </view>
     </view>
 
-    <block wx:if="{{allowContact}}">
-      <view class="form-label">微信号（选填，不进正文）</view>
-      <view class="field">
-        <input
-          maxlength="30"
-          type="text"
-          placeholder="例如：campus_ride"
-          value="{{contactValue}}"
-          bindinput="onContactInput"
-        />
-      </view>
-      <view class="contact-tip">
-        需要对接时再填微信号，不填也可以发。请勿写进正文或图片。线下交易请注意安全，平台不介入纠纷。
-      </view>
-    </block>
-    <view wx:else class="contact-tip">
-      微信号可以不填。需要对接时再通过「查看微信」，请勿在正文写微信、手机号或二维码。
+    <view class="form-label">微信号（选填，不进正文）</view>
+    <view class="field">
+      <input
+        maxlength="30"
+        type="text"
+        placeholder="例如：campus_ride"
+        value="{{contactValue}}"
+        bindinput="onContactInput"
+      />
+    </view>
+    <view class="contact-tip">
+      需要对接时再填微信号，不填也可以发。请勿写进正文或图片。线下交易请注意安全，平台不介入纠纷。
     </view>
 
     <view class="switch-row" style="margin-top: 28rpx;">
@@ -99,7 +94,7 @@
       <switch checked="{{anonymous}}" color="#2F7DFF" bindchange="onAnonymousChange" />
     </view>
 
-    <button class="btn-primary submit-btn" bindtap="onSubmit">发布到互助广场</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布到互助广场'}}</button>
   </block>
   <privacy-popup />
 </view>

@@ -1,4 +1,5 @@
 const repo = require('../../utils/repo')
+const defaultProfile = require('../../utils/default-profile')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
 const { formatTime } = require('../../utils/util')
@@ -16,7 +17,8 @@ Page({
     list: [],
     loading: true,
     error: '',
-    messaging: false
+    messaging: false,
+    moreOpen: false
   },
 
   onLoad(query) {
@@ -48,8 +50,12 @@ Page({
       return
     }
     track.pageView('user_profile', { contentId: this.userId })
+    const profile = result.profile || {}
     this.setData({
-      profile: result.profile,
+      profile: {
+        ...profile,
+        nickname: defaultProfile.resolveProfileNickname(profile.nickname, profile.id || this.userId)
+      },
       stats: result.stats || { postCount: 0, receivedLikes: 0, receivedComments: 0 },
       list: this.decorateList(rows, this.data.tab),
       loading: false,
@@ -96,7 +102,16 @@ Page({
     wx.navigateTo({ url: `/pages/dm-chat/dm-chat?id=${encodeURIComponent(id)}` })
   },
 
+  openMore() {
+    this.setData({ moreOpen: true })
+  },
+
+  closeMore() {
+    this.setData({ moreOpen: false })
+  },
+
   onReport() {
+    this.setData({ moreOpen: false })
     const targetId = this.userId || this.data.userId
     if (!targetId) {
       wx.showToast({ title: '这个用户还不能举报', icon: 'none' })
@@ -116,11 +131,6 @@ Page({
 
   goDetail(e) {
     const { id, type } = e.currentTarget.dataset
-    if (!id) return
-    if (type === 'forum') {
-      wx.navigateTo({ url: `/pages/forum-detail/forum-detail?id=${id}` })
-      return
-    }
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    require('../../utils/post-nav').openPostDetail(type === 'forum' ? 'forum' : 'wall', id)
   }
 })

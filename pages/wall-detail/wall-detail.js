@@ -6,22 +6,48 @@ const track = require('../../utils/track')
 const share = require('../../utils/share')
 const userNav = require('../../utils/user')
 const media = require('../../utils/media')
-const { flattenCommentThread, COMMENT_IMAGE_MAX } = require('../../utils/comments')
+const {
+  COMMENT_IMAGE_MAX,
+  ROOT_PREVIEW_COUNT,
+  buildCommentGroups,
+  decorateCommentGroups,
+  sliceRootCommentGroups,
+  countAllComments,
+  expandGroupForTarget
+} = require('../../utils/comments')
 const { formatTime } = require('../../utils/util')
+const sharePoster = require('../../utils/share-poster')
+const postNav = require('../../utils/post-nav')
 
 Page({
   data: {
     id: '',
     post: null,
-    comments: [],
+    commentGroups: [],
+    commentTotal: 0,
+    commentSort: 'earliest',
+    sortOptions: [
+      { id: 'likes', name: '赞数' },
+      { id: 'comments', name: '评论' },
+      { id: 'earliest', name: '最早' },
+      { id: 'latest', name: '最新' }
+    ],
+    commentsReady: false,
+    commentsLoading: false,
+    commentsError: '',
+    commentsListExpanded: false,
+    canExpandMoreComments: false,
+    canCollapseMoreComments: false,
+    hiddenRootCount: 0,
     draft: '',
     draftImages: [],
     replyTo: null,
-    draftPlaceholder: '留个言…',
+    draftPlaceholder: '说点什么…',
     submitting: false,
     canSpeak: false,
     speakCode: '',
     speakMessage: '',
+    keyboardHeight: 0,
     dealStatusOptions: store.WALL_DEAL_STATUSES,
     contactSheetVisible: false,
     contactSheet: {
@@ -37,18 +63,31 @@ Page({
     feedbackSubmitting: false,
     feedbackDone: false,
     loading: true,
-    loadError: ''
+    loadError: '',
+    shareSheetOpen: false,
+    moreSheetOpen: false
   },
 
   async onLoad(query) {
-    this.postId = query.id || ''
-    this.fromShare = query.from || ''
+    const id = postNav.normalizePostId(sharePoster.postIdFromQuery(query))
+    this.postId = id
+    this.targetCommentId = String((query && query.commentId) || '')
+    this.fromShare = (query && query.from) || ''
+    this._rawComments = []
+    this._groups = []
     this.setData({ id: this.postId, loading: true, loadError: '' })
     share.enableMenus()
-    await this.refresh({ trackView: true, initial: true })
-    if (this.postId) {
-      repo.bumpView('wall', this.postId).catch(() => {})
+    if (!this.postId) {
+      this.setData({
+        loading: false,
+        loadError: '帖子链接无效，缺少帖子 id',
+        commentsLoading: false,
+        commentsReady: true
+      })
+      return
     }
+    await this.refresh({ trackView: true, initial: true })
+    repo.bumpView('wall', this.postId).catch(() => {})
   },
 
   async onShow() {
@@ -58,10 +97,61 @@ Page({
     this._ready = true
   },
 
+  paintComments(groups) {
+    const decorated = decorateCommentGroups(groups, this.data.commentSort)
+    const sliced = sliceRootCommentGroups(decorated, {
+      rootLimit: ROOT_PREVIEW_COUNT,
+      listExpanded: !!this.data.commentsListExpanded
+    })
+    this._groups = groups
+    this.setData({
+      commentGroups: sliced.groups,
+      commentTotal: countAllComments(groups),
+      hiddenRootCount: sliced.hiddenRootCount,
+      canExpandMoreComments: sliced.canExpandMore,
+      canCollapseMoreComments: sliced.canCollapseMore,
+      commentsReady: true,
+      commentsLoading: false,
+      commentsError: ''
+    })
+  },
+
+  onExpandMoreComments() {
+    this.setData({ commentsListExpanded: true })
+    this.paintComments(this._groups || [])
+  },
+
+  onCollapseMoreComments() {
+    this.setData({ commentsListExpanded: false })
+    this.paintComments(this._groups || [])
+  },
+
+  scrollToComment(commentId) {
+    const id = String(commentId || '')
+    if (!id) return
+    wx.createSelectorQuery()
+      .select(`#c-${id}`)
+      .boundingClientRect()
+      .selectViewport()
+      .scrollOffset()
+      .exec((res) => {
+        const rect = res && res[0]
+        const view = res && res[1]
+        if (!rect || !view) return
+        wx.pageScrollTo({
+          scrollTop: Math.max(0, view.scrollTop + rect.top - 120),
+          duration: 280
+        })
+      })
+  },
+
   async refresh(options = {}) {
     const id = this.postId || this.data.id
     const initial = !!options.initial || !this.data.post
     if (initial) this.setData({ loading: true, loadError: '' })
+    if (!options.soft || !this.data.commentsReady) {
+      this.setData({ commentsLoading: true, commentsError: '' })
+    }
     try {
       const bundle = await repo.getPostBundle('wall', id)
       const post = bundle && bundle.post
@@ -70,7 +160,11 @@ Page({
       if (!post) {
         this.setData({
           post: null,
-          comments: [],
+          commentGroups: [],
+          commentTotal: 0,
+          commentsReady: true,
+          commentsLoading: false,
+          commentsError: '',
           loading: false,
           loadError: ''
         })
@@ -85,18 +179,68 @@ Page({
           dealStatus: post.dealStatus || 'open'
         })
       }
+      this._rawComments = comments
+      let groups = buildCommentGroups(comments, formatTime)
+      if (this.targetCommentId) {
+        groups = expandGroupForTarget(groups, this.targetCommentId)
+      }
       this.setData({
-        post: { ...post, timeText: formatTime(post.createdAt) },
-        comments: flattenCommentThread(comments || [], formatTime),
+        post: {
+          ...post,
+          title: post.title || post.headline || '',
+          categoryLabel: post.tag || post.category || '',
+          timeText: formatTime(post.createdAt)
+        },
         loading: false,
         loadError: ''
       })
-    } catch (err) {
-      const message = (err && err.message) || '加载失败，请下拉重试'
-      this.setData({ loading: false, loadError: this.data.post ? '' : message })
-      if (!this.data.post) {
-        wx.showToast({ title: '加载失败', icon: 'none' })
+      this.paintComments(groups)
+      if (this.targetCommentId) {
+        const targetId = this.targetCommentId
+        this.targetCommentId = ''
+        setTimeout(() => this.scrollToComment(targetId), 80)
       }
+    } catch (err) {
+      const message = (err && err.message) || '加载失败，请重试'
+      if (!this.data.post) {
+        this.setData({
+          loading: false,
+          loadError: message,
+          commentsLoading: false
+        })
+      } else if (!this.data.commentsReady) {
+        this.setData({
+          loading: false,
+          commentsLoading: false,
+          commentsError: message,
+          commentsReady: false
+        })
+      } else {
+        this.setData({ loading: false, commentsLoading: false })
+      }
+      wx.showToast({ title: '加载失败', icon: 'none' })
+    }
+  },
+
+  retryPost() {
+    this.refresh({ initial: true })
+  },
+
+  async retryComments() {
+    const id = this.postId || this.data.id
+    if (!id) return
+    this.setData({ commentsLoading: true, commentsError: '' })
+    try {
+      const comments = await repo.listComments('wall', id)
+      this._rawComments = comments || []
+      const groups = buildCommentGroups(this._rawComments, formatTime)
+      this.paintComments(groups)
+    } catch (err) {
+      this.setData({
+        commentsLoading: false,
+        commentsError: (err && err.message) || '评论加载失败',
+        commentsReady: false
+      })
     }
   },
 
@@ -111,6 +255,29 @@ Page({
     }).catch(() => {})
   },
 
+  onSortTap(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.commentSort) return
+    this.setData({ commentSort: id })
+    this.paintComments(this._groups || [])
+  },
+
+  onExpandGroup(e) {
+    const id = e.currentTarget.dataset.id
+    const groups = (this._groups || []).map((group) => (
+      String(group.id) === String(id) ? { ...group, expanded: true } : group
+    ))
+    this.paintComments(groups)
+  },
+
+  onCollapseGroup(e) {
+    const id = e.currentTarget.dataset.id
+    const groups = (this._groups || []).map((group) => (
+      String(group.id) === String(id) ? { ...group, expanded: false } : group
+    ))
+    this.paintComments(groups)
+  },
+
   async onLike() {
     const post = this.data.post
     if (!post || this._liking) return
@@ -122,7 +289,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: this.data.id,
-      tag: post.tag || ''
+      tag: post.tag || post.category || ''
     })
     try {
       const liked = await repo.toggleLike('wall', this.data.id)
@@ -142,6 +309,12 @@ Page({
   onCommentAuthorTap(e) {
     const userId = e.currentTarget.dataset.userid
     userNav.openProfile({ userId })
+  },
+
+  onKeyboard(e) {
+    const height = Number(e.detail && e.detail.height) || 0
+    if (height === this.data.keyboardHeight) return
+    this.setData({ keyboardHeight: height })
   },
 
   onDraftInput(e) {
@@ -175,7 +348,7 @@ Page({
   },
 
   clearReply() {
-    this.setData({ replyTo: null, draftPlaceholder: '留个言…' })
+    this.setData({ replyTo: null, draftPlaceholder: '说点什么…' })
   },
 
   chooseCommentImages() {
@@ -232,7 +405,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: this.data.id,
-      tag: (this.data.post && this.data.post.tag) || '',
+      tag: (this.data.post && (this.data.post.tag || this.data.post.category)) || '',
       isReply: !!replyTo,
       imageCount: images.length
     })
@@ -240,7 +413,7 @@ Page({
       draft: '',
       draftImages: [],
       replyTo: null,
-      draftPlaceholder: '留个言…'
+      draftPlaceholder: '说点什么…'
     })
     this.refresh({ soft: true })
   },
@@ -256,7 +429,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: post.id,
-      tag: post.tag || '',
+      tag: post.tag || post.category || '',
       source: 'detail_action'
     })
     contact.openWallContact(post.id, {
@@ -335,7 +508,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: post.id,
-      tag: post.tag || '',
+      tag: post.tag || post.category || '',
       reason,
       result: 'ok'
     })
@@ -353,6 +526,29 @@ Page({
     const sheet = this.data.contactSheet || {}
     await contact.copyText(sheet.value, `${sheet.label || '联系方式'}已复制`)
     this.setData({ contactSheetVisible: false })
+  },
+
+  onMoreTap() {
+    this.setData({ moreSheetOpen: true })
+  },
+
+  closeMoreSheet() {
+    this.setData({ moreSheetOpen: false })
+  },
+
+  onPinFromMore() {
+    this.setData({ moreSheetOpen: false })
+    this.onPin()
+  },
+
+  onDeleteFromMore() {
+    this.setData({ moreSheetOpen: false })
+    this.onDelete()
+  },
+
+  onReportFromMore() {
+    this.setData({ moreSheetOpen: false })
+    this.onReport()
   },
 
   onPin() {
@@ -418,12 +614,24 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: this.data.id,
-      tag: post.tag || '',
+      tag: post.tag || post.category || '',
       from: post.dealStatus || 'open',
       dealStatus
     })
     wx.showToast({ title: `已改为${store.wallDealStatusLabel(dealStatus)}`, icon: 'none' })
-    this.refresh()
+    this.refresh({ soft: true })
+  },
+
+  findCommentImages(cid) {
+    const groups = this.data.commentGroups || []
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i]
+      if (String(group.root.id) === String(cid)) return group.root.images || []
+      const hit = (group.shownReplies || []).find((item) => String(item.id) === String(cid))
+        || (group.replies || []).find((item) => String(item.id) === String(cid))
+      if (hit) return hit.images || []
+    }
+    return []
   },
 
   previewImage(e) {
@@ -433,16 +641,49 @@ Page({
     if (scope === 'draft') {
       urls = this.data.draftImages || []
     } else if (scope === 'comment') {
-      const cid = e.currentTarget.dataset.cid
-      const comment = (this.data.comments || []).find((item) => String(item.id) === String(cid))
-      urls = (comment && comment.images) || []
+      urls = this.findCommentImages(e.currentTarget.dataset.cid)
     } else {
       urls = (this.data.post && this.data.post.images) || []
     }
     media.previewImages(urls[index] || urls[0], urls)
   },
 
+  onGalleryPreview() {},
+
+  goHome() {
+    wx.switchTab({ url: '/pages/forum/forum' })
+  },
+
+  onShareTap() {
+    if (!this.data.post) return
+    this.setData({ shareSheetOpen: true })
+  },
+
+  closeShareSheet() {
+    this.setData({ shareSheetOpen: false })
+  },
+
+  onGeneratePoster() {
+    const post = this.data.post
+    const id = String(
+      this.postId
+      || this.data.id
+      || (post && (post.id || post._id))
+      || ''
+    ).trim()
+    this.setData({ shareSheetOpen: false })
+    const publicOk = !!(post && (!post.reviewStatus || post.reviewStatus === 'approved'))
+    if (!publicOk || !id || id === 'undefined') {
+      wx.showToast({ title: '内容暂不可生成分享图', icon: 'none' })
+      return
+    }
+    wx.navigateTo({
+      url: `/pages/share-poster/share-poster?source=wall&id=${encodeURIComponent(id)}`
+    })
+  },
+
   onShareAppMessage() {
+    this.setData({ shareSheetOpen: false })
     const post = this.data.post || {}
     const id = this.postId || this.data.id
     const card = share.wallPost(post, id)
@@ -451,7 +692,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: id,
-      tag: post.tag || ''
+      tag: post.tag || post.category || ''
     })
     return card.appMessage
   },
@@ -465,7 +706,7 @@ Page({
       surface: 'wall_detail',
       contentType: 'wall',
       contentId: id,
-      tag: post.tag || ''
+      tag: post.tag || post.category || ''
     })
     return card.timeline
   }

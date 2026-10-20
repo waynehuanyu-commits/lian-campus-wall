@@ -34,7 +34,7 @@ async function goLogin() {
 
   wx.showLoading({ title: '准备中', mask: true })
   try {
-    const result = await repo.bootstrap()
+    const result = await repo.login()
     wx.hideLoading()
     if (!result || !result.ok) {
       wx.showToast({ title: (result && result.message) || '登录失败', icon: 'none' })

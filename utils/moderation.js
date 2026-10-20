@@ -280,8 +280,9 @@ function hasSignal(hits, name) {
   return !!(hits[name] && hits[name].length)
 }
 
-function channelAllowsContact(channel) {
-  return CONTACT_ALLOWED_CHANNELS.includes(String(channel || ''))
+function channelAllowsContact(_channel) {
+  // 全部分类都允许选填微信号（写到专用字段，不要写进正文）
+  return true
 }
 
 function evaluateRules({ hits, entities, imageFlags, channel, contentType }) {
@@ -469,32 +470,26 @@ function evaluateRules({ hits, entities, imageFlags, channel, contentType }) {
   return matched
 }
 
+function vendorHoldRule(vendor) {
+  if (!vendor || (!vendor.highRisk && !vendor.uncertain)) return null
+  // 同步图片接口只有通过/不通过，正常照片误报很多，不单凭它隐藏
+  if (String(vendor.source || '').includes('imgSecCheck')) return null
+  const label = Number(vendor.label || 0)
+  const serious = label === 20001 || label === 20002 || label === 20006 || label === 20008
+  if (vendor.uncertain && !serious) return null
+  if (vendor.highRisk && !serious && label !== 21000) return null
+  return {
+    id: serious ? `V01_${label}` : (vendor.uncertain ? 'V02' : 'V01'),
+    outcome: OUTCOMES.MANUAL_REVIEW,
+    message: vendor.message || '未通过云端安全审核，已隐藏并转人工审核',
+    priority: serious ? 'high' : 'normal'
+  }
+}
+
 function mergeOutcomes(matched, vendor = {}) {
   const vendorRules = []
-  if (vendor.highRisk) {
-    const label = Number(vendor.label || 0)
-    const fromImage = String(vendor.source || '').includes('imgSecCheck')
-    const vendorId = label === 20001
-      ? 'V01_POLITICS'
-      : (label === 20002 || label === 20012 ? 'V01_ADULT' : (fromImage ? 'V01_IMAGE' : 'V01'))
-    // 高风险（含二维码/营销广告图）统一：自动隐藏并进人工审核
-    vendorRules.push({
-      id: vendorId,
-      outcome: OUTCOMES.MANUAL_REVIEW,
-      message: fromImage
-        ? (vendor.message || '图片疑似违规或营销引流，已隐藏并转人工审核')
-        : (vendor.message || '未通过云端安全审核，已隐藏并转人工审核'),
-      priority: (label === 20001 || label === 20002 || fromImage) ? 'high' : 'normal'
-    })
-  } else if (vendor.uncertain) {
-    const label = Number(vendor.label || 0)
-    vendorRules.push({
-      id: 'V02',
-      outcome: OUTCOMES.MANUAL_REVIEW,
-      message: vendor.message || '云端审核不确定，已转人工',
-      priority: (label === 20001 || label === 20002) ? 'high' : 'normal'
-    })
-  }
+  const hold = vendorHoldRule(vendor)
+  if (hold) vendorRules.push(hold)
   const all = vendorRules.concat(matched || [])
   if (!all.length) {
     return {
@@ -591,31 +586,6 @@ function reviewText(input = {}, options = {}) {
     hits.request_intent = uniq((hits.request_intent || []).concat(['求']))
   }
   const vendor = options.vendor || {}
-  // 云审核未真正执行（超时或接口降级）时不得默认通过，本地未拒绝的一律转待审核
-  if (vendor.timeout || vendor.degraded) {
-    const local = evaluateRules({
-      hits,
-      entities,
-      imageFlags: input.imageFlags || {},
-      channel: input.channel || input.tag || input.category || '',
-      contentType: input.contentType || 'post'
-    })
-    const merged = mergeOutcomes(local, {})
-    if (SEVERITY[merged.outcome] >= SEVERITY[OUTCOMES.REJECT]) {
-      return finalize(prepared, entities, hits, merged, vendor)
-    }
-    return finalize(prepared, entities, hits, {
-      outcome: OUTCOMES.MANUAL_REVIEW,
-      reviewStatus: OUTCOMES.MANUAL_REVIEW,
-      ruleIds: uniq((merged.ruleIds || []).concat(['V00'])),
-      message: '安全检测未完成，已隐藏并转人工审核',
-      tip: '',
-      priority: merged.priority,
-      restrictAccount: false,
-      notifyOwner: false,
-      matched: merged.matched || []
-    }, vendor)
-  }
   const matched = evaluateRules({
     hits,
     entities,
@@ -623,7 +593,8 @@ function reviewText(input = {}, options = {}) {
     channel: input.channel || input.tag || input.category || '',
     contentType: input.contentType || 'post'
   })
-  const merged = mergeOutcomes(matched, vendor)
+  // 接口超时或不可用时沿用本地词库结果，不再一律隐藏
+  const merged = mergeOutcomes(matched, (vendor.timeout || vendor.degraded) ? {} : vendor)
   return finalize(prepared, entities, hits, merged, vendor)
 }
 
@@ -690,16 +661,13 @@ function countsAsViolation(outcome) {
   return outcome === OUTCOMES.REJECT || outcome === OUTCOMES.EMERGENCY_BLOCK
 }
 
-function needsWallContact(tag) {
-  return CONTACT_ALLOWED_CHANNELS.includes(String(tag || ''))
+function needsWallContact(_tag) {
+  return true
 }
 
-function validateWallContact(type, value, tag) {
+function validateWallContact(type, value, _tag) {
   const text = String(value || '').trim()
-  if (tag && !needsWallContact(tag)) {
-    if (text) return { ok: false, message: '该频道不能填写联系方式' }
-    return { ok: true, contactType: '', contactValue: '' }
-  }
+  // 选填：空着可以通过
   if (!text) return { ok: true, contactType: '', contactValue: '' }
   if (text.length < 2 || text.length > 30 || /\s/.test(text)) {
     return { ok: false, message: '请填写有效微信号' }

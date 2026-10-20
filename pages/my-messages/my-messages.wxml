@@ -1,12 +1,14 @@
 <view class="msg-page">
-  <view wx:if="{{list.length}}" class="list">
+  <view wx:if="{{loading}}" class="note-state">加载中</view>
+  <view wx:elif="{{loadError}}" class="note-state">{{loadError}}</view>
+  <view wx:elif="{{list.length}}" class="conv-list">
     <view
       wx:for="{{list}}"
       wx:key="id"
-      class="conv-item"
+      class="conv-row"
       data-id="{{item.id}}"
       bindtap="goChat"
-      hover-class="conv-item-hover"
+      hover-class="conv-row-on"
     >
       <image class="conv-avatar" src="{{item.peerAvatar}}" mode="aspectFill" />
       <view class="conv-main">
@@ -16,13 +18,10 @@
         </view>
         <view class="conv-bottom">
           <view class="conv-preview">{{item.lastPreview || '暂无消息'}}</view>
-          <view wx:if="{{item.unreadCount}}" class="conv-badge">{{item.unreadCount > 99 ? '99+' : item.unreadCount}}</view>
+          <view wx:if="{{item.hasUnread}}" class="conv-reddot"></view>
         </view>
       </view>
     </view>
   </view>
-  <view wx:else class="empty">
-    <view class="empty-title">暂无私信</view>
-    <view class="muted">去同学主页点「发私信」开始聊天</view>
-  </view>
+  <view wx:else class="note-state">暂无私信</view>
 </view>

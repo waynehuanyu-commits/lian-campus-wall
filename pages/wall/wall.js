@@ -5,6 +5,7 @@ const track = require('../../utils/track')
 const share = require('../../utils/share')
 const userNav = require('../../utils/user')
 const media = require('../../utils/media')
+const postNav = require('../../utils/post-nav')
 const { formatTime, dedupePostsById } = require('../../utils/util')
 
 function feedBodyOverflows(text) {
@@ -43,21 +44,18 @@ Page({
   },
 
   onLoad(query) {
-    this.fromShare = (query && query.from) || ''
-    share.enableMenus()
-    const peeked = repo.peekList('wall', this.feedQuery())
-    if (peeked && peeked.data) this.renderPosts(peeked.data)
-    this.refresh()
+    const topic = store.normalizeTopic((query && (query.tag || query.topic)) || '')
+    const keyword = String((query && (query.keyword || query.q)) || '')
+    try {
+      wx.setStorageSync('cw_home_intent', { topic, keyword })
+    } catch (err) {
+      // 带不上筛选时仍回到首页
+    }
+    wx.switchTab({ url: '/pages/forum/forum' })
   },
 
   onShow() {
-    share.enableMenus()
-    if (!this._ready) {
-      this._ready = true
-      return
-    }
-    // 切 Tab 回来：8 秒内不重拉，避免互助广场每次都卡很久
-    this.refresh()
+    wx.switchTab({ url: '/pages/forum/forum' })
   },
 
   async onPullDownRefresh() {
@@ -211,24 +209,24 @@ Page({
   },
 
   goHotItem(e) {
-    const { id, type } = e.currentTarget.dataset
-    if (!id) return
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    const type = e.currentTarget.dataset.type === 'forum' ? 'forum' : 'wall'
+    if (!id || id === 'undefined' || id === 'null') {
+      wx.showToast({ title: '缺少帖子 id', icon: 'none' })
+      return
+    }
     const preview = ((this.data.weeklyHot && this.data.weeklyHot.preview) || []).find(
-      (item) => item.contentId === id && (item.contentType || 'wall') === (type || 'wall')
+      (item) => item.contentId === id && (item.contentType || 'wall') === type
     )
     track.weeklyHotClick({
       surface: 'wall',
       source: 'preview',
       contentId: id,
-      contentType: type || 'wall',
+      contentType: type,
       rank: (preview && preview.rank) || 0,
       tag: (preview && preview.tag) || ''
     })
-    if (type === 'forum') {
-      wx.navigateTo({ url: `/pages/forum-detail/forum-detail?id=${id}` })
-      return
-    }
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    postNav.openPostDetail(type, id)
   },
 
   onTagTap(e) {
@@ -273,8 +271,15 @@ Page({
   },
 
   goDetail(e) {
-    const id = e.currentTarget.dataset.id
-    const post = (this.data.posts || []).find((item) => item.id === id)
+    const id = String(
+      (e.currentTarget.dataset && e.currentTarget.dataset.id)
+      || ''
+    ).trim()
+    if (!id || id === 'undefined' || id === 'null') {
+      wx.showToast({ title: '缺少帖子 id', icon: 'none' })
+      return
+    }
+    const post = (this.data.posts || []).find((item) => item.id === id || item._id === id)
     track.postClick({
       surface: 'wall',
       contentType: 'wall',
@@ -282,7 +287,7 @@ Page({
       tag: (post && post.tag) || this.data.tag,
       sort: this.data.sort
     })
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    postNav.openPostDetail('wall', id)
   },
 
   goPublish() {

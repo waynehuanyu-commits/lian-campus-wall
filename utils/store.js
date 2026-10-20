@@ -2,6 +2,9 @@ const { uid, formatDateTime } = require('./util')
 const distribute = require('./distribute')
 const security = require('./security')
 const moderation = require('./moderation')
+const homeFeed = require('./home-feed')
+const sharePoster = require('./share-poster')
+const defaultProfile = require('./default-profile')
 
 const KEYS = {
   USER: 'cw_user',
@@ -111,10 +114,10 @@ function nowMinus(hours) {
 
 function seedData() {
   const demoUsers = [
-    { id: 'u_demo1', nickname: '晚风吹过操场', avatar: '/images/avatar-1.png', schoolName: '武汉大学', schoolCampus: '文理学部' },
-    { id: 'u_demo2', nickname: '图书馆三楼靠窗', avatar: '/images/avatar-2.png', schoolName: '武汉大学', schoolCampus: '信息学部' },
-    { id: 'u_demo3', nickname: '热心学长', avatar: '/images/avatar-3.png', schoolName: '华中科技大学', schoolCampus: '' },
-    { id: 'u_demo4', nickname: '匿名小透明', avatar: '/images/avatar-4.png', schoolName: '武汉大学', schoolCampus: '' }
+    { id: 'u_demo1', nickname: '晚风吹过操场', avatar: defaultProfile.stableAvatar('u_demo1'), schoolName: '武汉大学', schoolCampus: '文理学部' },
+    { id: 'u_demo2', nickname: '图书馆三楼靠窗', avatar: defaultProfile.stableAvatar('u_demo2'), schoolName: '武汉大学', schoolCampus: '信息学部' },
+    { id: 'u_demo3', nickname: '热心学长', avatar: defaultProfile.stableAvatar('u_demo3'), schoolName: '华中科技大学', schoolCampus: '' },
+    { id: 'u_demo4', nickname: '匿名小透明', avatar: defaultProfile.stableAvatar('u_demo4'), schoolName: '武汉大学', schoolCampus: '' }
   ]
 
   const forumPosts = [
@@ -190,7 +193,7 @@ function seedData() {
       images: [],
       authorId: demoUsers[3].id,
       authorName: '匿名同学',
-      authorAvatar: '/images/avatar-5.png',
+      authorAvatar: defaultProfile.stableAvatar('f_anon'),
       authorSchool: '',
       anonymous: true,
       createdAt: nowMinus(50),
@@ -656,16 +659,16 @@ function migrateDemoAvatars() {
     const next = list.map((item) => {
       const nextAvatar = map[item.authorId]
       if (!nextAvatar) {
-        if (item.anonymous && item.authorAvatar === '/images/avatar-default.png') {
+        if (item.anonymous && defaultProfile.isLegacyAvatar(item.authorAvatar)) {
           changed = true
-          return { ...item, authorAvatar: '/images/avatar-5.png' }
+          return { ...item, authorAvatar: defaultProfile.stableAvatar(item.id) }
         }
         return item
       }
       if (item.authorAvatar === nextAvatar) return item
       if (item.authorAvatar && item.authorAvatar.indexOf('/images/avatar') !== 0) return item
       changed = true
-      return { ...item, authorAvatar: item.anonymous ? '/images/avatar-5.png' : nextAvatar }
+      return { ...item, authorAvatar: item.anonymous ? defaultProfile.stableAvatar(item.id) : defaultProfile.stableAvatar(item.authorId) }
     })
     return { changed, next }
   }
@@ -717,8 +720,8 @@ function migrateWallContacts() {
 function createDefaultUser() {
   return {
     id: uid('u_'),
-    nickname: '黎安话事',
-    avatar: '/images/avatar-default.png',
+    nickname: defaultProfile.randomNickname(),
+    avatar: defaultProfile.randomAvatar(),
     bio: '在这里遇见有趣的灵魂',
     createdAt: Date.now(),
     schoolName: '',
@@ -768,7 +771,9 @@ function getUser() {
     return user
   }
   const next = normalizeUser(user)
-  if (user.status === 'muted' && next.status === 'active') {
+  const profilePatch = defaultProfile.defaultProfilePatch(next)
+  if (profilePatch) Object.assign(next, profilePatch)
+  if ((user.status === 'muted' && next.status === 'active') || profilePatch) {
     wx.setStorageSync(KEYS.USER, next)
     syncAccount(next)
   }
@@ -863,7 +868,7 @@ function syncAuthorProfileOnContent(user, { syncAvatar = false, syncNickname = f
   if (!user || !user.id) return
   if (!syncAvatar && !syncNickname) return
 
-  const avatar = user.avatar || '/images/avatar-default.png'
+  const avatar = defaultProfile.resolveAvatar(user.avatar, user.id)
   const nickname = user.nickname || '黎安话事'
   const patchPost = (item) => {
     if (item.authorId !== user.id || item.anonymous) return item
@@ -1192,7 +1197,7 @@ function listForum({ category = '全部', keyword = '', sort = 'new', official =
     list = list.filter((item) => item.category === category)
   }
   if (official) {
-    list = list.filter((item) => item.authorOfficial || item.official)
+    list = list.filter((item) => homeFeed.isOfficialPost(item))
   }
   if (keyword) {
     const q = keyword.trim().toLowerCase()
@@ -1211,7 +1216,7 @@ function listWall({ tag = '全部', keyword = '', sort = 'new', dealStatus = '�
     list = list.filter((item) => item.tag === tag)
   }
   if (official) {
-    list = list.filter((item) => item.authorOfficial || item.official)
+    list = list.filter((item) => homeFeed.isOfficialPost(item))
   }
   if (dealStatus && dealStatus !== '全部') {
     list = list.filter((item) => normalizeWallDealStatus(item.dealStatus) === dealStatus)
@@ -1226,6 +1231,36 @@ function listWall({ tag = '全部', keyword = '', sort = 'new', dealStatus = '�
   }
   list = sort === 'new' ? sortByTime(list) : sortByTimeAndHeat(list)
   return decorateList(list, 'wall')
+}
+
+function listHome({ topic = '全部', keyword = '', sort = 'new', before = 0 } = {}) {
+  const topicName = homeFeed.normalizeTopic(topic)
+  const q = String(keyword || '').trim()
+  const cursor = Number(before) || 0
+  const take = (list, type) => (list || [])
+    .filter((item) => homeFeed.isPublicPost(item))
+    .filter((item) => !cursor || Number(item.createdAt) < cursor)
+    .filter((item) => homeFeed.topicMatches(item, type, topicName))
+    .filter((item) => !q || homeFeed.textHit(item, type, q))
+    .map((item) => {
+      const decorated = decorateList([item], type)[0]
+      return { ...item, ...decorated, contentType: type }
+    })
+  const cards = homeFeed.sortHomePosts(
+    take(getForumPosts(), 'forum').concat(take(getWallPosts(), 'wall')),
+    sort === 'hot'
+  ).map((item) => homeFeed.toHomeCard(item, item.contentType))
+  const page = cards.slice(0, 24)
+  const nextBefore = page.reduce((min, item) => {
+    const time = Number(item && item.createdAt) || 0
+    if (!time) return min
+    return min ? Math.min(min, time) : time
+  }, 0)
+  return {
+    posts: page,
+    hasMore: cards.length > page.length,
+    nextBefore
+  }
 }
 
 function wallHeadline(item) {
@@ -1260,11 +1295,12 @@ function decorateList(list, type) {
       next.dealStatusLabel = wallDealStatusLabel(next.dealStatus)
       next.headline = wallHeadline(item)
       next.summary = wallSummary(item)
-      next.hasContact = needsWallContact(item.tag) && !!(item.contactType && item.contactValue) && moderation.isPublicStatus(item.reviewStatus)
-      next.contactType = item.contactType || ''
-      next.contactTypeLabel = contactTypeLabel(item.contactType)
-      delete next.contactValue
     }
+    next.hasContact = !!(item.contactType && item.contactValue && item.contactType !== 'phone')
+      && moderation.isPublicStatus(item.reviewStatus || 'approved')
+    next.contactType = item.contactType || ''
+    next.contactTypeLabel = contactTypeLabel(item.contactType)
+    delete next.contactValue
     next.reviewStatusLabel = moderation.reviewStatusLabel(item.reviewStatus)
     if (!moderation.isPublicStatus(item.reviewStatus) && !next.isOwner) {
       next.content = item.reviewNote || '内容审核中'
@@ -1692,8 +1728,12 @@ function createForumPost(payload) {
   const user = getUser()
   const title = String(payload.title || '').trim()
   const content = String(payload.content || '').trim()
-  if (!title) return { ok: false, message: '请填写标题' }
-  const fingerprint = security.contentFingerprint(title, content)
+  const tag = homeFeed.cleanTag(payload.tag || payload.category) || homeFeed.DEFAULT_HOME_TAG
+  const contact = validateWallContact(payload.contactType, payload.contactValue, tag)
+  if (!contact.ok) return { ok: false, message: contact.message }
+  const images = payload.images || []
+  if (!title && !content && !images.length) return { ok: false, message: '请填写标题或正文' }
+  const fingerprint = security.contentFingerprint(tag, title, content)
   if (!user.postWhitelist && security.hasDuplicateContent(getForumPosts(), user.id, fingerprint)) {
     return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复发布相同内容' }
   }
@@ -1705,20 +1745,25 @@ function createForumPost(payload) {
     title,
     content,
     contentType: 'forum',
-    category: payload.category,
-    channel: payload.category
+    category: tag,
+    channel: tag
   })
   const post = {
     id: uid('f_'),
-    category: payload.category,
+    tag,
+    category: tag,
     title,
     content,
-    images: payload.images || [],
+    images,
     authorId: user.id,
     authorName: payload.anonymous ? '匿名同学' : user.nickname,
-    authorAvatar: payload.anonymous ? '/images/avatar-default.png' : user.avatar,
+    authorAvatar: payload.anonymous
+      ? defaultProfile.stableAvatar('anonymous')
+      : defaultProfile.resolveAvatar(user.avatar, user.id),
     authorSchool: authorSchoolForUser(user, payload.anonymous),
     anonymous: !!payload.anonymous,
+    contactType: contact.contactType,
+    contactValue: contact.contactValue,
     ...reviewPatch(review),
     createdAt: Date.now(),
     likeCount: 0,
@@ -1794,7 +1839,9 @@ function createWallPost(payload) {
     contactValue: contact.contactValue,
     authorId: user.id,
     authorName: payload.anonymous ? '匿名同学' : user.nickname,
-    authorAvatar: payload.anonymous ? '/images/avatar-default.png' : user.avatar,
+    authorAvatar: payload.anonymous
+      ? defaultProfile.stableAvatar('anonymous')
+      : defaultProfile.resolveAvatar(user.avatar, user.id),
     authorSchool: authorSchoolForUser(user, payload.anonymous),
     anonymous: !!payload.anonymous,
     dealStatus: 'open',
@@ -1851,11 +1898,12 @@ function revealWallContact(id) {
   if (!limit.ok) return limit
   const user = getUser()
   const post = getWallPosts().find((item) => item.id === id)
+    || getForumPosts().find((item) => item.id === id)
   if (!post) return { ok: false, message: '这条信息已不存在' }
   if (!moderation.isPublicStatus(post.reviewStatus) && post.authorId !== user.id) {
     return { ok: false, message: '这条信息已不存在' }
   }
-  if (!needsWallContact(post.tag) || !post.contactType || !post.contactValue || post.contactType === 'phone') {
+  if (!post.contactType || !post.contactValue || post.contactType === 'phone') {
     return { ok: false, message: '发布者未留下微信号' }
   }
   const views = [{
@@ -2403,7 +2451,7 @@ function getPublicProfile(userId) {
     profile: {
       id: account.id,
       nickname: account.nickname || '黎安话事',
-      avatar: account.avatar || '/images/avatar-default.png',
+      avatar: defaultProfile.resolveAvatar(account.avatar, account.id),
       bio: account.bio || '在这里遇见有趣的灵魂',
       schoolText,
       schoolLocked: !!account.schoolLocked,
@@ -2447,32 +2495,84 @@ function myComments() {
 }
 
 function myReceivedComments() {
+  const snapshotAt = Date.now()
   const user = getUser()
   const forumById = {}
   const wallById = {}
   getForumPosts().forEach((item) => { forumById[item.id] = item })
   getWallPosts().forEach((item) => { wallById[item.id] = item })
-  return getComments()
+  const comments = getComments()
     .filter((item) => {
       if (item.authorId === user.id) return false
       const postAuthorId = item.postAuthorId
         || (item.targetType === 'wall'
           ? (wallById[item.targetId] && wallById[item.targetId].authorId)
           : (forumById[item.targetId] && forumById[item.targetId].authorId))
-      return postAuthorId === user.id
+      return postAuthorId === user.id || item.replyToUserId === user.id
     })
     .sort((a, b) => b.createdAt - a.createdAt)
     .map((item) => {
       const post = item.targetType === 'wall' ? wallById[item.targetId] : forumById[item.targetId]
+      const canOpen = !!post && (homeFeed.isPublicPost(post) || post.authorId === user.id)
+      const images = post && Array.isArray(post.images) ? post.images.filter(Boolean) : []
       return {
         ...item,
-        postExists: !!post,
-        postTitle: post
+        postExists: canOpen,
+        postCover: canOpen ? (images[0] || '') : '',
+        postTitle: canOpen
           ? (item.targetType === 'wall' ? wallHeadline(post) : post.title)
-          : '原帖已删除',
+          : '原帖已不可用',
         postBadge: sectionLabel(item.targetType === 'wall' ? 'wall' : 'forum')
       }
     })
+  return { comments, snapshotAt }
+}
+
+function myReceivedLikes() {
+  const snapshotAt = Date.now()
+  const user = getUser()
+  const forumById = {}
+  const wallById = {}
+  getForumPosts().forEach((item) => { forumById[item.id] = item })
+  getWallPosts().forEach((item) => { wallById[item.id] = item })
+  const myForum = new Set(Object.keys(forumById).filter((id) => forumById[id].authorId === user.id))
+  const myWall = new Set(Object.keys(wallById).filter((id) => wallById[id].authorId === user.id))
+  const likes = getLikes()
+  const meta = getLikeMeta()
+  const rows = []
+  Object.keys(likes).forEach((likerId) => {
+    if (likerId === user.id) return
+    const bucket = likes[likerId] || {}
+    ;['forum', 'wall'].forEach((type) => {
+      const mine = type === 'wall' ? myWall : myForum
+      ;(bucket[type] || []).forEach((postId) => {
+        if (!mine.has(postId)) return
+        const post = type === 'wall' ? wallById[postId] : forumById[postId]
+        const canOpen = !!post && (homeFeed.isPublicPost(post) || post.authorId === user.id)
+        const account = resolveAccount(likerId)
+        const images = post && Array.isArray(post.images) ? post.images.filter(Boolean) : []
+        rows.push({
+          id: `${likerId}_${type}_${postId}`,
+          userId: likerId,
+          userName: (account && account.nickname) || '同学',
+          userAvatar: defaultProfile.resolveAvatar(account && account.avatar, likerId),
+          contentType: type,
+          postId,
+          createdAt: meta[`${likerId}_${type}_${postId}`] || 0,
+          postExists: canOpen,
+          postCover: canOpen ? (images[0] || '') : '',
+          postTitle: canOpen
+            ? (type === 'wall' ? wallHeadline(post) : post.title)
+            : '原帖已不可用',
+          postBadge: sectionLabel(type)
+        })
+      })
+    })
+  })
+  return {
+    likes: rows.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    snapshotAt
+  }
 }
 
 function getInboxBadges() {
@@ -2517,12 +2617,83 @@ function getInboxBadges() {
 
 function markInboxSeen(payload = {}) {
   const user = getUser()
-  const now = Date.now()
   const next = { ...user }
-  if (payload.likes !== false) next.lastSeenLikesAt = now
-  if (payload.comments !== false) next.lastSeenCommentsAt = now
+  const likes = payload && payload.likes === true
+  const comments = payload && payload.comments === true
+  if (!likes && !comments) return { ok: false, message: '未指定已读类别' }
+  if (likes) {
+    const at = Number(payload.likesAt) || 0
+    if (!at) return { ok: false, message: '缺少已读位置' }
+    next.lastSeenLikesAt = Math.max(Number(user.lastSeenLikesAt) || 0, at)
+  }
+  if (comments) {
+    const at = Number(payload.commentsAt) || 0
+    if (!at) return { ok: false, message: '缺少已读位置' }
+    next.lastSeenCommentsAt = Math.max(Number(user.lastSeenCommentsAt) || 0, at)
+  }
   persistCurrentUser(next)
   return { ok: true, user: next }
+}
+
+function getShareCode({ type = 'forum', id = '' } = {}) {
+  const post = getPost(type === 'wall' ? 'wall' : 'forum', id)
+  if (!post || !sharePoster.isPublicApproved(post)) {
+    return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+  }
+  return {
+    ok: true,
+    code: {
+      page: sharePoster.detailPageFor(type),
+      scene: sharePoster.sceneForPost(type, id),
+      envVersion: 'develop',
+      fileId: '',
+      imageUrl: '',
+      localDemo: true
+    }
+  }
+}
+
+function generateSharePoster({ postSource = 'forum', postId = '', requestId = '' } = {}) {
+  const type = postSource === 'wall' ? 'wall' : 'forum'
+  const post = getPost(type, postId)
+  if (!post || !sharePoster.isPublicApproved(post)) {
+    return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+  }
+  const publicPost = sharePoster.shapePublicPost(post, type)
+  delete publicPost.viewCount
+  return {
+    ok: true,
+    status: 'ready',
+    imageFileId: '',
+    postSource: type,
+    postId,
+    postRevision: sharePoster.buildPostRevision(post, type),
+    templateVersion: sharePoster.TEMPLATE_VERSION,
+    requestId,
+    width: sharePoster.POSTER_WIDTH,
+    height: 0,
+    publicPost,
+    originalPostCode: {
+      page: sharePoster.detailPageFor(type),
+      scene: sharePoster.sceneForPost(type, postId),
+      envVersion: 'develop',
+      fileId: '',
+      localDemo: true
+    }
+  }
+}
+
+function validateSharePoster({ postSource = 'forum', postId = '', postRevision = '' } = {}) {
+  const type = postSource === 'wall' ? 'wall' : 'forum'
+  const post = getPost(type, postId)
+  if (!post || !sharePoster.isPublicApproved(post)) {
+    return { ok: true, canSave: false, reason: '内容已下架或不可查看' }
+  }
+  const latest = sharePoster.buildPostRevision(post, type)
+  if (postRevision && latest !== postRevision) {
+    return { ok: true, canSave: false, reason: '帖子内容已更新，请重新生成' }
+  }
+  return { ok: true, canSave: true, postRevision: latest }
 }
 
 function getConversations() {
@@ -2553,7 +2724,7 @@ function decorateConversation(conv, meId) {
     ...conv,
     peerId,
     peerName: peer.nickname || '同学',
-    peerAvatar: peer.avatar || '/images/avatar-default.png',
+    peerAvatar: defaultProfile.resolveAvatar(peer.avatar, peer.id),
     unreadCount: Number(unreadMap[meId]) || 0
   }
 }
@@ -2696,6 +2867,10 @@ function listMessages(conversationId) {
   }
   return getDmMessages()
     .filter((item) => item.conversationId === conversationId)
+    .filter((item) => {
+      const status = item.reviewStatus || 'approved'
+      return item.senderId === me.id || moderation.isPublicStatus(status)
+    })
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((item) => ({
       ...item,
@@ -2703,7 +2878,7 @@ function listMessages(conversationId) {
     }))
 }
 
-function markConversationRead(conversationId) {
+function markConversationRead(conversationId, unreadAtOpen) {
   const me = getUser()
   const list = getConversations()
   const index = list.findIndex((item) => item.id === conversationId)
@@ -2712,24 +2887,30 @@ function markConversationRead(conversationId) {
   if (!(conversation.memberIds || []).includes(me.id)) {
     return { ok: false, message: '会话不存在' }
   }
-  const unread = { ...(conversation.unread || {}), [me.id]: 0 }
+  const opened = Number(unreadAtOpen)
+  const current = Number((conversation.unread || {})[me.id]) || 0
+  const keep = Number.isFinite(opened) && opened >= 0 ? Math.max(0, current - opened) : current
+  if (!Number.isFinite(opened) || opened < 0) return { ok: false, message: '缺少已读位置' }
+  const unread = { ...(conversation.unread || {}), [me.id]: keep }
   list[index] = { ...conversation, unread }
   saveConversations(list)
   return { ok: true, conversation: decorateConversation(list[index], me.id) }
 }
 
-function sendMessage(conversationId, content) {
+function sendMessage(conversationId, content, images = []) {
   const gate = guardSpeakAction('dm')
   if (!gate.ok) return gate
   const me = gate.user
   const text = String(content || '').trim()
-  if (!text) return { ok: false, message: '先写点内容吧' }
+  const photos = (Array.isArray(images) ? images : []).filter(Boolean).slice(0, 3)
+  if (!text && !photos.length) return { ok: false, message: '写点文字或发张图吧' }
   if (text.length > 2000) return { ok: false, message: '私信最多 2000 字' }
   const review = runContentReview({ content: text, contentType: 'dm' })
-  if (!review.passed) {
-    if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
-      handleReviewViolation(me, review, '私信')
-    }
+  if (review.outcome === moderation.OUTCOMES.EDIT_REQUIRED) {
+    return { ok: false, code: 'EDIT_REQUIRED', review, message: review.message || '请修改后再发送' }
+  }
+  if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
+    handleReviewViolation(me, review, '私信')
     return { ok: false, code: review.outcome, review, message: review.message || '内容未通过审核，请修改后重试' }
   }
 
@@ -2742,30 +2923,39 @@ function sendMessage(conversationId, content) {
   }
 
   const now = Date.now()
+  const held = !moderation.isPublicStatus(review.reviewStatus)
   const message = {
     id: uid('dm_'),
     conversationId,
     senderId: me.id,
     content: text,
+    images: photos,
+    reviewStatus: review.reviewStatus,
+    reviewNote: review.note || review.message || '',
+    reviewOutcome: review.outcome,
     createdAt: now
   }
   saveDmMessages([...getDmMessages(), message])
 
-  const unread = { ...(conversation.unread || {}) }
-  ;(conversation.memberIds || []).forEach((id) => {
-    if (id === me.id) unread[id] = 0
-    else unread[id] = (Number(unread[id]) || 0) + 1
-  })
-  list[index] = {
-    ...conversation,
-    lastMessageAt: now,
-    lastPreview: text.slice(0, 40),
-    lastSenderId: me.id,
-    unread
+  if (!held) {
+    const unread = { ...(conversation.unread || {}) }
+    ;(conversation.memberIds || []).forEach((id) => {
+      if (id === me.id) unread[id] = 0
+      else unread[id] = (Number(unread[id]) || 0) + 1
+    })
+    list[index] = {
+      ...conversation,
+      lastMessageAt: now,
+      lastPreview: text ? text.slice(0, 40) : '[图片]',
+      lastSenderId: me.id,
+      unread
+    }
+    saveConversations(list)
   }
-  saveConversations(list)
   return {
     ok: true,
+    held,
+    notice: held ? (review.message || '审核通过后对方才能看到') : '',
     message: { ...message, mine: true },
     conversation: decorateConversation(list[index], me.id)
   }
@@ -3150,7 +3340,7 @@ function buildWeeklyHotItem(type, post, rank = 1) {
     oneLiner: title || summary.slice(0, 36),
     channel: card.channel,
     pagepath: card.pagepath,
-    tag: contentType === 'wall' ? (post.tag || '') : (post.category || ''),
+    tag: homeFeed.primaryTag(post, contentType),
     likeCount: post.likeCount || 0,
     commentCount: post.commentCount || 0,
     rank,
@@ -3173,7 +3363,7 @@ function buildSeedWeeklyHot(wallPosts, forumPosts) {
   return {
     id: 'current',
     title: '每周精选',
-    subtitle: '学习分享 + 互助广场热榜',
+    subtitle: '本周校园精选',
     enabled: true,
     schemaVersion: 2,
     items: top.map((item, index) => buildWeeklyHotItem(item.type, item.post, index + 1)),
@@ -3220,7 +3410,7 @@ function hydrateWeeklyHotItems(items) {
   return (items || []).map((item, index) => {
     const type = item.contentType === 'forum' ? 'forum' : 'wall'
     const post = type === 'forum' ? forumById[item.contentId] : wallById[item.contentId]
-    if (!post || post.reviewStatus === 'rejected') {
+    if (!post || !homeFeed.isPublicPost(post)) {
       return { ...item, rank: index + 1, missing: true }
     }
     return {
@@ -3385,6 +3575,12 @@ function updateWeeklyHotMeta({ title, subtitle, enabled } = {}) {
 
 module.exports = {
   FORUM_CATEGORIES,
+  HOME_TOPICS: homeFeed.HOME_TOPICS,
+  OTHER_TOPIC: homeFeed.OTHER_TOPIC,
+  OFFICIAL_TOPIC: homeFeed.OFFICIAL_TOPIC,
+  DEFAULT_HOME_TAG: homeFeed.DEFAULT_HOME_TAG,
+  normalizeTopic: homeFeed.normalizeTopic,
+  publicWeeklySubtitle: homeFeed.publicWeeklySubtitle,
   WALL_BOARDS,
   SECTION_LABELS,
   sectionLabel,
@@ -3423,6 +3619,7 @@ module.exports = {
   reviewSchoolChange,
   listForum,
   listWall,
+  listHome,
   getPost,
   bumpView,
   createForumPost,
@@ -3442,8 +3639,12 @@ module.exports = {
   myLiked,
   myComments,
   myReceivedComments,
+  myReceivedLikes,
   getInboxBadges,
   markInboxSeen,
+  getShareCode,
+  generateSharePoster,
+  validateSharePoster,
   listConversations,
   openOrCreateConversation,
   getConversation,

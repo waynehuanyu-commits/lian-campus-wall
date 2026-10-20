@@ -1,3 +1,4 @@
+const store = require('../../utils/store')
 const repo = require('../../utils/repo')
 const track = require('../../utils/track')
 const share = require('../../utils/share')
@@ -6,12 +7,6 @@ const { formatTime } = require('../../utils/util')
 Page({
   data: {
     board: null,
-    tabs: [
-      { id: '全部', name: '全部' },
-      { id: 'forum', name: '学习分享' },
-      { id: 'wall', name: '互助广场' }
-    ],
-    tab: '全部',
     items: [],
     loading: true,
     loadError: ''
@@ -38,26 +33,23 @@ Page({
     const initial = !!options.initial || !this.data.board
     if (initial) this.setData({ loading: true, loadError: '' })
     try {
-      const board = await repo.getWeeklyHot({ tab: this.data.tab })
+      const board = await repo.getWeeklyHot({ tab: '全部' })
       const items = ((board && board.items) || []).map((item, index) => ({
         ...item,
-        key: `${item.contentType || 'wall'}_${item.contentId}`,
+        key: `${item.contentType || 'wall'}:${item.contentId}`,
+        tag: item.tag || '',
         rank: item.rank || index + 1,
         rankClass: index === 0 ? 'top1' : index === 1 ? 'top2' : index === 2 ? 'top3' : 'normal'
       }))
-      track.pageView('weekly_hot', { tab: this.data.tab, totalCount: (board && board.totalCount) || 0 })
+      track.pageView('weekly_hot', { totalCount: (board && board.totalCount) || 0 })
       this.setData({
         board: board
           ? {
             ...board,
+            subtitle: store.publicWeeklySubtitle(board.subtitle),
             updatedText: board.updatedAt ? formatTime(board.updatedAt) : ''
           }
-          : { title: '每周精选', subtitle: '学习分享 + 互助广场热榜' },
-        tabs: [
-          { id: '全部', name: '全部', count: (board && board.totalCount) || 0 },
-          { id: 'forum', name: '学习分享', count: (board && board.forumCount) || 0 },
-          { id: 'wall', name: '互助广场', count: (board && board.wallCount) || 0 }
-        ],
+          : { title: '每周精选', subtitle: '本周校园精选' },
         items,
         loading: false,
         loadError: ''
@@ -74,33 +66,26 @@ Page({
     }
   },
 
-  onTabTap(e) {
-    const tab = e.currentTarget.dataset.id
-    if (tab === this.data.tab) return
-    track.weeklyHotTab({ surface: 'weekly_hot', tab, from: this.data.tab })
-    this.setData({ tab, loading: true }, () => this.refresh({ initial: true }))
-  },
-
   goDetail(e) {
-    const { id, type } = e.currentTarget.dataset
-    if (!id) return
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    const type = e.currentTarget.dataset.type === 'forum' ? 'forum' : 'wall'
+    if (!id || id === 'undefined' || id === 'null') {
+      wx.showToast({ title: '缺少帖子 id', icon: 'none' })
+      return
+    }
     const item = (this.data.items || []).find(
-      (row) => row.contentId === id && (row.contentType || 'wall') === (type || 'wall')
+      (row) => row.contentId === id && (row.contentType || 'wall') === type
     )
     track.weeklyHotClick({
       surface: 'weekly_hot',
       source: 'list',
       contentId: id,
-      contentType: type || 'wall',
+      contentType: type,
       rank: (item && item.rank) || 0,
       tag: (item && item.tag) || '',
-      tab: this.data.tab
+      tab: '全部'
     })
-    if (type === 'forum') {
-      wx.navigateTo({ url: `/pages/forum-detail/forum-detail?id=${id}` })
-      return
-    }
-    wx.navigateTo({ url: `/pages/wall-detail/wall-detail?id=${id}` })
+    require('../../utils/post-nav').openPostDetail(type, id)
   },
 
   onShareAppMessage() {

@@ -525,6 +525,39 @@ async function listStudentAuthRequests(status = 'pending') {
   }))
 }
 
+async function setUserSchool(userId, { schoolName, schoolCampus } = {}) {
+  const id = String(userId || '').trim()
+  if (!/^u_[A-Za-z0-9_]+$/.test(id)) return { ok: false, message: '请填写 u_ 开头的账号编号' }
+  const user = await db.getDoc('users', id)
+  if (!user) return { ok: false, message: '账号不存在' }
+  const name = String(schoolName || '').trim()
+  if (!name) return { ok: false, message: '请填写学校名称' }
+  if (name.length < 2) return { ok: false, message: '学校名称过短，请填写全称' }
+  if (name.length > 40) return { ok: false, message: '学校名称过长' }
+  const campus = String(schoolCampus || '').trim().slice(0, 20)
+  await db.updateDoc('users', id, {
+    schoolName: name,
+    schoolCampus: campus,
+    schoolLocked: true,
+    schoolSubmittedAt: user.schoolSubmittedAt || Date.now()
+  })
+  const school = user.showSchoolTag ? [name, campus].filter(Boolean).join(' · ') : ''
+  const [forum, wall] = await Promise.all([
+    db.findByField('forum_posts', 'authorId', id, 100),
+    db.findByField('wall_posts', 'authorId', id, 100)
+  ])
+  await Promise.all([
+    ...forum.filter((item) => !item.anonymous).map((item) => db.updateDoc('forum_posts', item.id || item._id, { authorSchool: school })),
+    ...wall.filter((item) => !item.anonymous).map((item) => db.updateDoc('wall_posts', item.id || item._id, { authorSchool: school }))
+  ])
+  return {
+    ok: true,
+    schoolName: name,
+    schoolCampus: campus,
+    message: `已把学校改为${[name, campus].filter(Boolean).join(' · ')}`
+  }
+}
+
 async function reviewSchoolChange(requestId, { approved, note } = {}) {
   const req = await db.getDoc('school_requests', requestId)
   if (!req || req.status !== 'pending' || req.type === 'student_auth') return { ok: false, message: '申请不存在或已处理' }
@@ -572,11 +605,35 @@ async function reviewStudentAuth(requestId, { approved, note } = {}) {
 }
 
 async function digestState() {
-  const queued = (await db.allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
-  const groups = (await db.allDocs('distribute_targets')).filter((item) => item.enabled && item.receiveDigest)
-  const digests = (await db.allDocs('digests')).sort((a, b) => b.createdAt - a.createdAt)
-  const logs = (await db.allDocs('distribute_logs')).sort((a, b) => b.createdAt - a.createdAt)
+  await Promise.all([
+    db.ensureCollection('digest_queue'),
+    db.ensureCollection('digests')
+  ])
+  let queued = []
+  let groups = []
+  let digests = []
+  let logs = []
   let candidates = []
+  try {
+    queued = (await db.allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
+  } catch (err) {
+    console.warn('[digestState] digest_queue', err && err.message)
+  }
+  try {
+    groups = (await db.allDocs('distribute_targets')).filter((item) => item.enabled && item.receiveDigest)
+  } catch (err) {
+    groups = []
+  }
+  try {
+    digests = (await db.allDocs('digests')).sort((a, b) => b.createdAt - a.createdAt)
+  } catch (err) {
+    console.warn('[digestState] digests', err && err.message)
+  }
+  try {
+    logs = (await db.allDocs('distribute_logs')).sort((a, b) => b.createdAt - a.createdAt)
+  } catch (err) {
+    logs = []
+  }
   try {
     candidates = await listDigestCandidates(30)
   } catch (err) {
@@ -854,29 +911,57 @@ async function listDigestCandidates(limit = 30) {
 }
 
 async function publishDigest(items) {
-  const picked = (items || []).filter((item) => item && item.contentId).slice(0, DIGEST_SIZE)
+  const picked = (items || [])
+    .filter((item) => item && item.contentId)
+    .slice(0, DIGEST_SIZE)
+    .map((item) => ({
+      contentType: item.contentType === 'forum' ? 'forum' : 'wall',
+      contentId: String(item.contentId),
+      title: String(item.title || '未命名').slice(0, 80),
+      summary: String(item.summary || '').slice(0, 120),
+      channel: String(item.channel || '').slice(0, 40),
+      pagepath: String(item.pagepath || itemPage(item)).replace(/^\//, ''),
+      createdAt: Number(item.createdAt) || 0
+    }))
   if (!picked.length) return { ok: false, message: '没有可汇总的帖子' }
-  const queue = await db.allDocs('digest_queue')
-  const ids = new Set(picked.map((item) => item.contentId))
-  await Promise.all(queue
-    .filter((item) => ids.has(item.contentId))
-    .map((item) => db.removeDoc('digest_queue', item.id || item._id)))
+  await Promise.all([
+    db.ensureCollection('digest_queue'),
+    db.ensureCollection('digests')
+  ])
+  try {
+    const queue = await db.allDocs('digest_queue')
+    const ids = new Set(picked.map((item) => item.contentId))
+    await Promise.all(queue
+      .filter((item) => ids.has(item.contentId) && (item.id || item._id))
+      .map((item) => db.removeDoc('digest_queue', item.id || item._id).catch(() => {})))
+  } catch (err) {
+    console.warn('[publishDigest] clear queue', err && err.message)
+  }
   const digest = {
     id: uid('dg_'),
-    items: picked.map(({ _id, ...rest }) => rest),
+    items: picked,
     title: `黎安话事精选 · ${picked.length}条汇总`,
     summary: picked.map((item, index) => `${index + 1}.${item.title}`).join(' ').slice(0, 120),
     createdAt: Date.now()
   }
   digest.pagepath = `pages/digest/digest?id=${digest.id}`
   digest.sharePath = `/pages/digest/digest?id=${digest.id}`
-  await db.setDoc('digests', digest.id, digest)
+  try {
+    await db.setDoc('digests', digest.id, digest)
+  } catch (err) {
+    console.error('[publishDigest] setDoc', err && err.message)
+    return { ok: false, message: `写入推文失败：${err.message || '云数据库错误'}` }
+  }
   let saved = digest
   try {
     saved = await attachDigestPaste(digest)
   } catch (err) {
     saved = { ...digest, pasteText: `文字链生成失败：${err.message || '失败'}` }
-    await db.setDoc('digests', digest.id, saved)
+    try {
+      await db.setDoc('digests', digest.id, saved)
+    } catch (err2) {
+      // 正文已落库，文字链失败不挡返回
+    }
   }
   return {
     ok: true,
@@ -886,50 +971,60 @@ async function publishDigest(items) {
 }
 
 async function buildDigestByTime(range) {
-  const candidates = await listDigestCandidates(40)
-  const now = Date.now()
-  let list = candidates
-  let label = '最近 10 条'
-  if (range === '24h') {
-    list = candidates.filter((item) => now - (item.createdAt || 0) < 24 * 60 * 60 * 1000)
-    label = '最近 24 小时'
-  } else if (range === '7d') {
-    list = candidates.filter((item) => now - (item.createdAt || 0) < 7 * 24 * 60 * 60 * 1000)
-    label = '最近 7 天'
+  try {
+    const candidates = await listDigestCandidates(40)
+    const now = Date.now()
+    let list = candidates
+    let label = '最近 10 条'
+    if (range === '24h') {
+      list = candidates.filter((item) => now - (item.createdAt || 0) < 24 * 60 * 60 * 1000)
+      label = '最近 24 小时'
+    } else if (range === '7d') {
+      list = candidates.filter((item) => now - (item.createdAt || 0) < 7 * 24 * 60 * 60 * 1000)
+      label = '最近 7 天'
+    }
+    const picked = list.slice(0, DIGEST_SIZE)
+    if (!picked.length) return { ok: false, message: `${label}里没有已通过的帖子` }
+    const result = await publishDigest(picked)
+    if (result.ok) {
+      const extra = list.length > picked.length ? `。这个范围共 ${list.length} 条，已取最新 ${picked.length} 条` : ''
+      result.message = `已按时间生成${label}的推文${extra}。复制后贴进公众号即可。`
+    }
+    return result
+  } catch (err) {
+    console.error('[buildDigestByTime]', err && err.message)
+    return { ok: false, message: err.message || '按时间出成稿失败' }
   }
-  const picked = list.slice(0, DIGEST_SIZE)
-  if (!picked.length) return { ok: false, message: `${label}里没有已通过的帖子` }
-  const result = await publishDigest(picked)
-  if (result.ok) {
-    const extra = list.length > picked.length ? `。这个范围共 ${list.length} 条，已取最新 ${picked.length} 条` : ''
-    result.message = `已按时间生成${label}的推文${extra}。复制后贴进公众号即可。`
-  }
-  return result
 }
 
 async function buildDigestFromSelection(picks) {
-  const wanted = []
-  const seen = new Set()
-  ;(Array.isArray(picks) ? picks : []).forEach((pick) => {
-    const contentId = String((pick && (pick.contentId || pick.id)) || '').trim()
-    const contentType = pick && pick.contentType === 'forum' ? 'forum' : 'wall'
-    if (!contentId || seen.has(contentId) || wanted.length >= DIGEST_SIZE) return
-    seen.add(contentId)
-    wanted.push({ contentType, contentId })
-  })
-  if (!wanted.length) return { ok: false, message: '先勾选要放进推文的帖子' }
-  const items = []
-  for (const pick of wanted) {
-    const post = await db.getDoc(pick.contentType === 'forum' ? 'forum_posts' : 'wall_posts', pick.contentId)
-    if (!post) continue
-    if (post.reviewStatus && post.reviewStatus !== 'approved') continue
-    items.push(toDigestItem(post, pick.contentType))
+  try {
+    const wanted = []
+    const seen = new Set()
+    ;(Array.isArray(picks) ? picks : []).forEach((pick) => {
+      const contentId = String((pick && (pick.contentId || pick.id)) || '').trim()
+      const contentType = pick && pick.contentType === 'forum' ? 'forum' : 'wall'
+      if (!contentId || seen.has(contentId) || wanted.length >= DIGEST_SIZE) return
+      seen.add(contentId)
+      wanted.push({ contentType, contentId })
+    })
+    if (!wanted.length) return { ok: false, message: '先勾选要放进推文的帖子' }
+    const items = []
+    for (const pick of wanted) {
+      const post = await db.getDoc(pick.contentType === 'forum' ? 'forum_posts' : 'wall_posts', pick.contentId)
+      if (!post) continue
+      if (post.reviewStatus && post.reviewStatus !== 'approved') continue
+      items.push(toDigestItem(post, pick.contentType))
+    }
+    items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    if (!items.length) return { ok: false, message: '勾选的帖子不存在，或还没通过审核' }
+    const result = await publishDigest(items)
+    if (result.ok) result.message = `已用勾选的 ${items.length} 条生成推文，按时间从新到旧排列。`
+    return result
+  } catch (err) {
+    console.error('[buildDigestFromSelection]', err && err.message)
+    return { ok: false, message: err.message || '生成推文失败' }
   }
-  items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-  if (!items.length) return { ok: false, message: '勾选的帖子不存在，或还没通过审核' }
-  const result = await publishDigest(items)
-  if (result.ok) result.message = `已用勾选的 ${items.length} 条生成推文，按时间从新到旧排列。`
-  return result
 }
 
 async function listGroups() {
@@ -1063,43 +1158,71 @@ async function getWeeklyHotBoard() {
   }
 }
 
+function escapeRegExp(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function weeklyCandidateFromPost(post, contentType) {
+  const id = post.id || post._id
+  return {
+    id,
+    contentType,
+    title: contentType === 'forum' ? post.title : wallHeadline(post),
+    summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+    tag: contentType === 'forum' ? (post.category || '') : (post.tag || ''),
+    likeCount: post.likeCount || 0,
+    commentCount: post.commentCount || 0,
+    createdAt: post.createdAt
+  }
+}
+
+function matchesWeeklyKeyword(post, contentType, q) {
+  if (!q) return true
+  const hay = contentType === 'forum'
+    ? `${post.title || ''} ${post.content || ''} ${post.category || ''}`
+    : `${post.title || ''} ${post.content || ''} ${post.tag || ''}`
+  return hay.toLowerCase().includes(q)
+}
+
+/** 有关键词时用云库正则直查，避免只扫到前几百条漏帖 */
+async function searchWeeklyCollection(collection, contentType, keyword, picked) {
+  const q = String(keyword || '').trim()
+  if (!q) {
+    return (await db.allDocs(collection))
+      .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+      .filter((item) => !picked.has(`${contentType}:${item.id || item._id}`))
+      .map((post) => weeklyCandidateFromPost(post, contentType))
+  }
+  if (db.useLocal()) {
+    return (await db.allDocs(collection))
+      .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+      .filter((item) => !picked.has(`${contentType}:${item.id || item._id}`))
+      .filter((item) => matchesWeeklyKeyword(item, contentType, q.toLowerCase()))
+      .map((post) => weeklyCandidateFromPost(post, contentType))
+  }
+  const database = db.getDb()
+  const _ = database.command
+  const reg = database.RegExp({ regexp: escapeRegExp(q), options: 'i' })
+  const orFields = contentType === 'forum'
+    ? [{ title: reg }, { content: reg }, { category: reg }]
+    : [{ title: reg }, { content: reg }, { tag: reg }]
+  const res = await database.collection(collection).where(_.or(orFields)).limit(100).get()
+  return (res.data || [])
+    .map((row) => ({ ...row, id: row.id || row._id }))
+    .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+    .filter((item) => !picked.has(`${contentType}:${item.id}`))
+    .filter((item) => matchesWeeklyKeyword(item, contentType, q.toLowerCase()))
+    .map((post) => weeklyCandidateFromPost(post, contentType))
+}
+
 async function listWeeklyHotCandidates(keyword = '') {
   const board = await getWeeklyHotBoard()
   const picked = new Set((board.items || []).map((item) => `${item.contentType || 'wall'}:${item.contentId}`))
-  const q = String(keyword || '').trim().toLowerCase()
-  const walls = (await db.allDocs('wall_posts'))
-    .filter((item) => item.reviewStatus === 'approved' && !picked.has(`wall:${item.id}`))
-    .filter((item) => {
-      if (!q) return true
-      return `${item.title || ''} ${item.content || ''} ${item.tag || ''}`.toLowerCase().includes(q)
-    })
-    .map((post) => ({
-      id: post.id,
-      contentType: 'wall',
-      title: wallHeadline(post),
-      summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-      tag: post.tag || '',
-      likeCount: post.likeCount || 0,
-      commentCount: post.commentCount || 0,
-      createdAt: post.createdAt
-    }))
-  const forums = (await db.allDocs('forum_posts'))
-    .filter((item) => item.reviewStatus === 'approved' && !picked.has(`forum:${item.id}`))
-    .filter((item) => {
-      if (!q) return true
-      return `${item.title || ''} ${item.content || ''} ${item.category || ''}`.toLowerCase().includes(q)
-    })
-    .map((post) => ({
-      id: post.id,
-      contentType: 'forum',
-      title: post.title,
-      summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-      tag: post.category || '',
-      likeCount: post.likeCount || 0,
-      commentCount: post.commentCount || 0,
-      createdAt: post.createdAt
-    }))
-  return walls.concat(forums).sort((a, b) => b.createdAt - a.createdAt).slice(0, 40)
+  const [walls, forums] = await Promise.all([
+    searchWeeklyCollection('wall_posts', 'wall', keyword, picked),
+    searchWeeklyCollection('forum_posts', 'forum', keyword, picked)
+  ])
+  return walls.concat(forums).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 40)
 }
 
 async function saveWeeklyHotBoard(board) {
@@ -1130,7 +1253,7 @@ async function addWeeklyHotItem(contentId, contentType = 'wall') {
   const type = contentType === 'forum' ? 'forum' : 'wall'
   const collection = type === 'forum' ? 'forum_posts' : 'wall_posts'
   const post = await db.getDoc(collection, contentId)
-  if (!post || post.reviewStatus !== 'approved') {
+  if (!post || !moderation.isPublicStatus(post.reviewStatus || 'approved')) {
     return { ok: false, message: type === 'forum' ? '只能添加已通过的学习分享内容' : '只能添加已通过的互助广场内容' }
   }
   const board = await getWeeklyHotBoard()
@@ -1353,6 +1476,7 @@ module.exports = {
   removeLexiconTerm,
   listSchoolRequests,
   listStudentAuthRequests,
+  setUserSchool,
   reviewSchoolChange,
   reviewStudentAuth,
   digestState,

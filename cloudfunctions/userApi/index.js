@@ -5,6 +5,9 @@ const security = require('./lib/security')
 const wecom = require('./lib/wecom')
 const moderation = require('./lib/moderation')
 const wxSecurity = require('./lib/wx-security')
+const homeFeed = require('./lib/home-feed')
+const sharePoster = require('./lib/share-poster')
+const defaultProfile = require('./lib/default-profile')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
@@ -134,6 +137,41 @@ function uid(prefix = '') {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+function samePostId(userId, fingerprint) {
+  const bucket = Math.floor(Date.now() / 60000)
+  const hash = crypto.createHash('sha1').update(`${userId}|${fingerprint}|${bucket}`).digest('hex').slice(0, 20)
+  return hash
+}
+
+function isMissingDoc(err) {
+  const text = String((err && (err.errMsg || err.message)) || err || '')
+  return /does not exist|不存在|DOCUMENT_NOT_FOUND|-502005/i.test(text)
+}
+
+async function readPost(ref) {
+  try {
+    const snap = await ref.get()
+    return (snap && snap.data) || null
+  } catch (err) {
+    if (isMissingDoc(err)) return null
+    throw err
+  }
+}
+
+async function savePostOnce(collection, post) {
+  const ref = db.collection(collection).doc(post.id)
+  const existing = await readPost(ref)
+  if (existing && existing.id) return { post: existing, duplicated: true }
+  try {
+    await ref.set({ data: post })
+  } catch (err) {
+    const again = await readPost(ref)
+    if (again && again.id) return { post: again, duplicated: true }
+    throw err
+  }
+  return { post, duplicated: false }
+}
+
 function formatSchool(user) {
   return [user.schoolName, user.schoolCampus].filter(Boolean).join(' · ')
 }
@@ -152,7 +190,7 @@ async function ensureOfficialAuthor() {
     id: OFFICIAL_AUTHOR_ID,
     openid: OFFICIAL_AUTHOR_ID,
     nickname: OFFICIAL_AUTHOR_NAME,
-    avatar: '/images/avatar-default.png',
+    avatar: defaultProfile.stableAvatar(OFFICIAL_AUTHOR_ID),
     bio: '校园墙官方发布',
     status: 'active',
     schoolName: '',
@@ -169,6 +207,14 @@ async function ensureOfficialAuthor() {
     const res = await db.collection('users').doc(OFFICIAL_AUTHOR_ID).get()
     const existing = res && res.data
     if (existing && (existing.id || existing._id)) {
+      if (defaultProfile.isLegacyAvatar(existing.avatar) && !defaultProfile.isCustomAvatar(existing.avatar)) {
+        const avatar = defaultProfile.stableAvatar(OFFICIAL_AUTHOR_ID)
+        await db.collection('users').doc(OFFICIAL_AUTHOR_ID).update({ data: { avatar } })
+        existing = { ...existing, avatar }
+        try {
+          await syncAuthorProfileOnContent({ ...existing, id: OFFICIAL_AUTHOR_ID }, { syncAvatar: true })
+        } catch (err) { /* 官方头像回刷失败不挡住登录 */ }
+      }
       if (existing.nickname !== OFFICIAL_AUTHOR_NAME || !existing.postWhitelist) {
         await db.collection('users').doc(OFFICIAL_AUTHOR_ID).update({
           data: { nickname: OFFICIAL_AUTHOR_NAME, postWhitelist: true }
@@ -216,8 +262,8 @@ async function syncAuthorProfileOnContent(user, { syncAvatar = false, syncNickna
   if (!syncAvatar && !syncNickname) return
 
   const postPatch = {}
-  if (syncAvatar) postPatch.authorAvatar = user.avatar || '/images/avatar-default.png'
-  if (syncNickname) postPatch.authorName = user.nickname || '黎安话事'
+  if (syncAvatar) postPatch.authorAvatar = defaultProfile.resolveAvatar(user.avatar, user.id)
+  if (syncNickname) postPatch.authorName = user.nickname || defaultProfile.stableNickname(user.id)
 
   const [forum, wall, comments] = await Promise.all([
     allDocs('forum_posts', { authorId: user.id }),
@@ -307,6 +353,7 @@ function publicUser(user) {
   next.wechatBound = isWeChatOpenid(next.openid)
   next.webBound = !!(next.webUsername || next.webEmail || next.webPhone)
   next.wechatLogin = next.wechatBound || !!next.webWechatOpenid
+  next.avatar = defaultProfile.resolveAvatar(next.avatar, next.id)
   delete next.openid
   delete next.passwordHash
   delete next.passwordSalt
@@ -422,45 +469,105 @@ function invalidateFeedCache(collection) {
 
 async function queryOfficialFeed(collection, limit = FEED_LIMIT) {
   try {
-    const res = await db.collection(collection).where({ authorOfficial: true }).limit(100).get()
-    return (res.data || [])
+    const [byFlag, byAuthor] = await Promise.all([
+      db.collection(collection).where({ authorOfficial: true }).limit(100).get().catch(() => ({ data: [] })),
+      db.collection(collection).where({ authorId: OFFICIAL_AUTHOR_ID }).limit(100).get().catch(() => ({ data: [] }))
+    ])
+    const map = new Map()
+    ;[...(byFlag.data || []), ...(byAuthor.data || [])].forEach((item) => {
+      if (!item) return
+      const key = item.id || item._id
+      if (key) map.set(key, item)
+    })
+    const rows = [...map.values()]
       .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+      .filter((item) => homeFeed.isOfficialPost(item))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, limit)
+    const missing = rows.filter((item) => item.authorId === OFFICIAL_AUTHOR_ID && !item.authorOfficial && !item.anonymous)
+    if (missing.length) {
+      updateDocsByIds(collection, missing, { authorOfficial: true }).catch(() => {})
+    }
+    return rows
   } catch (err) {
     console.error('[queryOfficialFeed]', collection, err && err.message)
     return []
   }
 }
 
+async function queryStatusFeed(collection, where, limit) {
+  if (feedOrderOk[collection] !== false) {
+    try {
+      const res = await db.collection(collection).where(where).orderBy('createdAt', 'desc').limit(limit).get()
+      feedOrderOk[collection] = true
+      return res.data || []
+    } catch (err) {
+      feedOrderOk[collection] = false
+      console.error('[queryStatusFeed]', collection, err && err.message)
+    }
+  }
+  try {
+    const res = await db.collection(collection).where(where).limit(limit).get()
+    return res.data || []
+  } catch (err) {
+    return []
+  }
+}
+
+function mergePublicRows(groups, limit) {
+  const map = new Map()
+  ;(groups || []).forEach((rows) => {
+    ;(rows || []).forEach((item) => {
+      if (!item || !moderation.isPublicStatus(item.reviewStatus || 'approved')) return
+      const id = item.id || item._id
+      if (!id || map.has(id)) return
+      map.set(id, item)
+    })
+  })
+  return Array.from(map.values())
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+    .slice(0, limit)
+}
+
+async function queryHomeSource(collection, before, limit) {
+  const size = Math.min(50, Math.max(10, Number(limit) || 40))
+  const cursor = Number(before) || 0
+  try {
+    const query = cursor > 0
+      ? db.collection(collection).where({ createdAt: _.lt(cursor) })
+      : db.collection(collection)
+    const res = await query.orderBy('createdAt', 'desc').limit(size).get()
+    const raw = res.data || []
+    return {
+      raw,
+      rows: raw.filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
+    }
+  } catch (err) {
+    console.error('[queryHomeSource]', collection, err && err.message)
+    return { raw: [], rows: [] }
+  }
+}
+
 async function queryApprovedFeed(collection, limit = FEED_LIMIT) {
   const slot = feedCache[collection]
   const now = Date.now()
-  if (slot && slot.rows && now - slot.at < FEED_CACHE_TTL) return slot.rows
-  let rows = []
-  if (feedOrderOk[collection] !== false) {
+  if (slot && slot.rows && slot.rows.length >= limit && now - slot.at < FEED_CACHE_TTL) return slot.rows
+  const [approved, legacy] = await Promise.all([
+    queryStatusFeed(collection, { reviewStatus: 'approved' }, limit),
+    queryStatusFeed(collection, { reviewStatus: _.exists(false) }, limit)
+  ])
+  let rows = mergePublicRows([approved, legacy], limit)
+  if (!rows.length) {
     try {
-      const res = await db.collection(collection)
-        .where({ reviewStatus: 'approved' })
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get()
-      rows = res.data || []
-      feedOrderOk[collection] = true
+      const res = await db.collection(collection).orderBy('createdAt', 'desc').limit(limit).get()
+      rows = mergePublicRows([res.data || []], limit)
     } catch (err) {
-      feedOrderOk[collection] = false
-      console.error('[queryApprovedFeed]', collection, err && err.message)
-    }
-  }
-  if (feedOrderOk[collection] === false) {
-    try {
-      const res = await db.collection(collection)
-        .where({ reviewStatus: 'approved' })
-        .limit(limit)
-        .get()
-      rows = res.data || []
-    } catch (err2) {
-      rows = []
+      try {
+        const res = await db.collection(collection).limit(Math.min(100, limit)).get()
+        rows = mergePublicRows([res.data || []], limit)
+      } catch (err2) {
+        rows = []
+      }
     }
   }
   if (slot) {
@@ -629,7 +736,7 @@ function guestUser() {
     id: 'guest_readonly',
     openid: 'guest_readonly',
     nickname: '访客',
-    avatar: '/images/avatar-default.png',
+    avatar: defaultProfile.stableAvatar('guest_readonly'),
     bio: '',
     createdAt: 0,
     schoolName: '',
@@ -652,8 +759,8 @@ function createBlankUser(openid, extras = {}) {
   return {
     id: extras.id || `u_${suffix}_${now.toString(36)}`,
     openid,
-    nickname: extras.nickname || '黎安话事',
-    avatar: extras.avatar || '/images/avatar-default.png',
+    nickname: extras.nickname || defaultProfile.randomNickname(),
+    avatar: extras.avatar || defaultProfile.randomAvatar(),
     bio: extras.bio || '在这里遇见有趣的灵魂',
     createdAt: now,
     schoolName: '',
@@ -809,7 +916,6 @@ async function remapOwnership(fromId, toId) {
   ))
 }
 
-const DEFAULT_AVATAR = '/images/avatar-default.png'
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/
 const MIME_EXT = {
   'image/jpeg': 'jpg',
@@ -859,7 +965,7 @@ async function persistCloudFile(value, folder = 'web') {
   if (raw.startsWith('cloud://') || raw.startsWith('/images/')) return raw
   // 客户端本地临时路径应已在小程序端上传；云函数无法读 wxfile
   if (raw.startsWith('wxfile://') || raw.startsWith('http://tmp')) return raw
-  if (raw.startsWith('data:image/svg')) return DEFAULT_AVATAR
+  if (raw.startsWith('data:image/svg')) return defaultProfile.DEFAULT_AVATARS[0]
 
   if (/^https?:\/\//i.test(raw)) {
     try {
@@ -948,7 +1054,7 @@ async function mergeAccounts(fromUser, toUser) {
   if ((!merged.bio || merged.bio === '在这里遇见有趣的灵魂') && fromUser.bio) {
     merged.bio = fromUser.bio
   }
-  if ((!merged.avatar || merged.avatar === DEFAULT_AVATAR) && fromUser.avatar && fromUser.avatar !== DEFAULT_AVATAR) {
+  if (defaultProfile.isLegacyAvatar(merged.avatar) && !defaultProfile.isLegacyAvatar(fromUser.avatar)) {
     merged.avatar = fromUser.avatar
   }
   if (!merged.schoolLocked && fromUser.schoolLocked) {
@@ -1039,11 +1145,6 @@ async function runContentReview(input, user) {
     getLexiconMap()
   ])
   const imageFlags = { ...(input.imageFlags || {}) }
-  const parts = (vendor && vendor.parts) || []
-  const imageHit = parts.find((item) => item && String(item.source || '').includes('imgSecCheck') && item.highRisk)
-  if (imageHit || (vendor.highRisk && String(vendor.source || '').includes('imgSecCheck'))) {
-    imageFlags.marketingAd = true
-  }
   const review = moderation.reviewText({ ...input, imageFlags }, {
     lexicons,
     vendor
@@ -1236,25 +1337,41 @@ async function likedIds(userId, type, postIds) {
 
 function decorate(list, type, user, liked) {
   return list.map((item) => {
+    const id = String((item && (item.id || item._id)) || '').trim()
     const next = {
       ...item,
-      liked: liked.includes(item.id),
+      id,
+      liked: !!(id && liked.includes(id)),
       isOwner: !!(user && item.authorId === user.id),
       pinned: !!item.pinned,
-      official: !!item.authorOfficial,
+      official: homeFeed.isOfficialPost(item),
       canManage: canModerate(user)
     }
     next.mine = next.isOwner
+    next._legacyName = !item.anonymous
+      && !defaultProfile.isAnonymousNickname(item.authorName)
+      && defaultProfile.isLegacyNickname(item.authorName)
+    next.authorName = defaultProfile.resolveAuthorName(item.authorName, item.authorId || id, {
+      anonymous: !!item.anonymous
+    })
+    next.authorAvatar = defaultProfile.resolveAuthorAvatar(
+      item.authorAvatar,
+      item.anonymous || item.authorName === '匿名同学' ? (id || item.authorId) : item.authorId,
+      { anonymous: !!item.anonymous, authorName: item.authorName }
+    )
+    next._legacyAvatar = !(item.anonymous || item.authorName === '匿名同学')
+      && defaultProfile.isLegacyAvatar(item.authorAvatar)
     if (type === 'wall') {
       next.dealStatus = normalizeWallDealStatus(item.dealStatus)
       next.dealStatusLabel = wallDealStatusLabel(next.dealStatus)
       next.headline = wallHeadline(item)
       next.summary = wallSummary(item)
-      next.hasContact = moderation.needsWallContact(item.tag) && !!(item.contactType && item.contactValue) && moderation.isPublicStatus(item.reviewStatus)
-      next.contactType = item.contactType || ''
-      next.contactTypeLabel = contactTypeLabel(item.contactType)
-      delete next.contactValue
     }
+    next.hasContact = !!(item.contactType && item.contactValue && item.contactType !== 'phone')
+      && moderation.isPublicStatus(item.reviewStatus || 'approved')
+    next.contactType = item.contactType || ''
+    next.contactTypeLabel = contactTypeLabel(item.contactType)
+    delete next.contactValue
     next.reviewStatusLabel = moderation.reviewStatusLabel(item.reviewStatus)
     if (!moderation.isPublicStatus(item.reviewStatus) && !next.isOwner) {
       next.content = item.reviewNote || '内容审核中'
@@ -1330,14 +1447,109 @@ function compactFeedItem(item) {
     images: Array.isArray(item.images) ? item.images.slice(0, 3) : [],
     reviewHits: undefined,
     reviewRuleIds: undefined,
-    contactValue: undefined
+    contactValue: undefined,
+    _legacyAvatar: undefined,
+    _legacyName: undefined
   }
+}
+
+async function usersByIds(ids) {
+  const uniq = [...new Set((ids || []).filter(Boolean))]
+  const map = {}
+  for (let i = 0; i < uniq.length; i += 10) {
+    const chunk = uniq.slice(i, i + 10)
+    const res = await db.collection('users').where({ id: _.in(chunk) }).limit(10).get().catch(() => ({ data: [] }))
+    ;(res.data || []).forEach((row) => {
+      if (row && row.id) map[row.id] = row
+    })
+  }
+  return map
+}
+
+async function hydrateLegacyAvatars(list, viewer) {
+  const rows = Array.isArray(list) ? list : []
+  const ids = rows.filter((item) => item && (item._legacyAvatar || item._legacyName)).map((item) => item.authorId)
+  const accounts = ids.length ? await usersByIds(ids) : {}
+  return rows.map((item) => {
+    if (!item) return item
+    const next = { ...item }
+    const account = accounts[item.authorId]
+    delete next._legacyAvatar
+    delete next._legacyName
+    if (item._legacyName && !item.anonymous) {
+      const accountName = account && account.nickname
+      const viewerName = viewer && item.authorId === viewer.id ? viewer.nickname : ''
+      const picked = [accountName, viewerName].find((name) => (
+        name && !defaultProfile.isLegacyNickname(name) && !defaultProfile.isAnonymousNickname(name)
+      ))
+      if (picked) next.authorName = picked
+    }
+    if (item.anonymous) {
+      next.authorAvatar = defaultProfile.stableAvatar(item.id || item.authorId)
+      return next
+    }
+    if (!item._legacyAvatar) return next
+    const fromAccount = account && (
+      defaultProfile.isCustomAvatar(account.avatar)
+      || defaultProfile.DEFAULT_AVATARS.indexOf(account.avatar) >= 0
+    ) ? account.avatar : ''
+    const fromViewer = viewer && item.authorId === viewer.id && defaultProfile.isCustomAvatar(viewer.avatar)
+      ? viewer.avatar
+      : ''
+    next.authorAvatar = fromAccount || fromViewer || defaultProfile.stableAvatar(item.authorId)
+    return next
+  })
+}
+
+async function backfillAuthorNames(user) {
+  if (!user || user.nicknameBackfillAt || user.id === 'guest_readonly' || user.id === OFFICIAL_AUTHOR_ID) return user
+  let next = user
+  const nick = defaultProfile.resolveProfileNickname(user.nickname, user.id)
+  if (nick !== user.nickname) next = await saveUser({ ...user, nickname: nick })
+  next = await saveUser({ ...next, nicknameBackfillAt: Date.now() })
+  try {
+    const [forum, wall, comments] = await Promise.all([
+      allDocs('forum_posts', { authorId: next.id }),
+      allDocs('wall_posts', { authorId: next.id }),
+      allDocs('comments', { authorId: next.id })
+    ])
+    const anonRows = (rows) => rows.filter((item) => item.anonymous && item.authorName !== '匿名同学')
+    const legacyRows = (rows) => rows.filter((item) => (
+      !item.anonymous
+      && !defaultProfile.isAnonymousNickname(item.authorName)
+      && defaultProfile.isLegacyNickname(item.authorName)
+    ))
+    await Promise.all([
+      updateDocsByIds('forum_posts', anonRows(forum), { authorName: '匿名同学' }),
+      updateDocsByIds('wall_posts', anonRows(wall), { authorName: '匿名同学' }),
+      updateDocsByIds('forum_posts', legacyRows(forum), { authorName: next.nickname }),
+      updateDocsByIds('wall_posts', legacyRows(wall), { authorName: next.nickname }),
+      updateDocsByIds('comments', comments.filter((item) => defaultProfile.isLegacyNickname(item.authorName)), { authorName: next.nickname })
+    ])
+  } catch (err) {
+    // 历史昵称回刷失败时，读取时仍会按规则替换展示名
+  }
+  return next
+}
+
+async function backfillAuthorAvatars(user) {
+  if (!user || user.avatarBackfillAt || user.id === 'guest_readonly' || user.id === 'official_lian_wall') return user
+  const avatar = defaultProfile.isLegacyAvatar(user.avatar)
+    ? defaultProfile.stableAvatar(user.id)
+    : user.avatar
+  const next = await saveUser({ ...user, avatar, avatarBackfillAt: Date.now() })
+  try {
+    await syncAuthorProfileOnContent(next, { syncAvatar: true })
+  } catch (err) {
+    // 历史帖回刷失败时，读取时仍会按资料补头像
+  }
+  return next
 }
 
 async function listPosts(collection, type, user, filter = {}) {
   const real = isRealUser(user)
   const officialOnly = !!filter.official
-  const limit = Math.min(FEED_LIMIT, Math.max(8, Number(filter.limit) || FEED_LIMIT))
+  const limit = Math.min(80, Math.max(8, Number(filter.limit) || FEED_LIMIT))
   // 我的帖：不要 orderBy，避免缺复合索引时退化成全表 allDocs（极慢）
   const [rows, mine, pinned] = await Promise.all([
     officialOnly ? queryOfficialFeed(collection, limit) : queryApprovedFeed(collection, limit),
@@ -1359,7 +1571,7 @@ async function listPosts(collection, type, user, filter = {}) {
     list = list.filter((item) => normalizeWallDealStatus(item.dealStatus) === filter.dealStatus)
   }
   if (officialOnly) {
-    list = list.filter((item) => item.authorOfficial)
+    list = list.filter((item) => homeFeed.isOfficialPost(item))
   }
   if (filter.keyword) {
     const q = filter.keyword.trim().toLowerCase()
@@ -1372,7 +1584,8 @@ async function listPosts(collection, type, user, filter = {}) {
   list = sortFeed(list, filter.sort === 'hot')
   const page = list.slice(0, limit)
   const liked = real ? await likedIds(user.id, type, page.map((item) => item.id)) : []
-  return decorate(page, type, user, liked).map(compactFeedItem)
+  const decorated = await hydrateLegacyAvatars(decorate(page, type, user, liked), user)
+  return decorated.map(compactFeedItem)
 }
 
 async function enqueueWall(post) {
@@ -1509,25 +1722,25 @@ async function ensureDemoContent() {
     {
       id: 'demo_u1',
       nickname: '晚风同学',
-      avatar: '/images/avatar-1.png',
+      avatar: defaultProfile.stableAvatar('demo_u1'),
       school: '武汉大学 · 文理学部'
     },
     {
       id: 'demo_u2',
       nickname: '图书馆钉子户',
-      avatar: '/images/avatar-2.png',
+      avatar: defaultProfile.stableAvatar('demo_u2'),
       school: '武汉大学 · 信息学部'
     },
     {
       id: 'demo_u3',
       nickname: '骑行的猫',
-      avatar: '/images/avatar-3.png',
+      avatar: defaultProfile.stableAvatar('demo_u3'),
       school: '华中科技大学'
     },
     {
       id: 'demo_u4',
       nickname: '匿名树洞',
-      avatar: '/images/avatar-5.png',
+      avatar: defaultProfile.stableAvatar('demo_u4'),
       school: ''
     }
   ]
@@ -1938,6 +2151,156 @@ async function makeWxaCode(ticket, envVersion) {
   return `data:image/jpeg;base64,${buf.toString('base64')}`
 }
 
+async function fetchPostDoc(type, id) {
+  const collection = type === 'wall' ? 'wall_posts' : 'forum_posts'
+  try {
+    const res = await db.collection(collection).doc(String(id || '')).get()
+    return (res && res.data) || null
+  } catch (err) {
+    return null
+  }
+}
+
+function assertWxacodeBuffer(raw) {
+  if (!raw || !raw.length) throw new Error('empty wxacode')
+  if (raw[0] === 0x7b) {
+    const err = JSON.parse(raw.toString('utf8'))
+    throw new Error(err.errmsg || `wxacode ${err.errcode}`)
+  }
+  return raw
+}
+
+async function createUnlimitedCodeBuffer(page, scene, envVersion) {
+  try {
+    const res = await cloud.openapi.wxacode.getUnlimited({
+      scene,
+      page,
+      checkPath: false,
+      envVersion,
+      width: 430
+    })
+    const buf = res && (res.buffer || res.fileContent)
+    if (buf && buf.length) return assertWxacodeBuffer(Buffer.from(buf))
+  } catch (err) {
+    console.warn('[wxacode.getUnlimited]', err && err.message)
+  }
+  const token = await getMiniAccessToken()
+  const raw = await wxHttps(
+    `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`,
+    {
+      scene,
+      page,
+      check_path: false,
+      env_version: envVersion,
+      width: 430
+    }
+  )
+  return assertWxacodeBuffer(raw)
+}
+
+async function createPathCodeBuffer(pagePath, envVersion) {
+  // 有限码把帖子 id 放在页面 path 上。长按识别走 query.id，
+  // 不依赖 scene；scene 在未发布或被分享入口截断时会丢。
+  try {
+    const res = await cloud.openapi.wxacode.get({
+      path: pagePath,
+      width: 430,
+      envVersion
+    })
+    const buf = res && (res.buffer || res.fileContent)
+    if (buf && buf.length) return assertWxacodeBuffer(Buffer.from(buf))
+  } catch (err) {
+    console.warn('[wxacode.get]', err && err.message)
+  }
+  try {
+    const token = await getMiniAccessToken()
+    const raw = await wxHttps(
+      `https://api.weixin.qq.com/wxa/getwxacode?access_token=${encodeURIComponent(token)}`,
+      {
+        path: pagePath,
+        width: 430,
+        env_version: envVersion
+      }
+    )
+    return assertWxacodeBuffer(raw)
+  } catch (err) {
+    console.warn('[wxacode.get https]', err && err.message)
+    const cut = pagePath.indexOf('?')
+    const page = cut >= 0 ? pagePath.slice(0, cut) : pagePath
+    const query = cut >= 0 ? pagePath.slice(cut + 1) : ''
+    const scene = (new URLSearchParams(query).get('id') || '').trim()
+    if (!scene) throw err
+    return createUnlimitedCodeBuffer(page, scene, envVersion)
+  }
+}
+
+function shareCodeEnv(requested) {
+  const raw = String(requested || '').trim()
+  if (raw === 'develop' || raw === 'trial' || raw === 'release') return raw
+  return process.env.SHARE_CODE_ENV || 'release'
+}
+
+async function getOrCreateShareCode(type, id, requestedEnv) {
+  const contentType = type === 'wall' ? 'wall' : 'forum'
+  const postId = String(id || '').trim()
+  if (!postId) return { ok: false, message: '缺少帖子' }
+  const post = await fetchPostDoc(contentType, postId)
+  if (!post || !sharePoster.isPublicApproved(post)) {
+    return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+  }
+  const page = sharePoster.detailPageFor(contentType)
+  const scene = sharePoster.sceneForPost(contentType, postId)
+  const codePath = `${page}?id=${encodeURIComponent(postId)}`
+  const envVersion = shareCodeEnv(requestedEnv)
+  const cacheId = `scode_path_${contentType}_${postId}_${envVersion}`
+  try {
+    const cached = (await db.collection('meta').doc(cacheId).get()).data
+    if (cached && cached.fileId) {
+      return {
+        ok: true,
+        code: {
+          page: cached.page || codePath,
+          scene: cached.scene || scene,
+          envVersion: cached.envVersion || envVersion,
+          fileId: cached.fileId,
+          imageUrl: cached.fileId
+        }
+      }
+    }
+  } catch (err) {
+    // miss
+  }
+  const buffer = await createPathCodeBuffer(codePath, envVersion)
+  const upload = await cloud.uploadFile({
+    cloudPath: `share_codes/${contentType}_${postId}_${envVersion}.png`,
+    fileContent: buffer
+  })
+  const fileId = upload.fileID
+  if (!fileId) return { ok: false, message: '原帖码上传失败' }
+  const row = {
+    id: cacheId,
+    type: contentType,
+    contentId: postId,
+    page: codePath,
+    scene,
+    envVersion,
+    fileId,
+    imageUrl: fileId,
+    createdAt: Date.now()
+  }
+  await db.collection('meta').doc(cacheId).set({ data: row })
+  return {
+    ok: true,
+    code: {
+      page: codePath,
+      scene,
+      envVersion,
+      fileId,
+      imageUrl: fileId
+    }
+  }
+}
+
 async function makeUrlScheme(ticket) {
   const token = await getMiniAccessToken()
   const buf = await wxHttps(
@@ -1977,6 +2340,9 @@ function shapeComments(rows, user) {
     replyToId: item.replyToId || '',
     replyToName: item.replyToName || '',
     images: Array.isArray(item.images) ? item.images : [],
+    authorAvatar: defaultProfile.isLegacyAvatar(item.authorAvatar) && user && item.authorId === user.id && defaultProfile.isCustomAvatar(user.avatar)
+      ? user.avatar
+      : defaultProfile.resolveAvatar(item.authorAvatar, item.authorId),
     depth: Number(item.depth) || 0,
     reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus || 'approved'),
     mine: !!(viewerId && item.authorId === viewerId),
@@ -2362,6 +2728,116 @@ const handlers = {
     return { ok: true, posts, speakGate: speakGate(user) }
   },
 
+  async listHome(payload, user) {
+    const topicName = homeFeed.normalizeTopic((payload && (payload.topic || payload.category)) || '全部')
+    const keyword = String((payload && payload.keyword) || '').trim()
+    const hot = payload && payload.sort === 'hot'
+    const before = Number(payload && payload.before) || 0
+    const pageSize = Math.min(30, Math.max(10, Number(payload && payload.limit) || 24))
+    const batchSize = 40
+    let cursor = before
+    const matched = []
+    const seen = new Set()
+    let hasMore = false
+    const pushMatch = (item, type) => {
+      const id = postDocId(item)
+      if (!id || seen.has(id)) return
+      if (!homeFeed.topicMatches(item, type, topicName)) return
+      if (keyword && !homeFeed.textHit(item, type, keyword)) return
+      seen.add(id)
+      matched.push({ ...item, id, contentType: type })
+    }
+    for (let round = 0; round < 5 && matched.length < pageSize; round += 1) {
+      const [forumSource, wallSource] = await Promise.all([
+        queryHomeSource('forum_posts', cursor, batchSize),
+        queryHomeSource('wall_posts', cursor, batchSize)
+      ])
+      const raw = [...(forumSource.raw || []), ...(wallSource.raw || [])]
+      if (!raw.length) {
+        hasMore = false
+        break
+      }
+      ;(forumSource.rows || []).forEach((item) => pushMatch(item, 'forum'))
+      ;(wallSource.rows || []).forEach((item) => pushMatch(item, 'wall'))
+      const oldest = raw.reduce((min, item) => {
+        const time = Number(item && item.createdAt) || 0
+        if (!time) return min
+        return min ? Math.min(min, time) : time
+      }, 0)
+      const full = (forumSource.raw || []).length >= batchSize || (wallSource.raw || []).length >= batchSize
+      if (!oldest || oldest === cursor) {
+        hasMore = false
+        break
+      }
+      cursor = oldest
+      hasMore = full
+      if (!full) break
+    }
+    matched.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+    let page = matched
+    if (matched.length > pageSize) {
+      const boundary = Number(matched[pageSize - 1].createdAt) || 0
+      let end = pageSize
+      while (end < matched.length && Number(matched[end].createdAt) === boundary) end += 1
+      page = matched.slice(0, end)
+      hasMore = true
+    }
+    const nextBefore = page.reduce((min, item) => {
+      const time = Number(item && item.createdAt) || 0
+      if (!time) return min
+      return min ? Math.min(min, time) : time
+    }, 0) || (hasMore ? cursor : 0)
+    if (!before) {
+      const [pinForum, pinWall, mineForum, mineWall] = await Promise.all([
+        pinnedPosts('forum_posts'),
+        pinnedPosts('wall_posts'),
+        isRealUser(user)
+          ? db.collection('forum_posts').where({ authorId: user.id }).limit(8).get().then((res) => res.data || []).catch(() => [])
+          : Promise.resolve([]),
+        isRealUser(user)
+          ? db.collection('wall_posts').where({ authorId: user.id }).limit(8).get().then((res) => res.data || []).catch(() => [])
+          : Promise.resolve([])
+      ])
+      pinForum.forEach((item) => pushMatch(item, 'forum'))
+      pinWall.forEach((item) => pushMatch(item, 'wall'))
+      mineForum.forEach((item) => {
+        if (!item || item.authorId !== user.id) return
+        if (item.reviewStatus === 'rejected' || item.reviewStatus === 'emergency_block') return
+        pushMatch(item, 'forum')
+      })
+      mineWall.forEach((item) => {
+        if (!item || item.authorId !== user.id) return
+        if (item.reviewStatus === 'rejected' || item.reviewStatus === 'emergency_block') return
+        pushMatch(item, 'wall')
+      })
+      const extras = matched.filter((item) => !page.some((row) => postDocId(row) === postDocId(item)))
+      if (extras.length) page = page.concat(extras)
+    }
+    const forumPage = page.filter((item) => item.contentType === 'forum')
+    const wallPage = page.filter((item) => item.contentType === 'wall')
+    const real = isRealUser(user)
+    const [forumLiked, wallLiked] = await Promise.all([
+      real ? likedIds(user.id, 'forum', forumPage.map((item) => item.id)) : Promise.resolve([]),
+      real ? likedIds(user.id, 'wall', wallPage.map((item) => item.id)) : Promise.resolve([])
+    ])
+    const decorated = [
+      ...decorate(forumPage, 'forum', user, forumLiked),
+      ...decorate(wallPage, 'wall', user, wallLiked)
+    ]
+    const hydrated = await hydrateLegacyAvatars(decorated, user)
+    const posts = homeFeed.sortHomePosts(hydrated.map(compactFeedItem), hot)
+      .map((item) => homeFeed.toHomeCard(item, item.contentType))
+      .filter((item) => item && item.id)
+    return {
+      ok: true,
+      paged: true,
+      posts,
+      hasMore: !!hasMore,
+      nextBefore,
+      speakGate: speakGate(user)
+    }
+  },
+
   async listWall(payload, user) {
     const [posts, digestRes] = await Promise.all([
       listPosts('wall_posts', 'wall', user, payload || {}),
@@ -2383,8 +2859,10 @@ const handlers = {
   async getPost(payload, user) {
     const type = payload.type === 'wall' ? 'wall' : 'forum'
     const collection = type === 'wall' ? 'wall_posts' : 'forum_posts'
-    const id = String((payload && payload.id) || '').trim()
-    if (!id) return { ok: false, code: 'BAD_REQUEST', message: '缺少帖子 id', post: null }
+    const id = String((payload && (payload.id || payload.postId || payload.contentId)) || '').trim()
+    if (!id || id === 'undefined' || id === 'null') {
+      return { ok: false, code: 'BAD_REQUEST', message: '缺少帖子 id', post: null }
+    }
     try {
       const res = await db.collection(collection).doc(id).get()
       const post = res && res.data
@@ -2397,7 +2875,7 @@ const handlers = {
             .catch(() => [])
           : Promise.resolve(null)
       ])
-      const decorated = decorate([post], type, user, liked)[0]
+      const decorated = (await hydrateLegacyAvatars(decorate([post], type, user, liked), user))[0]
       if (!moderation.isPublicStatus(decorated.reviewStatus) && !decorated.isOwner) {
         return { ok: true, post: null, notFound: true, comments: payload.includeComments ? [] : undefined }
       }
@@ -2433,13 +2911,16 @@ const handlers = {
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const title = String(payload.title || '').trim()
     const content = String(payload.content || '').trim()
-    if (!title) return { ok: false, message: '请填写标题' }
+    const tag = homeFeed.cleanTag(payload.tag || payload.category) || homeFeed.DEFAULT_HOME_TAG
+    const contact = validateWallContact(payload.contactType, payload.contactValue, tag)
+    if (!contact.ok) return contact
+    if (!title && !content && !(payload.images || []).length) return { ok: false, message: '请填写标题或正文' }
     const [forumRes, limit] = await Promise.all([
       db.collection('forum_posts').where({ authorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
       consumeRateLimit(user.id, 'post', user)
     ])
     const forum = forumRes.data || []
-    const fingerprint = security.contentFingerprint(title, content)
+    const fingerprint = security.contentFingerprint(tag, title, content)
     if (!user.postWhitelist && !user.appAdmin && security.hasDuplicateContent(forum, user.id, fingerprint)) {
       return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复发布相同内容' }
     }
@@ -2454,29 +2935,36 @@ const handlers = {
       title,
       content,
       contentType: 'forum',
-      category: payload.category,
-      channel: payload.category,
+      category: tag,
+      channel: tag,
       images
     }, user)
+    const postId = `f_${samePostId(user.id, fingerprint)}`
     const post = {
-      id: uid('f_'),
-      category: payload.category,
+      id: postId,
+      tag,
+      category: tag,
       title,
       content,
       images,
       authorId: user.id,
       authorName: payload.anonymous ? '匿名同学' : user.nickname,
-      authorAvatar: payload.anonymous ? '/images/avatar-default.png' : user.avatar,
+      authorAvatar: payload.anonymous ? defaultProfile.stableAvatar(postId) : defaultProfile.resolveAvatar(user.avatar, user.id),
       authorSchool: authorSchoolForUser(user, payload.anonymous),
       authorOfficial: (!!user.appAdmin || user.id === OFFICIAL_AUTHOR_ID) && !payload.anonymous,
       anonymous: !!payload.anonymous,
+      contactType: contact.contactType,
+      contactValue: contact.contactValue,
       ...reviewPatch(review),
       createdAt: Date.now(),
       likeCount: 0,
       commentCount: 0,
       viewCount: 0
     }
-    await db.collection('forum_posts').doc(post.id).set({ data: post })
+    const savedForum = await savePostOnce('forum_posts', post)
+    if (savedForum.duplicated) {
+      return { ok: true, post: savedForum.post, message: '发布成功', speakGate: speakGate(user) }
+    }
     if (moderation.isPublicStatus(post.reviewStatus)) invalidateFeedCache('forum_posts')
     if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
       await handleReviewViolation(user, review, '学习分享发帖')
@@ -2525,8 +3013,9 @@ const handlers = {
       contactValue: contact.contactValue,
       images
     }, user)
+    const postId = `w_${samePostId(user.id, fingerprint)}`
     const post = {
-      id: uid('w_'),
+      id: postId,
       tag: payload.tag,
       title,
       price: String(payload.price || '').trim(),
@@ -2540,7 +3029,7 @@ const handlers = {
       contactValue: contact.contactValue,
       authorId: user.id,
       authorName: payload.anonymous ? '匿名同学' : user.nickname,
-      authorAvatar: payload.anonymous ? '/images/avatar-default.png' : user.avatar,
+      authorAvatar: payload.anonymous ? defaultProfile.stableAvatar(postId) : defaultProfile.resolveAvatar(user.avatar, user.id),
       authorSchool: authorSchoolForUser(user, payload.anonymous),
       authorOfficial: (!!user.appAdmin || user.id === OFFICIAL_AUTHOR_ID) && !payload.anonymous,
       anonymous: !!payload.anonymous,
@@ -2551,7 +3040,10 @@ const handlers = {
       commentCount: 0,
       viewCount: 0
     }
-    await db.collection('wall_posts').doc(post.id).set({ data: post })
+    const savedWall = await savePostOnce('wall_posts', post)
+    if (savedWall.duplicated) {
+      return { ok: true, post: savedWall.post, message: '发布成功', speakGate: speakGate(user) }
+    }
     if (moderation.isPublicStatus(post.reviewStatus)) invalidateFeedCache('wall_posts')
     if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
       await handleReviewViolation(user, review, '校园墙发帖')
@@ -2767,7 +3259,7 @@ const handlers = {
       depth,
       authorId: user.id,
       authorName: user.nickname,
-      authorAvatar: user.avatar,
+      authorAvatar: defaultProfile.resolveAvatar(user.avatar, user.id),
       ...reviewPatch(review),
       createdAt: Date.now()
     }
@@ -2845,7 +3337,7 @@ const handlers = {
     const res = await db.collection(collection).where({ authorId: user.id }).limit(40).get().catch(() => ({ data: [] }))
     const rows = (res.data || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     const liked = await likedIds(user.id, type, rows.map((item) => item.id))
-    return { ok: true, posts: decorate(rows, type, user, liked) }
+    return { ok: true, posts: await hydrateLegacyAvatars(decorate(rows, type, user, liked), user) }
   },
 
   async myLiked(payload, user) {
@@ -2854,7 +3346,7 @@ const handlers = {
     const ids = await likedIds(user.id, type)
     const map = await fetchPostsByIds(collection, ids)
     const rows = ids.map((id) => map[id]).filter(Boolean)
-    return { ok: true, posts: decorate(rows, type, user, ids) }
+    return { ok: true, posts: await hydrateLegacyAvatars(decorate(rows, type, user, ids), user) }
   },
 
   async listConversations(_payload, user) {
@@ -2880,7 +3372,7 @@ const handlers = {
         ...row,
         peerId,
         peerName: peer.nickname || '同学',
-        peerAvatar: peer.avatar || '/images/avatar-default.png',
+        peerAvatar: defaultProfile.resolveAvatar(peer.avatar, peer.id || peerId),
         unreadCount: Number((row.unread || {})[user.id]) || 0
       }
     })
@@ -2934,7 +3426,7 @@ const handlers = {
         ...conversation,
         peerId,
         peerName: peer.nickname || '同学',
-        peerAvatar: peer.avatar || '/images/avatar-default.png',
+        peerAvatar: defaultProfile.resolveAvatar(peer.avatar, peer.id),
         unreadCount: Number((conversation.unread || {})[user.id]) || 0
       }
     }
@@ -2967,7 +3459,7 @@ const handlers = {
         ...conversation,
         peerId,
         peerName: peer.nickname || '同学',
-        peerAvatar: peer.avatar || '/images/avatar-default.png',
+        peerAvatar: defaultProfile.resolveAvatar(peer.avatar, peer.id),
         unreadCount: Number((conversation.unread || {})[user.id]) || 0
       }
     }
@@ -2994,8 +3486,16 @@ const handlers = {
       messages = []
     }
     messages = messages
+      .filter((item) => {
+        const status = item.reviewStatus || 'approved'
+        return item.senderId === user.id || moderation.isPublicStatus(status)
+      })
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
-      .map((item) => ({ ...item, mine: item.senderId === user.id }))
+      .map((item) => ({
+        ...item,
+        images: Array.isArray(item.images) ? item.images.filter(Boolean).slice(0, 3) : [],
+        mine: item.senderId === user.id
+      }))
     return { ok: true, messages }
   },
 
@@ -3012,7 +3512,10 @@ const handlers = {
     if (!conversation || !(conversation.memberIds || []).includes(user.id)) {
       return { ok: false, message: '会话不存在' }
     }
-    const unread = { ...(conversation.unread || {}), [user.id]: 0 }
+    const opened = Number(payload && payload.unreadAtOpen)
+    if (!Number.isFinite(opened) || opened < 0) return { ok: false, message: '缺少已读位置' }
+    const current = Number((conversation.unread || {})[user.id]) || 0
+    const unread = { ...(conversation.unread || {}), [user.id]: Math.max(0, current - opened) }
     await db.collection('conversations').doc(conversationId).update({ data: { unread } })
     return { ok: true }
   },
@@ -3022,11 +3525,20 @@ const handlers = {
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const conversationId = String((payload && payload.conversationId) || '').trim()
     const text = String((payload && payload.content) || '').trim()
-    if (!text) return { ok: false, message: '先写点内容吧' }
+    let images = []
+    try {
+      images = await persistCloudFiles(
+        (Array.isArray(payload.images) ? payload.images : []).filter(Boolean).slice(0, 3),
+        'dm'
+      )
+    } catch (err) {
+      return { ok: false, message: (err && err.message) || '图片上传失败' }
+    }
+    if (!text && !images.length) return { ok: false, message: '写点文字或发张图吧' }
     if (text.length > 2000) return { ok: false, message: '私信最多 2000 字' }
     const [limit, review, convRes] = await Promise.all([
       consumeRateLimit(user.id, 'dm'),
-      runContentReview({ content: text, contentType: 'dm' }, user),
+      runContentReview({ content: text, contentType: 'dm', images }, user),
       conversationId
         ? db.collection('conversations').doc(conversationId).get().then((res) => res && res.data).catch(() => null)
         : Promise.resolve(null)
@@ -3049,33 +3561,43 @@ const handlers = {
       return { ok: false, message: '会话不存在' }
     }
     const now = Date.now()
+    const held = !moderation.isPublicStatus(review.reviewStatus)
     const message = {
       id: uid('dm_'),
       conversationId,
       senderId: user.id,
       content: text,
+      images,
+      ...reviewPatch(review),
       createdAt: now
     }
-    const unread = { ...(conversation.unread || {}) }
-    ;(conversation.memberIds || []).forEach((id) => {
-      if (id === user.id) unread[id] = 0
-      else unread[id] = (Number(unread[id]) || 0) + 1
-    })
-    await Promise.all([
-      db.collection('dm_messages').doc(message.id).set({ data: message }),
-      db.collection('conversations').doc(conversationId).update({
+    await db.collection('dm_messages').doc(message.id).set({ data: message })
+    if (!held) {
+      const unread = { ...(conversation.unread || {}) }
+      ;(conversation.memberIds || []).forEach((id) => {
+        if (id === user.id) unread[id] = 0
+        else unread[id] = (Number(unread[id]) || 0) + 1
+      })
+      const preview = text ? text.slice(0, 40) : '[图片]'
+      await db.collection('conversations').doc(conversationId).update({
         data: {
           lastMessageAt: now,
-          lastPreview: text.slice(0, 40),
+          lastPreview: preview,
           lastSenderId: user.id,
           unread
         }
       })
-    ])
-    return { ok: true, message: { ...message, mine: true } }
+    }
+    return {
+      ok: true,
+      held,
+      notice: held ? (review.message || '审核通过后对方才能看到') : '',
+      message: { ...message, mine: true }
+    }
   },
 
   async myReceivedComments(_payload, user) {
+    const snapshotAt = Date.now()
     const [byPost, byReply] = await Promise.all([
       db.collection('comments').where({ postAuthorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
       db.collection('comments').where({ replyToUserId: user.id }).limit(20).get().catch(() => ({ data: [] }))
@@ -3096,18 +3618,75 @@ const handlers = {
     ])
     const comments = rows.slice(0, 40).map((item) => {
       const post = item.targetType === 'wall' ? wallById[item.targetId] : forumById[item.targetId]
+      const canOpen = !!(post && (homeFeed.isPublicPost(post) || post.authorId === user.id))
+      const postImages = post && Array.isArray(post.images) ? post.images.filter(Boolean) : []
       return {
         ...item,
         parentId: item.parentId || '',
         images: Array.isArray(item.images) ? item.images : [],
-        postExists: !!post,
-        postTitle: post
+        postExists: canOpen,
+        postCover: canOpen ? (postImages[0] || '') : '',
+        postTitle: canOpen
           ? (item.targetType === 'wall' ? wallHeadline(post) : post.title)
-          : '原帖已删除',
+          : '原帖已不可用',
         postBadge: item.targetType === 'wall' ? '互助广场' : '学习分享'
       }
     })
-    return { ok: true, comments }
+    return { ok: true, comments, snapshotAt }
+  },
+
+  async myReceivedLikes(_payload, user) {
+    const snapshotAt = Date.now()
+    let likeRows = []
+    try {
+      const res = await db.collection('likes').where({ postAuthorId: user.id }).limit(40).get()
+      likeRows = res.data || []
+    } catch (err) {
+      likeRows = []
+    }
+    const rows = likeRows
+      .filter((item) => item && item.userId && item.userId !== user.id && item.postAuthorId === user.id)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 40)
+    const forumIds = rows.filter((item) => item.type !== 'wall').map((item) => item.postId)
+    const wallIds = rows.filter((item) => item.type === 'wall').map((item) => item.postId)
+    const likerIds = Array.from(new Set(rows.map((item) => item.userId).filter(Boolean)))
+    const [forumById, wallById] = await Promise.all([
+      fetchPostsByIds('forum_posts', forumIds),
+      fetchPostsByIds('wall_posts', wallIds)
+    ])
+    const peers = {}
+    await Promise.all(likerIds.map(async (peerId) => {
+      try {
+        const peerRes = await db.collection('users').doc(peerId).get()
+        peers[peerId] = peerRes.data || null
+      } catch (e) {
+        peers[peerId] = null
+      }
+    }))
+    const likes = rows.map((item) => {
+      const type = item.type === 'wall' ? 'wall' : 'forum'
+      const post = type === 'wall' ? wallById[item.postId] : forumById[item.postId]
+      const canOpen = !!(post && (homeFeed.isPublicPost(post) || post.authorId === user.id))
+      const peer = peers[item.userId] || {}
+      const postImages = post && Array.isArray(post.images) ? post.images.filter(Boolean) : []
+      return {
+        id: item.id || `${item.userId}_${type}_${item.postId}`,
+        userId: item.userId,
+        userName: peer.nickname || '同学',
+        userAvatar: defaultProfile.resolveAvatar(peer.avatar, peer.id),
+        contentType: type,
+        postId: item.postId,
+        createdAt: item.createdAt || 0,
+        postExists: canOpen,
+        postCover: canOpen ? (postImages[0] || '') : '',
+        postTitle: canOpen
+          ? (type === 'wall' ? wallHeadline(post) : post.title)
+          : '原帖已不可用',
+        postBadge: type === 'wall' ? '互助广场' : '学习分享'
+      }
+    })
+    return { ok: true, likes, snapshotAt }
   },
 
   async myComments(_payload, user) {
@@ -3184,12 +3763,104 @@ const handlers = {
   },
 
   async markInboxSeen(payload, user) {
-    const now = Date.now()
     const next = { ...user }
-    if (!payload || payload.likes !== false) next.lastSeenLikesAt = now
-    if (!payload || payload.comments !== false) next.lastSeenCommentsAt = now
+    const likes = payload && payload.likes === true
+    const comments = payload && payload.comments === true
+    if (!likes && !comments) return { ok: false, message: '未指定已读类别' }
+    if (likes) {
+      const at = Number(payload.likesAt) || 0
+      if (!at) return { ok: false, message: '缺少已读位置' }
+      next.lastSeenLikesAt = Math.max(Number(user.lastSeenLikesAt) || 0, at)
+    }
+    if (comments) {
+      const at = Number(payload.commentsAt) || 0
+      if (!at) return { ok: false, message: '缺少已读位置' }
+      next.lastSeenCommentsAt = Math.max(Number(user.lastSeenCommentsAt) || 0, at)
+    }
     await saveUser(next)
     return { ok: true, user: publicUser(next) }
+  },
+
+  async getShareCode(payload) {
+    const type = payload && (payload.type || payload.postSource) === 'wall' ? 'wall' : 'forum'
+    const id = String((payload && (payload.id || payload.postId)) || '').trim()
+    try {
+      return await getOrCreateShareCode(type, id, payload && payload.envVersion)
+    } catch (err) {
+      return { ok: false, message: (err && err.message) || '原帖码生成失败' }
+    }
+  },
+
+  async generateSharePoster(payload) {
+    const type = payload && (payload.postSource === 'wall' || payload.type === 'wall') ? 'wall' : 'forum'
+    const postId = String((payload && (payload.postId || payload.id || payload.contentId)) || '').trim()
+    const requestId = String((payload && payload.requestId) || '').trim()
+    if (!postId || postId === 'undefined' || postId === 'null') {
+      return { ok: false, message: '缺少帖子 id' }
+    }
+    const post = await fetchPostDoc(type, postId)
+    if (!post || !sharePoster.isPublicApproved(post)) {
+      return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+    }
+    const publicPost = sharePoster.shapePublicPost(post, type)
+    if (!publicPost) return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+    // 明确剔除浏览量，避免进入渲染输入
+    delete publicPost.viewCount
+    const postRevision = sharePoster.buildPostRevision(post, type)
+    let codeResult
+    try {
+      codeResult = await getOrCreateShareCode(type, postId, payload && payload.envVersion)
+    } catch (err) {
+      return { ok: false, message: (err && err.message) || '原帖码生成失败' }
+    }
+    if (!codeResult || !codeResult.ok || !codeResult.code || !codeResult.code.fileId) {
+      return { ok: false, message: (codeResult && codeResult.message) || '原帖码生成失败' }
+    }
+    // 复查公开状态与内容版本
+    const again = await fetchPostDoc(type, postId)
+    if (!again || !sharePoster.isPublicApproved(again)) {
+      return { ok: false, code: 'NOT_PUBLIC', message: '内容暂不可生成分享图' }
+    }
+    const latestRevision = sharePoster.buildPostRevision(again, type)
+    if (latestRevision !== postRevision) {
+      return { ok: false, code: 'STALE', message: '帖子内容已更新，请重新生成' }
+    }
+    return {
+      ok: true,
+      status: 'ready',
+      // 小程序端按同一模板渲染 PNG；此处返回渲染输入与原帖码
+      imageFileId: '',
+      postSource: type,
+      postId,
+      postRevision,
+      templateVersion: sharePoster.TEMPLATE_VERSION,
+      requestId,
+      width: sharePoster.POSTER_WIDTH,
+      height: 0,
+      publicPost,
+      originalPostCode: {
+        page: codeResult.code.page,
+        scene: codeResult.code.scene,
+        envVersion: codeResult.code.envVersion,
+        fileId: codeResult.code.fileId
+      }
+    }
+  },
+
+  async validateSharePoster(payload) {
+    const type = payload && payload.postSource === 'wall' ? 'wall' : 'forum'
+    const postId = String((payload && payload.postId) || '').trim()
+    const postRevision = String((payload && payload.postRevision) || '').trim()
+    if (!postId) return { ok: true, canSave: false, reason: '缺少帖子' }
+    const post = await fetchPostDoc(type, postId)
+    if (!post || !sharePoster.isPublicApproved(post)) {
+      return { ok: true, canSave: false, reason: '内容已下架或不可查看' }
+    }
+    const latest = sharePoster.buildPostRevision(post, type)
+    if (postRevision && latest !== postRevision) {
+      return { ok: true, canSave: false, reason: '帖子内容已更新，请重新生成' }
+    }
+    return { ok: true, canSave: true, postRevision: latest }
   },
 
   async getPublicProfile(payload, user) {
@@ -3234,8 +3905,8 @@ const handlers = {
       isSelf: !!(me && (me.id === userId || me.id === profileId || me._id === userId)),
       profile: {
         id: profileId,
-        nickname: target.nickname || '黎安话事',
-        avatar: target.avatar || '/images/avatar-default.png',
+        nickname: defaultProfile.resolveProfileNickname(target.nickname, profileId),
+        avatar: defaultProfile.resolveAvatar(target.avatar, target.id),
         bio: target.bio || '在这里遇见有趣的灵魂',
         schoolText,
         schoolLocked: !!target.schoolLocked,
@@ -3263,7 +3934,7 @@ const handlers = {
     const rows = (authoredRes.data || [])
       .filter((item) => !item.anonymous)
       .sort((a, b) => b.createdAt - a.createdAt)
-    return { ok: true, posts: decorate(rows, type, user || guestUser(), liked) }
+    return { ok: true, posts: await hydrateLegacyAvatars(decorate(rows, type, user || guestUser(), liked), user) }
   },
 
   async stats(_payload, user) {
@@ -3335,7 +4006,7 @@ const handlers = {
         board: {
           id: 'current',
           title: '每周精选',
-          subtitle: '学习分享 + 互助广场热榜',
+          subtitle: '本周校园精选',
           enabled: false,
           items: [],
           preview: [],
@@ -3375,7 +4046,7 @@ const handlers = {
     const allItems = (board.items || []).map((item, index) => {
       const type = item.contentType === 'forum' ? 'forum' : 'wall'
       const post = type === 'forum' ? forumById[item.contentId] : wallById[item.contentId]
-      if (!post || post.reviewStatus === 'rejected') return null
+      if (!post || !homeFeed.isPublicPost(post)) return null
       const title = type === 'forum'
         ? String(post.title || '').trim()
         : String(wallHeadline(post) || '').trim()
@@ -3386,13 +4057,13 @@ const handlers = {
         title: title || summary.slice(0, 36),
         summary,
         oneLiner: title || summary.slice(0, 36),
-        channel: type === 'forum' ? `学习分享 · ${post.category || ''}` : `互助广场 · ${post.tag || ''}`,
-        tag: type === 'forum' ? (post.category || '') : (post.tag || ''),
+        channel: homeFeed.primaryTag(post, type),
+        tag: homeFeed.primaryTag(post, type),
         likeCount: post.likeCount || 0,
         commentCount: post.commentCount || 0,
         pagepath: type === 'forum'
-          ? `pages/forum-detail/forum-detail?id=${post.id}`
-          : `pages/wall-detail/wall-detail?id=${post.id}`,
+          ? `pages/forum-detail/forum-detail?id=${post.id || post._id || item.contentId}`
+          : `pages/wall-detail/wall-detail?id=${post.id || post._id || item.contentId}`,
         rank: index + 1
       }
     }).filter(Boolean)
@@ -3408,9 +4079,10 @@ const handlers = {
     items = items.map((item, index) => ({ ...item, rank: index + 1 }))
     const resultBoard = {
       ...board,
+      subtitle: homeFeed.publicWeeklySubtitle(board.subtitle),
       id: 'current',
       items,
-      preview: allItems.slice(0, 8).map((item, index) => ({
+      preview: allItems.slice(0, 3).map((item, index) => ({
         rank: index + 1,
         contentType: item.contentType,
         contentId: item.contentId,
@@ -3440,17 +4112,25 @@ const handlers = {
     }
     const limit = await consumeRateLimit(user.id, 'contactView')
     if (!limit.ok) return limit
-    let post
-    try {
-      post = (await db.collection('wall_posts').doc(payload.id).get()).data
-    } catch (err) {
-      return { ok: false, message: '这条信息已不存在' }
+    const preferForum = payload && payload.type === 'forum'
+    const collections = preferForum ? ['forum_posts', 'wall_posts'] : ['wall_posts', 'forum_posts']
+    let post = null
+    for (let i = 0; i < collections.length; i += 1) {
+      try {
+        const row = (await db.collection(collections[i]).doc(payload.id).get()).data
+        if (row) {
+          post = row
+          break
+        }
+      } catch (err) {
+        // try next
+      }
     }
     if (!post) return { ok: false, message: '这条信息已不存在' }
     if (!moderation.isPublicStatus(post.reviewStatus) && post.authorId !== user.id) {
       return { ok: false, message: '这条信息已不存在' }
     }
-    if (!moderation.needsWallContact(post.tag) || !post.contactType || !post.contactValue || post.contactType === 'phone') {
+    if (!post.contactType || !post.contactValue || post.contactType === 'phone') {
       return { ok: false, message: '发布者未留下微信号' }
     }
     const view = {
@@ -3485,11 +4165,19 @@ const handlers = {
     }
     const limit = await consumeRateLimit(user.id, 'contactFeedback')
     if (!limit.ok) return limit
-    let post
-    try {
-      post = (await db.collection('wall_posts').doc(payload.id).get()).data
-    } catch (err) {
-      return { ok: false, message: '这条信息已不存在' }
+    const preferForum = payload && payload.type === 'forum'
+    const collections = preferForum ? ['forum_posts', 'wall_posts'] : ['wall_posts', 'forum_posts']
+    let post = null
+    for (let i = 0; i < collections.length; i += 1) {
+      try {
+        const row = (await db.collection(collections[i]).doc(payload.id).get()).data
+        if (row) {
+          post = row
+          break
+        }
+      } catch (err) {
+        // try next
+      }
     }
     if (!post) return { ok: false, message: '这条信息已不存在' }
     if (!moderation.isPublicStatus(post.reviewStatus) && post.authorId !== user.id) {
@@ -3498,7 +4186,7 @@ const handlers = {
     if (post.authorId === user.id) {
       return { ok: false, message: '不能反馈自己的联系方式' }
     }
-    if (!moderation.needsWallContact(post.tag) || !post.contactType || !post.contactValue) {
+    if (!post.contactType || !post.contactValue) {
       return { ok: false, message: '该帖未留下可反馈的联系方式' }
     }
     const viewed = await db.collection('contact_views').where({
@@ -3764,6 +4452,7 @@ async function ensureAppAdmin(user) {
 const GUEST_OK = new Set([
   'listForum',
   'listWall',
+  'listHome',
   'getPost',
   'bumpView',
   'listComments',
@@ -3772,7 +4461,10 @@ const GUEST_OK = new Set([
   'listUserPosts',
   'getDigests',
   'stats',
-  'trackEvents'
+  'trackEvents',
+  'getShareCode',
+  'generateSharePoster',
+  'validateSharePoster'
 ])
 
 const WEB_AUTH_ACTIONS = new Set(['webRegister', 'webLogin', 'createWebLoginTicket', 'pollWebLogin'])
@@ -3804,7 +4496,11 @@ exports.main = async (event) => {
         const patch = {}
         if (unionid && user.unionid !== unionid) patch.unionid = unionid
         if (isWeChatOpenid(OPENID) && user.openid !== OPENID) patch.openid = OPENID
+        const profilePatch = defaultProfile.defaultProfilePatch(user)
+        if (profilePatch) Object.assign(patch, profilePatch)
         if (Object.keys(patch).length) user = await saveUser({ ...user, ...patch })
+        user = await backfillAuthorAvatars(user)
+        user = await backfillAuthorNames(user)
       }
       user = await ensureAppAdmin(user)
       const keepIdentity = action === 'enterOfficial' || action === 'leaveOfficial'

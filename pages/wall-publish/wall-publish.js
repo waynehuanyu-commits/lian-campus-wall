@@ -75,9 +75,8 @@ Page({
     maxImages: 9
   },
 
-  onLoad(query) {
-    const tag = decodeURIComponent(query.tag || '')
-    this.applyBoard(store.WALL_BOARDS.includes(tag) ? tag : store.WALL_BOARDS[0])
+  onLoad() {
+    wx.redirectTo({ url: '/pages/forum-publish/forum-publish' })
   },
 
   async onShow() {
@@ -99,12 +98,10 @@ Page({
 
   applyBoard(tag) {
     const meta = BOARD_META[tag] || BOARD_META['二手闲置流转']
-    const allowContact = store.needsWallContact(tag)
     this.setData({
       tag,
       isRide: tag === '出行拼车',
-      allowContact,
-      contactValue: allowContact ? this.data.contactValue : '',
+      allowContact: true,
       titleLabel: meta.titleLabel || '',
       titlePlaceholder: meta.titlePlaceholder || '',
       extraLabel: meta.extraLabel || '',
@@ -190,7 +187,7 @@ Page({
   },
 
   async onSubmit() {
-    if (this.data.submitting || !auth.ensureCanSpeak()) return
+    if (this._submitLock || this.data.submitting || !auth.ensureCanSpeak()) return
     const { tag, isRide, title, extraField, extra, routeFrom, routeTo, departTime, content, images, contactValue, anonymous } = this.data
     const text = (content || '').trim()
     const titleText = (title || '').trim()
@@ -206,8 +203,11 @@ Page({
       return
     }
 
+    this._submitLock = true
     this.setData({ submitting: true })
-    const result = await repo.createWallPost({
+    let result
+    try {
+      result = await repo.createWallPost({
       tag,
       title: titleText,
       price: tag === '二手闲置流转' ? extraField : '',
@@ -221,7 +221,10 @@ Page({
       contactValue: contact.contactValue,
       anonymous
     })
-    this.setData({ submitting: false })
+    } finally {
+      this._submitLock = false
+      this.setData({ submitting: false })
+    }
     if (auth.showActionError(result)) {
       track.publishFail({
         surface: 'wall_publish',

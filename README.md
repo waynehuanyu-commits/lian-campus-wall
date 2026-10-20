@@ -39,6 +39,8 @@ npm start
 
 **正式云库**：填齐 `TCB_ENV / TCB_SECRET_ID / TCB_SECRET_KEY`，并去掉 `ADMIN_LOCAL`；云库需有 `lexicon_terms` 集合。
 
+**运营自动化接库**：小程序端不能直连数据库；脚本与后台一样用腾讯云 API 密钥 + Node SDK。见 [`ops/README.md`](ops/README.md)（`npm run ping` / `npm run stats`）。
+
 演示/本地后台账号不要再用小程序里的 `admin888`。密码只放服务器环境变量。
 
 ## 用户端功能

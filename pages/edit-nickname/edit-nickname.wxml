@@ -1,33 +1,30 @@
-<view class="page">
+<form class="page" bindsubmit="onSave">
   <view class="body">
     <view class="field">
       <view class="field-head">
         <text class="label">昵称</text>
-        <text class="count">{{nickname.length}}/20</text>
       </view>
       <input
         class="input"
         type="nickname"
+        name="nickname"
         maxlength="20"
         cursor-spacing="80"
         confirm-type="done"
-        value="{{nickname}}"
-        placeholder="填写昵称"
+        placeholder="{{placeholder}}"
         placeholder-class="ph"
-        bindinput="onInput"
-        bindblur="onNicknameBlur"
         bindnicknamereview="onNicknameReview"
-        bindconfirm="onSave"
       />
     </view>
-    <view class="tips">点输入框后，键盘上方会出现「使用微信昵称」，点一下就会填进来。也可以直接打字。</view>
+    <view class="tips">点输入框，键盘上方会出现「使用微信昵称」。点一下填入，再点保存。也可以直接打字。</view>
   </view>
 
   <view class="footer">
-    <view
-      class="save-btn {{saving || !canSave ? 'disabled' : ''}}"
-      hover-class="{{saving || !canSave ? '' : 'save-btn-hover'}}"
-      bindtap="onSave"
-    >{{saving ? '保存中…' : '保存'}}</view>
+    <button
+      class="save-btn {{saving ? 'disabled' : ''}}"
+      form-type="submit"
+      disabled="{{saving}}"
+      hover-class="save-btn-hover"
+    >{{saving ? '保存中…' : '保存'}}</button>
   </view>
-</view>
+</form>

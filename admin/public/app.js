@@ -17,20 +17,20 @@ const state = {
 }
 
 const titles = {
-  overview: ['OVERVIEW', '今日概览'],
-  review: ['REVIEW', '内容审帖'],
-  keywords: ['LEXICON', '本地词库'],
-  accounts: ['ACCOUNT', '账号处置'],
-  whitelist: ['ALLOW', '发帖白名单'],
-  official: ['OFFICIAL', '官方登录'],
-  staff: ['STAFF', '运营账号'],
-  reports: ['REPORT', '举报处理'],
-  digest: ['DIGEST', '汇总推送'],
-  weekly: ['HOT', '每周精选热榜'],
-  groups: ['GROUPS', '客户群'],
-  school: ['SCHOOL', '学校修改审核'],
-  student: ['STUDENT', '学生认证审核'],
-  more: ['MORE', '日志与说明']
+  overview: ['', '今日概览'],
+  review: ['', '内容审帖'],
+  keywords: ['', '本地词库'],
+  accounts: ['', '账号处置'],
+  whitelist: ['', '发帖白名单'],
+  official: ['', '官方登录'],
+  staff: ['', '运营账号'],
+  reports: ['', '举报处理'],
+  digest: ['', '汇总推送'],
+  weekly: ['', '每周精选热榜'],
+  groups: ['', '客户群'],
+  school: ['', '学校修改审核'],
+  student: ['', '学生认证审核'],
+  more: ['', '日志与说明']
 }
 
 const TYPE_LABEL = {
@@ -40,16 +40,26 @@ const TYPE_LABEL = {
 }
 
 async function api(url, options = {}) {
-  const res = await fetch(url, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options
-  })
-  const data = await res.json()
+  let res
+  try {
+    res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options
+    })
+  } catch (err) {
+    return { ok: false, message: (err && err.message) || '网络请求失败' }
+  }
+  let data
+  try {
+    data = await res.json()
+  } catch (err) {
+    return { ok: false, message: `服务器返回异常(${res.status})` }
+  }
   if (res.status === 401 && !url.includes('/api/login') && !url.includes('/api/session')) {
     showLogin()
   }
-  return data
+  return data || { ok: false, message: '服务器无响应' }
 }
 
 function showLogin() {
@@ -329,6 +339,7 @@ async function render() {
             <button data-act="whitelist" data-id="${esc(item.id)}" data-on="${item.postWhitelist ? '1' : '0'}">${item.postWhitelist ? '取消发帖白名单' : '设为发帖白名单'}</button>
             <button data-act="official" data-id="${esc(item.id)}" data-on="${item.officialLoginAllowed ? '1' : '0'}">${item.officialLoginAllowed ? '取消官方登录' : '允许登录官方账号'}</button>
             <button data-act="appadmin" data-id="${esc(item.id)}" data-on="${item.appAdmin ? '1' : '0'}">${item.appAdmin ? '取消小程序管理员' : '设为小程序管理员'}</button>
+            <button data-act="school" data-id="${esc(item.id)}">改学校</button>
           </div>
         </div>`)}
       <div class="card">
@@ -395,6 +406,26 @@ async function render() {
             const found = await api('/api/accounts/search?q=' + encodeURIComponent(state.accountQuery))
             if (found.ok) state.accountHits = found.list || []
           }
+          render()
+          return
+        }
+        if (btn.dataset.act === 'school') {
+          const schoolName = window.prompt('学校全称', '')
+          if (schoolName === null) return
+          const schoolCampus = window.prompt('校区，没有就留空', '')
+          if (schoolCampus === null) return
+          const result = await api('/api/school/set', {
+            method: 'POST',
+            body: JSON.stringify({ id: btn.dataset.id, schoolName, schoolCampus })
+          })
+          alert(result.ok ? (result.message || '已更新') : (result.message || '失败'))
+          if (!result.ok) return
+          if (state.accountQuery) {
+            const found = await api('/api/accounts/search?q=' + encodeURIComponent(state.accountQuery))
+            if (found.ok) state.accountHits = found.list || []
+          }
+          const fresh = await api('/api/accounts')
+          if (fresh.ok) state.data.accounts = fresh.list || []
           render()
           return
         }
@@ -747,13 +778,16 @@ async function render() {
       <div class="card">
         <h3>当前热榜顺序</h3>
         ${listOrEmpty(board.items, (item) => `
-          <div class="list-item">
-            <div class="row"><strong>#${item.rank} ${esc(item.title)}</strong><span>${item.contentType === 'forum' ? '学习分享' : '互助广场'} · ${esc(item.tag || '')}</span></div>
-            <div class="meta">${esc(item.oneLiner || item.summary || '')}</div>
-            <div class="row gap">
-              <button data-weekly-move="up" data-id="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">上移</button>
-              <button data-weekly-move="down" data-id="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">下移</button>
-              <button data-weekly-remove="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">移除</button>
+          <div class="hot-row">
+            <span class="hot-rank">${item.rank}</span>
+            <div class="hot-copy">
+              <strong>${esc(item.title)}</strong>
+              <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+            </div>
+            <div class="hot-ops">
+              <button class="quiet" data-weekly-move="up" data-id="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">上移</button>
+              <button class="quiet" data-weekly-move="down" data-id="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">下移</button>
+              <button class="quiet warn" data-weekly-remove="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">移除</button>
             </div>
           </div>`)}
       </div>
@@ -764,10 +798,12 @@ async function render() {
           <button id="weekly-search" type="button">搜索</button>
         </div>
         ${listOrEmpty(weekly.candidates, (item) => `
-          <div class="list-item">
-            <div class="row"><strong>${esc(item.title)}</strong><span>${item.contentType === 'forum' ? '学习分享' : '互助广场'} · ${esc(item.tag || '')}</span></div>
-            <div class="meta">${esc(item.summary || '')}</div>
-            <button data-weekly-add="${esc(item.id)}" data-type="${esc(item.contentType || 'wall')}" type="button">加入热榜</button>
+          <div class="hot-row">
+            <div class="hot-copy">
+              <strong>${esc(item.title)}</strong>
+              <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+            </div>
+            <button class="quiet" data-weekly-add="${esc(item.id)}" data-type="${esc(item.contentType || 'wall')}" type="button">加入热榜</button>
           </div>`)}
       </div>`
     panel.querySelector('#weekly-save-meta').onclick = async () => {
@@ -883,12 +919,18 @@ async function render() {
     panel.querySelectorAll('[data-by-time]').forEach((btn) => {
       btn.onclick = async () => {
         btn.disabled = true
-        const result = await api('/api/digest/by-time', {
-          method: 'POST',
-          body: JSON.stringify({ range: btn.dataset.byTime })
-        })
-        alert(result.ok ? (result.message || '推文已生成') : (result.message || '失败'))
-        await refreshDigest()
+        try {
+          const result = await api('/api/digest/by-time', {
+            method: 'POST',
+            body: JSON.stringify({ range: btn.dataset.byTime })
+          })
+          alert(result.ok ? (result.message || '推文已生成') : (result.message || '失败'))
+          await refreshDigest()
+        } catch (err) {
+          alert((err && err.message) || '按时间出成稿失败')
+        } finally {
+          btn.disabled = false
+        }
       }
     })
     const customBtn = panel.querySelector('#custom-digest')
@@ -900,18 +942,32 @@ async function render() {
         if (!items.length) return alert('先勾选要放进推文的帖子')
         if (items.length > 10) return alert('一次最多 10 条')
         customBtn.disabled = true
-        const result = await api('/api/digest/custom', {
-          method: 'POST',
-          body: JSON.stringify({ items })
-        })
-        alert(result.ok ? (result.message || '推文已生成') : (result.message || '失败'))
-        await refreshDigest()
+        try {
+          const result = await api('/api/digest/custom', {
+            method: 'POST',
+            body: JSON.stringify({ items })
+          })
+          alert(result.ok ? (result.message || '推文已生成') : (result.message || '失败'))
+          await refreshDigest()
+        } catch (err) {
+          alert((err && err.message) || '生成推文失败')
+        } finally {
+          customBtn.disabled = false
+        }
       }
     }
     panel.querySelector('#flush-btn').onclick = async () => {
-      const result = await api('/api/digest/flush', { method: 'POST', body: '{}' })
-      alert(result.ok ? (result.message || '汇总已生成') : (result.message || '失败'))
-      await refreshDigest()
+      const btn = panel.querySelector('#flush-btn')
+      if (btn) btn.disabled = true
+      try {
+        const result = await api('/api/digest/flush', { method: 'POST', body: '{}' })
+        alert(result.ok ? (result.message || '汇总已生成') : (result.message || '失败'))
+        await refreshDigest()
+      } catch (err) {
+        alert((err && err.message) || '用队列生成失败')
+      } finally {
+        if (btn) btn.disabled = false
+      }
     }
     panel.querySelectorAll('[data-copy]').forEach((btn) => {
       btn.onclick = () => {
@@ -1017,6 +1073,17 @@ async function render() {
   }
   if (state.nav === 'school') {
     panel.innerHTML = `
+      <div class="card">
+        <h3>给账号改学校</h3>
+        <p class="muted">学校认证完成后，用户自己不能再改。把小程序「我的」里的账号编号贴过来，填写学校全称。校区可以空着。这个人如果开了学校标签，已发帖上的学校会一起换掉。</p>
+        <label class="field-label">账号编号</label>
+        <input id="school-user" placeholder="u_ 开头" />
+        <label class="field-label">学校全称</label>
+        <input id="school-name" placeholder="例如 武汉大学" />
+        <label class="field-label">校区</label>
+        <input id="school-campus" placeholder="可空" />
+        <button id="school-set" type="button" style="margin-top:16px">保存学校</button>
+      </div>
       <div class="chips">
         ${['pending', '全部', 'approved', 'rejected'].map((id) => `<button class="chip ${state.schoolStatus === id ? 'active' : ''}" data-status="${id}">${id === 'pending' ? '待审核' : id === '全部' ? '全部' : id === 'approved' ? '已通过' : '已驳回'}</button>`).join('')}
       </div>
@@ -1030,6 +1097,20 @@ async function render() {
             <button data-review="0" data-id="${esc(item.id)}">驳回</button>
           </div>` : ''}
         </div>`)}`
+    const schoolSet = panel.querySelector('#school-set')
+    if (schoolSet) {
+      schoolSet.onclick = async () => {
+        const result = await api('/api/school/set', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: panel.querySelector('#school-user').value.trim(),
+            schoolName: panel.querySelector('#school-name').value.trim(),
+            schoolCampus: panel.querySelector('#school-campus').value.trim()
+          })
+        })
+        alert(result.ok ? (result.message || '已更新') : (result.message || '失败'))
+      }
+    }
     panel.querySelectorAll('[data-status]').forEach((btn) => {
       btn.onclick = async () => {
         state.schoolStatus = btn.dataset.status

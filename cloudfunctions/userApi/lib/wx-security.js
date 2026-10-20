@@ -25,8 +25,8 @@ const LABEL_TEXT = {
 }
 
 const TEXT_CHUNK = 2400
-const TEXT_TIMEOUT_MS = 2800
-const IMAGE_TIMEOUT_MS = 2800
+const TEXT_TIMEOUT_MS = 8000
+const IMAGE_TIMEOUT_MS = 8000
 const MAX_IMAGES = 3
 
 function sceneFor(contentType) {
