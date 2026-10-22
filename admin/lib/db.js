@@ -109,6 +109,38 @@ async function allDocs(name, where) {
   }
 }
 
+/** 只取最近 N 条，少打几轮跨海请求 */
+async function recentDocs(name, limit = 100, where) {
+  const size = Math.min(200, Math.max(1, Number(limit) || 100))
+  if (useLocal()) {
+    const rows = await localDb.allDocs(name, where)
+    return rows
+      .slice()
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+      .slice(0, size)
+  }
+  const load = async () => {
+    const database = getDb()
+    let ref = database.collection(name)
+    if (where) ref = ref.where(where)
+    try {
+      const res = await ref.orderBy('createdAt', 'desc').limit(size).get()
+      return (res.data || []).map(withDocId)
+    } catch (err) {
+      const res = await ref.limit(size).get()
+      return (res.data || [])
+        .map(withDocId)
+        .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+    }
+  }
+  try {
+    return await withCollection(name, load)
+  } catch (err) {
+    if (isMissingCollection(err)) return []
+    throw err
+  }
+}
+
 /** 按字段取值查询，只返回命中的文档，避免审帖把整表读回来 */
 async function findByField(name, field, values, limit = 40) {
   const list = (Array.isArray(values) ? values : [values]).filter(Boolean)
@@ -226,6 +258,7 @@ module.exports = {
   getDb,
   ensureCollection,
   allDocs,
+  recentDocs,
   countDocs,
   findByField,
   getDoc,

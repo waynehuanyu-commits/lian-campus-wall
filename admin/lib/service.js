@@ -5,8 +5,13 @@ const distribute = require('../../utils/distribute')
 const moderation = require('../../utils/moderation')
 const { uid } = require('../../utils/util')
 const db = require('./db')
+const cache = require('./cache')
 
 const DIGEST_SIZE = 10
+
+function bustReadCache() {
+  cache.clear()
+}
 
 function wallHeadline(item) {
   if (item.title) return item.title
@@ -17,58 +22,58 @@ function wallHeadline(item) {
 }
 
 async function overview() {
-  if (db.useLocal()) return overviewByScan()
-  const _ = db.getDb().command
-  const pending = ['pending', 'manual_review', 'edit_required']
-  const blocked = ['rejected', 'emergency_block']
-  const collections = ['forum_posts', 'wall_posts', 'comments']
-  const count = (name, where) => db.countDocs(name, where)
-  const [
-    forumCount, wallCount, commentCount,
-    pendingCounts, emergencyCounts, blockedCounts,
-    pendingSchool, digestCount, groupCount, designatedGroups, logCount,
-    bannedCount, mutedCount, riskLogCount, contactViewCount, contactFeedbackCount
-  ] = await Promise.all([
-    count('forum_posts'),
-    count('wall_posts'),
-    count('comments'),
-    Promise.all(collections.map((name) => count(name, { reviewStatus: _.in(pending) }))),
-    Promise.all(collections.map((name) => count(name, { reviewStatus: 'emergency_block' }))),
-    Promise.all(collections.map((name) => count(name, { reviewStatus: _.in(blocked) }))),
-    count('school_requests', { status: 'pending' }),
-    count('digest_queue'),
-    count('distribute_targets'),
-    count('distribute_targets', { enabled: true, receiveDigest: true }),
-    count('distribute_logs'),
-    count('users', { status: 'banned' }),
-    count('users', { status: 'muted', muteUntil: _.gt(Date.now()) }),
-    count('security_logs'),
-    count('contact_views'),
-    count('contact_feedbacks')
-  ])
-  const sum = (list) => list.reduce((total, n) => total + n, 0)
-  return {
-    forumCount,
-    wallCount,
-    commentCount,
-    postCount: forumCount + wallCount,
-    interceptCount: sum(blockedCounts),
-    pendingReview: sum(pendingCounts),
-    emergencyCount: sum(emergencyCounts),
-    pendingSchool,
-    digestCount,
-    digestSize: DIGEST_SIZE,
-    digestRemain: Math.max(0, DIGEST_SIZE - digestCount),
-    designatedGroups,
-    groupCount,
-    logCount,
-    bannedCount,
-    mutedCount,
-    riskLogCount,
-    contactViewCount,
-    contactFeedbackCount,
-    mode: 'cloud'
-  }
+  return cache.wrap('overview', 60000, async () => {
+    if (db.useLocal()) return overviewByScan()
+    const _ = db.getDb().command
+    const pending = ['pending', 'manual_review', 'edit_required']
+    const blocked = ['rejected', 'emergency_block']
+    const count = (name, where) => db.countDocs(name, where)
+    // 新加坡跨海：少打 count，核心数字优先
+    const [
+      forumCount, wallCount, commentCount,
+      pendingForum, pendingWall, pendingComment,
+      emergencyForum, emergencyWall,
+      blockedForum, blockedWall,
+      pendingSchool, digestCount, designatedGroups, bannedCount
+    ] = await Promise.all([
+      count('forum_posts'),
+      count('wall_posts'),
+      count('comments'),
+      count('forum_posts', { reviewStatus: _.in(pending) }),
+      count('wall_posts', { reviewStatus: _.in(pending) }),
+      count('comments', { reviewStatus: _.in(pending) }),
+      count('forum_posts', { reviewStatus: 'emergency_block' }),
+      count('wall_posts', { reviewStatus: 'emergency_block' }),
+      count('forum_posts', { reviewStatus: _.in(blocked) }),
+      count('wall_posts', { reviewStatus: _.in(blocked) }),
+      count('school_requests', { status: 'pending' }),
+      count('digest_queue'),
+      count('distribute_targets', { enabled: true, receiveDigest: true }),
+      count('users', { status: 'banned' })
+    ])
+    return {
+      forumCount,
+      wallCount,
+      commentCount,
+      postCount: forumCount + wallCount,
+      interceptCount: blockedForum + blockedWall,
+      pendingReview: pendingForum + pendingWall + pendingComment,
+      emergencyCount: emergencyForum + emergencyWall,
+      pendingSchool,
+      digestCount,
+      digestSize: DIGEST_SIZE,
+      digestRemain: Math.max(0, DIGEST_SIZE - digestCount),
+      designatedGroups,
+      groupCount: designatedGroups,
+      logCount: 0,
+      bannedCount,
+      mutedCount: 0,
+      riskLogCount: 0,
+      contactViewCount: 0,
+      contactFeedbackCount: 0,
+      mode: 'cloud'
+    }
+  })
 }
 
 async function overviewByScan() {
@@ -130,23 +135,63 @@ async function addKeyword(word) {
   const text = String(word || '').trim()
   if (!text) return { ok: false, message: '请填写关键词' }
   await db.setDoc('keywords', text, { word: text, locked: security.isLockedKeyword(text), createdAt: Date.now() })
+  bustReadCache()
   return { ok: true }
 }
 
 async function removeKeyword(word) {
   if (security.isLockedKeyword(word)) return { ok: false, message: '必拦词不能删除' }
   await db.removeDoc('keywords', word)
+  bustReadCache()
   return { ok: true }
 }
 
 async function listAccounts() {
-  const users = await db.allDocs('users')
-  return users
-    .map((item) => {
+  return cache.wrap('accounts', 30000, async () => {
+    if (db.useLocal()) {
+      const users = await db.allDocs('users')
+      return users
+        .map((item) => {
+          const { openid, ...rest } = item
+          return rest
+        })
+        .sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0) || (b.createdAt || 0) - (a.createdAt || 0))
+    }
+    const database = db.getDb()
+    const _ = database.command
+    const take = async (primary, fallback) => {
+      try {
+        const res = await primary
+        return (res.data || []).map((item) => ({ ...item, id: item.id || item._id }))
+      } catch (err) {
+        if (!fallback) return []
+        try {
+          const res = await fallback
+          return (res.data || []).map((item) => ({ ...item, id: item.id || item._id }))
+        } catch (err2) {
+          return []
+        }
+      }
+    }
+    const users = database.collection('users')
+    const [recent, banned, muted, risky] = await Promise.all([
+      take(users.orderBy('createdAt', 'desc').limit(120).get(), users.limit(120).get()),
+      take(users.where({ status: 'banned' }).limit(80).get()),
+      take(users.where({ status: 'muted' }).limit(80).get()),
+      take(
+        users.where({ riskScore: _.gt(0) }).orderBy('riskScore', 'desc').limit(80).get(),
+        users.where({ riskScore: _.gt(0) }).limit(80).get()
+      )
+    ])
+    const map = new Map()
+    ;[...risky, ...banned, ...muted, ...recent].forEach((item) => {
+      if (!item || !item.id) return
       const { openid, ...rest } = item
-      return rest
+      map.set(item.id, rest)
     })
-    .sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0) || (b.createdAt || 0) - (a.createdAt || 0))
+    return [...map.values()]
+      .sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0) || (b.createdAt || 0) - (a.createdAt || 0))
+  })
 }
 
 async function setAppAdmin(userId, enabled) {
@@ -161,6 +206,7 @@ async function setAppAdmin(userId, enabled) {
     patch.wechatId = ''
   }
   await db.updateDoc('users', userId, patch)
+  bustReadCache()
   return {
     ok: true,
     appAdmin: on,
@@ -175,6 +221,7 @@ async function setPostWhitelist(userId, enabled) {
   if (!user) return { ok: false, message: '账号不存在' }
   const on = !!enabled
   await db.updateDoc('users', userId, { postWhitelist: on })
+  bustReadCache()
   return {
     ok: true,
     postWhitelist: on,
@@ -191,6 +238,7 @@ async function setOfficialLogin(userId, enabled) {
   const patch = { officialLoginAllowed: on }
   if (!on) patch.actingOfficial = false
   await db.updateDoc('users', id, patch)
+  bustReadCache()
   return {
     ok: true,
     officialLoginAllowed: on,
@@ -286,19 +334,27 @@ async function setAccountStatus(userId, { status, reason, muteHours } = {}) {
     createdAt: Date.now()
   }
   await db.setDoc('security_logs', log.id, log)
+  bustReadCache()
   return { ok: true }
 }
 
 async function listSecurityLogs() {
-  return (await db.allDocs('security_logs')).sort((a, b) => b.createdAt - a.createdAt)
+  return cache.wrap('security_logs', 30000, async () => (
+    (await db.recentDocs('security_logs', 80)).sort((a, b) => b.createdAt - a.createdAt)
+  ))
 }
 
 async function listContactViews() {
-  return (await db.allDocs('contact_views')).sort((a, b) => b.createdAt - a.createdAt)
+  return cache.wrap('contact_views', 30000, async () => (
+    (await db.recentDocs('contact_views', 80)).sort((a, b) => b.createdAt - a.createdAt)
+  ))
 }
 
 async function listContactFeedbacks() {
-  return (await db.allDocs('contact_feedbacks')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+  return cache.wrap('contact_feedbacks', 30000, async () => (
+    (await db.recentDocs('contact_feedbacks', 80))
+      .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+  ))
 }
 
 async function listIntercepts() {
@@ -309,48 +365,49 @@ const REVIEW_QUEUE = ['pending', 'manual_review', 'edit_required', 'emergency_bl
 const REVIEW_ALL = REVIEW_QUEUE.concat(['rejected', 'approved'])
 
 async function listContentReviews(status = 'manual_review', limit = 40) {
-  const statuses = status === 'queue'
-    ? REVIEW_QUEUE
-    : (status === '全部' ? REVIEW_ALL : [status])
-  const [forum, wall, comments] = await Promise.all([
-    db.findByField('forum_posts', 'reviewStatus', statuses, limit),
-    db.findByField('wall_posts', 'reviewStatus', statuses, limit),
-    db.findByField('comments', 'reviewStatus', statuses, limit)
-  ])
-  const forumItems = forum.map((item) => ({
-    ...item,
-    contentType: 'forum',
-    headline: item.title,
-    channel: item.category,
-    reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus)
-  }))
-  const wallItems = wall.map((item) => {
-    const next = {
+  return cache.wrap(`reviews:${status}:${limit}`, 15000, async () => {
+    const statuses = status === 'queue'
+      ? REVIEW_QUEUE
+      : (status === '全部' ? REVIEW_ALL : [status])
+    const [forum, wall, comments] = await Promise.all([
+      db.findByField('forum_posts', 'reviewStatus', statuses, limit),
+      db.findByField('wall_posts', 'reviewStatus', statuses, limit),
+      db.findByField('comments', 'reviewStatus', statuses, limit)
+    ])
+    const forumItems = forum.map((item) => ({
       ...item,
-      contentType: 'wall',
-      headline: wallHeadline(item),
-      channel: item.tag,
-      hasContact: !!(item.contactType && item.contactValue),
-      reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus)
-    }
-    delete next.contactValue
-    return next
-  })
-  const commentItems = comments
-    .map((item) => ({
-      ...item,
-      contentType: 'comment',
-      headline: String(item.content || '').slice(0, 40) || '评论',
-      channel: `${item.targetType || ''} / ${item.targetId || ''}`,
+      contentType: 'forum',
+      headline: item.title,
+      channel: item.category,
       reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus)
     }))
-  let list = [...forumItems, ...wallItems, ...commentItems]
-    .sort((a, b) => (
-      (b.reviewPriority === 'high' ? 1 : 0) - (a.reviewPriority === 'high' ? 1 : 0)
-      || (b.reviewStatus === 'emergency_block' ? 1 : 0) - (a.reviewStatus === 'emergency_block' ? 1 : 0)
-      || b.createdAt - a.createdAt
-    ))
-  return list
+    const wallItems = wall.map((item) => {
+      const next = {
+        ...item,
+        contentType: 'wall',
+        headline: wallHeadline(item),
+        channel: item.tag,
+        hasContact: !!(item.contactType && item.contactValue),
+        reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus)
+      }
+      delete next.contactValue
+      return next
+    })
+    const commentItems = comments
+      .map((item) => ({
+        ...item,
+        contentType: 'comment',
+        headline: String(item.content || '').slice(0, 40) || '评论',
+        channel: `${item.targetType || ''} / ${item.targetId || ''}`,
+        reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus)
+      }))
+    return [...forumItems, ...wallItems, ...commentItems]
+      .sort((a, b) => (
+        (b.reviewPriority === 'high' ? 1 : 0) - (a.reviewPriority === 'high' ? 1 : 0)
+        || (b.reviewStatus === 'emergency_block' ? 1 : 0) - (a.reviewStatus === 'emergency_block' ? 1 : 0)
+        || b.createdAt - a.createdAt
+      ))
+  })
 }
 
 async function getReviewDetail(type, id) {
@@ -411,12 +468,13 @@ async function reviewContent(type, id, { outcome, note } = {}) {
   if (nextStatus === 'approved' && type === 'wall') {
     distribution = await enqueueApprovedWall(next)
   }
+  bustReadCache()
   return { ok: true, post: next, distribution }
 }
 
 async function enqueueApprovedWall(post) {
   if (!moderation.isPublicStatus(post.reviewStatus)) return null
-  const queue = await db.allDocs('digest_queue')
+  const queue = await db.recentDocs('digest_queue', 50)
   if (queue.some((item) => item.contentId === post.id)) {
     return { queued: true, count: queue.length }
   }
@@ -431,6 +489,7 @@ async function enqueueApprovedWall(post) {
     queuedAt: Date.now()
   }
   await db.setDoc('digest_queue', item.id, item)
+  bustReadCache()
   return { queued: true, count: queue.length + 1 }
 }
 
@@ -506,23 +565,27 @@ async function removeLexiconTerm(id) {
 }
 
 async function listSchoolRequests(status = 'pending') {
-  let list = (await db.allDocs('school_requests'))
-    .filter((item) => item.type !== 'student_auth')
-    .sort((a, b) => b.createdAt - a.createdAt)
-  if (status && status !== '全部') list = list.filter((item) => item.status === status)
-  return list
+  return cache.wrap(`school_requests:${status}`, 20000, async () => {
+    let list = (await db.recentDocs('school_requests', 120))
+      .filter((item) => item.type !== 'student_auth')
+      .sort((a, b) => b.createdAt - a.createdAt)
+    if (status && status !== '全部') list = list.filter((item) => item.status === status)
+    return list
+  })
 }
 
 async function listStudentAuthRequests(status = 'pending') {
-  let list = (await db.allDocs('school_requests'))
-    .filter((item) => item.type === 'student_auth')
-    .sort((a, b) => b.createdAt - a.createdAt)
-  if (status && status !== '全部') list = list.filter((item) => item.status === status)
-  const map = await db.resolveCloudUrls(list.flatMap((item) => item.images || []))
-  return list.map((item) => ({
-    ...item,
-    images: db.applyCloudUrls(item.images, map)
-  }))
+  return cache.wrap(`student_auth:${status}`, 20000, async () => {
+    let list = (await db.recentDocs('school_requests', 120))
+      .filter((item) => item.type === 'student_auth')
+      .sort((a, b) => b.createdAt - a.createdAt)
+    if (status && status !== '全部') list = list.filter((item) => item.status === status)
+    const map = await db.resolveCloudUrls(list.flatMap((item) => item.images || []))
+    return list.map((item) => ({
+      ...item,
+      images: db.applyCloudUrls(item.images, map)
+    }))
+  })
 }
 
 async function setUserSchool(userId, { schoolName, schoolCampus } = {}) {
@@ -568,6 +631,7 @@ async function reviewSchoolChange(requestId, { approved, note } = {}) {
     reviewNote: note || (approved ? '审核通过' : '审核未通过')
   }
   await db.setDoc('school_requests', requestId, updated)
+  bustReadCache()
   const user = await db.getDoc('users', req.userId)
   if (user) {
     const patch = { schoolChangeRequest: updated }
@@ -605,53 +669,42 @@ async function reviewStudentAuth(requestId, { approved, note } = {}) {
 }
 
 async function digestState() {
-  await Promise.all([
-    db.ensureCollection('digest_queue'),
-    db.ensureCollection('digests')
-  ])
-  let queued = []
-  let groups = []
-  let digests = []
-  let logs = []
-  let candidates = []
-  try {
-    queued = (await db.allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
-  } catch (err) {
-    console.warn('[digestState] digest_queue', err && err.message)
-  }
-  try {
-    groups = (await db.allDocs('distribute_targets')).filter((item) => item.enabled && item.receiveDigest)
-  } catch (err) {
-    groups = []
-  }
-  try {
-    digests = (await db.allDocs('digests')).sort((a, b) => b.createdAt - a.createdAt)
-  } catch (err) {
-    console.warn('[digestState] digests', err && err.message)
-  }
-  try {
-    logs = (await db.allDocs('distribute_logs')).sort((a, b) => b.createdAt - a.createdAt)
-  } catch (err) {
-    logs = []
-  }
-  try {
-    candidates = await listDigestCandidates(30)
-  } catch (err) {
-    candidates = []
-  }
-  return {
-    progress: {
-      size: DIGEST_SIZE,
-      count: queued.length,
-      remain: Math.max(0, DIGEST_SIZE - queued.length),
-      queued,
-      digestGroups: groups,
-      digestGroupText: groups.length ? groups.map((item) => item.name).join('、') : '尚未指定'
-    },
-    candidates,
-    digests,
-    logs
-  }
+  return cache.wrap('digest_state', 20000, async () => {
+    await Promise.all([
+      db.ensureCollection('digest_queue'),
+      db.ensureCollection('digests')
+    ])
+    const [queuedRaw, groupsRaw, digestsRaw, logsRaw, candidates] = await Promise.all([
+      db.recentDocs('digest_queue', 50).catch((err) => {
+        console.warn('[digestState] digest_queue', err && err.message)
+        return []
+      }),
+      db.recentDocs('distribute_targets', 50).catch(() => []),
+      db.recentDocs('digests', 30).catch((err) => {
+        console.warn('[digestState] digests', err && err.message)
+        return []
+      }),
+      db.recentDocs('distribute_logs', 40).catch(() => []),
+      listDigestCandidates(30).catch(() => [])
+    ])
+    const queued = queuedRaw.sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0))
+    const groups = groupsRaw.filter((item) => item.enabled && item.receiveDigest)
+    const digests = digestsRaw.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    const logs = logsRaw.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    return {
+      progress: {
+        size: DIGEST_SIZE,
+        count: queued.length,
+        remain: Math.max(0, DIGEST_SIZE - queued.length),
+        queued,
+        digestGroups: groups,
+        digestGroupText: groups.length ? groups.map((item) => item.name).join('、') : '尚未指定'
+      },
+      candidates,
+      digests,
+      logs
+    }
+  })
 }
 
 function getWecom() {
@@ -861,13 +914,13 @@ async function recentApproved(name, limit) {
         .orderBy('createdAt', 'desc')
         .limit(limit)
         .get()
-      const rows = res.data || []
+      const rows = (res.data || []).map((item) => ({ ...item, id: item.id || item._id }))
       if (rows.length) return rows
     } catch (err) {
       console.warn('[recentApproved]', name, err && err.message)
     }
   }
-  const rows = await db.allDocs(name)
+  const rows = await db.recentDocs(name, Math.max(limit * 2, 40))
   return rows
     .filter((item) => !item.reviewStatus || item.reviewStatus === 'approved')
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
@@ -1028,24 +1081,26 @@ async function buildDigestFromSelection(picks) {
 }
 
 async function listGroups() {
-  const groups = await db.allDocs('distribute_targets')
-  if (groups.length) return groups
-  const seed = {
-    id: 'g_customer',
-    name: '群聊推送测试',
-    type: 'external',
-    enabled: true,
-    webhook: '',
-    chatId: '',
-    sender: '',
-    scopes: ['wall'],
-    categories: [],
-    boards: ['*'],
-    desc: '群主企微 + 同学微信',
-    receiveDigest: true
-  }
-  await db.setDoc('distribute_targets', seed.id, seed)
-  return [seed]
+  return cache.wrap('groups', 60000, async () => {
+    const groups = await db.recentDocs('distribute_targets', 50)
+    if (groups.length) return groups
+    const seed = {
+      id: 'g_customer',
+      name: '群聊推送测试',
+      type: 'external',
+      enabled: true,
+      webhook: '',
+      chatId: '',
+      sender: '',
+      scopes: ['wall'],
+      categories: [],
+      boards: ['*'],
+      desc: '群主企微 + 同学微信',
+      receiveDigest: true
+    }
+    await db.setDoc('distribute_targets', seed.id, seed)
+    return [seed]
+  })
 }
 
 async function addGroup(payload) {
@@ -1135,14 +1190,14 @@ function buildWeeklyItem(type, post, rank = 1) {
 
 async function getWeeklyHotBoard() {
   const board = (await db.getDoc('weekly_hot', 'current')) || defaultWeeklyHot()
-  const [walls, forums] = await Promise.all([db.allDocs('wall_posts'), db.allDocs('forum_posts')])
-  const wallById = {}
-  const forumById = {}
-  walls.forEach((post) => { wallById[post.id || post._id] = post })
-  forums.forEach((post) => { forumById[post.id || post._id] = post })
-  const items = (board.items || []).map((item, index) => {
+  const rawItems = board.items || []
+  const posts = await Promise.all(rawItems.map(async (item) => {
     const type = item.contentType === 'forum' ? 'forum' : 'wall'
-    const post = type === 'forum' ? forumById[item.contentId] : wallById[item.contentId]
+    const collection = type === 'forum' ? 'forum_posts' : 'wall_posts'
+    const post = await db.getDoc(collection, item.contentId).catch(() => null)
+    return { item, type, post }
+  }))
+  const items = posts.map(({ item, type, post }, index) => {
     if (!post || post.reviewStatus === 'rejected') return null
     return { ...buildWeeklyItem(type, post, index + 1), pinnedAt: item.pinnedAt || Date.now() }
   }).filter(Boolean)
@@ -1188,13 +1243,13 @@ function matchesWeeklyKeyword(post, contentType, q) {
 async function searchWeeklyCollection(collection, contentType, keyword, picked) {
   const q = String(keyword || '').trim()
   if (!q) {
-    return (await db.allDocs(collection))
+    return (await db.recentDocs(collection, 120))
       .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
       .filter((item) => !picked.has(`${contentType}:${item.id || item._id}`))
       .map((post) => weeklyCandidateFromPost(post, contentType))
   }
   if (db.useLocal()) {
-    return (await db.allDocs(collection))
+    return (await db.recentDocs(collection, 200))
       .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved'))
       .filter((item) => !picked.has(`${contentType}:${item.id || item._id}`))
       .filter((item) => matchesWeeklyKeyword(item, contentType, q.toLowerCase()))
@@ -1302,11 +1357,14 @@ async function moveWeeklyHotItem(contentId, direction, contentType) {
 }
 
 async function weeklyHotState(keyword = '') {
-  const [board, candidates] = await Promise.all([
-    getWeeklyHotBoard(),
-    listWeeklyHotCandidates(keyword)
-  ])
-  return { board, candidates, max: WEEKLY_HOT_MAX }
+  const key = `weekly_hot:${String(keyword || '').trim()}`
+  return cache.wrap(key, 20000, async () => {
+    const [board, candidates] = await Promise.all([
+      getWeeklyHotBoard(),
+      listWeeklyHotCandidates(keyword)
+    ])
+    return { board, candidates, max: WEEKLY_HOT_MAX }
+  })
 }
 
 async function resolveReport(reportId, { action, note, muteHours } = {}) {
@@ -1369,11 +1427,12 @@ async function resolveReport(reportId, { action, note, muteHours } = {}) {
     detail: `处理举报 ${reportId} → ${act}`,
     createdAt: Date.now()
   })
+  bustReadCache()
   return { ok: true, report: { ...row, ...stamp }, accountResult }
 }
 
 async function listReportCases(status = '全部') {
-  const rows = (await db.allDocs('reports')).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  const rows = (await db.recentDocs('reports', 100)).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const groups = new Map()
   rows.forEach((item) => {
     const key = `${item.targetType || ''}:${item.targetId || ''}`
@@ -1432,18 +1491,20 @@ async function listReportCases(status = '全部') {
 }
 
 async function listReports(status = 'pending') {
-  return listReportCases(status)
+  return cache.wrap(`reports:${status}`, 20000, () => listReportCases(status))
 }
 
 async function dashboard() {
-  const [ov, reviews] = await Promise.all([
-    overview(),
-    listContentReviews('queue', 8)
-  ])
-  return {
-    overview: ov,
-    reviews: reviews.slice(0, 5)
-  }
+  return cache.wrap('dashboard', 20000, async () => {
+    const [ov, reviews] = await Promise.all([
+      overview(),
+      listContentReviews('queue', 8)
+    ])
+    return {
+      overview: ov,
+      reviews: reviews.slice(0, 5)
+    }
+  })
 }
 
 module.exports = {

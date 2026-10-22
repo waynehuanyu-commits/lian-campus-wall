@@ -1400,11 +1400,11 @@ async function loadNav(nav) {
     return
   }
   if (nav === 'accounts') {
-    const [accounts, intercepts] = await Promise.all([
-      api('/api/accounts'),
-      api('/api/reviews?status=' + encodeURIComponent('rejected'))
-    ])
+    const accounts = await api('/api/accounts')
     if (accounts.ok) state.data.accounts = accounts.list || []
+    if (state.nav === 'accounts') render()
+    // 拦截列表后置，避免和账号列表抢跨海连接
+    const intercepts = await api('/api/reviews?status=' + encodeURIComponent('rejected'))
     if (intercepts.ok) state.data.intercepts = intercepts.list || []
     if (state.nav === 'accounts') render()
     return
