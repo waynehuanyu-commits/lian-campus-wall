@@ -1,0 +1,49 @@
+.mine-posts {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.mine-posts .home-top {
+  position: static;
+  padding: 8rpx 24rpx 0;
+  background: transparent;
+}
+
+.mine-posts .home-tabs-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.mine-posts .tabs-scroll {
+  flex: 1;
+  width: 0;
+  height: 72rpx;
+  white-space: nowrap;
+}
+
+.mine-posts .home-tabs-line {
+  display: inline-block !important;
+  height: 72rpx;
+  padding: 0 16rpx 0 0 !important;
+  box-sizing: border-box;
+  white-space: nowrap;
+  font-size: 0;
+  background: transparent;
+}
+
+.mine-posts .feed-end {
+  padding: 28rpx 24rpx 48rpx;
+  text-align: center;
+  color: #b0b4ba;
+  font-size: 24rpx;
+}
+
+.mine-posts .home-tab-item {
+  display: inline-block !important;
+  vertical-align: middle;
+  margin-right: 36rpx;
+  font-size: 28rpx;
+  white-space: nowrap;
+}

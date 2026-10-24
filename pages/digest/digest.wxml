@@ -1,0 +1,28 @@
+<view class="page">
+  <view wx:if="{{digest}}" class="digest-head">
+    <view class="digest-count">按时间与热度排序 · 共 {{digest.items.length}} 条</view>
+    <view class="digest-title">{{digest.title}}</view>
+    <view class="digest-desc">综合发布时间与点赞、评论热度排列。点条目进入详情。转发微信群由运营在管理端完成。</view>
+  </view>
+
+  <view wx:if="{{digest}}" class="feed">
+    <view
+      wx:for="{{digest.items}}"
+      wx:key="contentId"
+      class="feed-item"
+      data-type="{{item.contentType}}"
+      data-id="{{item.contentId}}"
+      bindtap="goDetail"
+    >
+      <view class="tag">{{index + 1}} / {{digest.items.length}} · {{item.channel}}</view>
+      <view class="item-title">{{item.title}}</view>
+      <view class="item-summary">{{item.summary}}</view>
+      <view class="go">进入详情 ›</view>
+    </view>
+  </view>
+
+  <view wx:else class="empty">
+    <view class="empty-title">汇总不存在</view>
+    <view>这条推送可能已过期或尚未生成</view>
+  </view>
+</view>

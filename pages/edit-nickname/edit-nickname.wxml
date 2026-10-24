@@ -1,0 +1,30 @@
+<form class="page" bindsubmit="onSave">
+  <view class="body">
+    <view class="field">
+      <view class="field-head">
+        <text class="label">昵称</text>
+      </view>
+      <input
+        class="input"
+        type="nickname"
+        name="nickname"
+        maxlength="20"
+        cursor-spacing="80"
+        confirm-type="done"
+        placeholder="{{placeholder}}"
+        placeholder-class="ph"
+        bindnicknamereview="onNicknameReview"
+      />
+    </view>
+    <view class="tips">点输入框，键盘上方会出现「使用微信昵称」。点一下填入，再点保存。也可以直接打字。</view>
+  </view>
+
+  <view class="footer">
+    <button
+      class="save-btn {{saving ? 'disabled' : ''}}"
+      form-type="submit"
+      disabled="{{saving}}"
+      hover-class="save-btn-hover"
+    >{{saving ? '保存中…' : '保存'}}</button>
+  </view>
+</form>

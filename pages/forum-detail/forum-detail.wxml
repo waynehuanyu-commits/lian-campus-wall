@@ -1,0 +1,252 @@
+<view wx:if="{{loading}}" class="page-loading">
+  <view class="page-loading-dot"></view>
+  <view>加载中…</view>
+</view>
+
+<view wx:elif="{{post}}" class="page detail-page" style="padding-bottom: calc(360rpx + {{keyboardHeight}}px);">
+  <view class="detail-card">
+    <view class="author-row">
+      <image class="avatar" src="{{post.authorAvatar}}" mode="aspectFill" bindtap="onAuthorTap" />
+      <view class="author-meta" bindtap="onAuthorTap">
+        <view class="author-name">{{post.authorName}}</view>
+        <view wx:if="{{post.authorSchool}}" class="author-school">{{post.authorSchool}}</view>
+      </view>
+      <view class="author-side">
+        <text class="author-time">{{post.timeText}}</text>
+        <view class="author-more" catchtap="onMoreTap">⋮</view>
+      </view>
+    </view>
+
+    <view wx:if="{{post.isOwner && post.reviewStatus && post.reviewStatus !== 'approved'}}" class="tag" style="margin-top: 16rpx;">{{post.reviewStatusLabel || ''}} · {{post.reviewNote || '审核处理中'}}</view>
+
+    <view wx:if="{{post.title}}" class="detail-title"><text wx:if="{{post.pinned}}" class="pin-tag">置顶</text><text wx:if="{{post.official}}" class="pin-tag official">官方</text>{{post.title}}</view>
+    <view wx:if="{{post.content}}" class="detail-content">{{post.content}}</view>
+
+    <post-gallery wx:if="{{post.images && post.images.length}}" urls="{{post.images}}" bind:preview="onGalleryPreview" />
+
+    <view class="detail-foot">
+      <view class="detail-foot-left">
+        <view wx:if="{{post.categoryLabel}}" class="category-pill">
+          <text class="category-hash">#</text>
+          <text class="category-text">{{post.categoryLabel}}</text>
+        </view>
+        <text class="view-count">{{post.viewCount || 0}}次围观</text>
+      </view>
+    <view class="engage-bar">
+      <view class="engage-item {{post.liked ? 'liked' : ''}}" bindtap="onLike">
+        <view class="engage-ic engage-ic-heart"></view>
+        <text class="engage-num">{{post.likeCount}}</text>
+      </view>
+      <view class="engage-item">
+        <view class="engage-ic engage-ic-comment"></view>
+        <text class="engage-num">{{post.commentCount}}</text>
+      </view>
+      <view class="engage-item" catchtap="onShareTap">
+        <view class="engage-ic engage-ic-share"></view>
+      </view>
+      <view wx:if="{{post.hasContact && !post.isOwner}}" class="engage-item engage-cta" bindtap="onContactTap">
+        <text class="engage-cta-text">微信</text>
+      </view>
+    </view>
+    </view>
+  </view>
+
+  <view class="comment-panel">
+    <view class="comment-toolbar">
+      <view class="comment-sorts">
+        <view
+          wx:for="{{sortOptions}}"
+          wx:key="id"
+          class="comment-sort {{commentSort === item.id ? 'active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onSortTap"
+        >{{item.name}}</view>
+      </view>
+      <view wx:if="{{commentsReady}}" class="comment-total">共{{commentTotal}}条评论</view>
+    </view>
+
+    <view wx:if="{{commentsLoading}}" class="comment-empty">评论加载中…</view>
+    <view wx:elif="{{commentsError}}" class="comment-error">
+      <view>评论加载失败</view>
+      <view class="retry" bindtap="retryComments">重试</view>
+    </view>
+    <block wx:elif="{{commentGroups.length}}">
+      <view wx:for="{{commentGroups}}" wx:key="id" class="comment-group">
+        <view class="comment-item" id="c-{{item.root.id}}">
+          <image
+            class="comment-avatar"
+            src="{{item.root.authorAvatar}}"
+            mode="aspectFill"
+            data-userid="{{item.root.authorId}}"
+            catchtap="onCommentAuthorTap"
+          />
+          <view class="comment-body">
+            <view class="comment-name" data-userid="{{item.root.authorId}}" catchtap="onCommentAuthorTap">{{item.root.authorName}}</view>
+            <view wx:if="{{item.root.content}}" class="comment-text">{{item.root.content}}</view>
+            <view wx:if="{{item.root.images && item.root.images.length}}" class="comment-images">
+              <image
+                wx:for="{{item.root.images}}"
+                wx:for-item="img"
+                wx:for-index="imgIndex"
+                wx:key="*this"
+                src="{{img}}"
+                mode="aspectFill"
+                data-scope="comment"
+                data-cid="{{item.root.id}}"
+                data-index="{{imgIndex}}"
+                bindtap="previewImage"
+              />
+            </view>
+            <view class="comment-foot">
+              <view class="comment-meta">
+                <text>{{item.root.timeText}}</text>
+                <text class="comment-action" data-id="{{item.root.id}}" data-name="{{item.root.authorName}}" bindtap="onReply">回复</text>
+                <text wx:if="{{item.root.canDelete}}" class="comment-action danger" data-id="{{item.root.id}}" catchtap="onDeleteComment">删除</text>
+              </view>
+              <view class="comment-like">
+                <view class="comment-like-ic"></view>
+                <text>{{item.root.likeCount || 0}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:for="{{item.shownReplies}}" wx:for-item="reply" wx:key="id" class="comment-item reply" id="c-{{reply.id}}">
+          <image
+            class="comment-avatar"
+            src="{{reply.authorAvatar}}"
+            mode="aspectFill"
+            data-userid="{{reply.authorId}}"
+            catchtap="onCommentAuthorTap"
+          />
+          <view class="comment-body">
+            <view class="comment-name" data-userid="{{reply.authorId}}" catchtap="onCommentAuthorTap">{{reply.authorName}}</view>
+            <view wx:if="{{reply.replyToName}}" class="comment-reply-to">回复 @{{reply.replyToName}}</view>
+            <view wx:if="{{reply.content}}" class="comment-text">{{reply.content}}</view>
+            <view wx:if="{{reply.images && reply.images.length}}" class="comment-images">
+              <image
+                wx:for="{{reply.images}}"
+                wx:for-item="img"
+                wx:for-index="imgIndex"
+                wx:key="*this"
+                src="{{img}}"
+                mode="aspectFill"
+                data-scope="comment"
+                data-cid="{{reply.id}}"
+                data-index="{{imgIndex}}"
+                bindtap="previewImage"
+              />
+            </view>
+            <view class="comment-foot">
+              <view class="comment-meta">
+                <text>{{reply.timeText}}</text>
+                <text class="comment-action" data-id="{{reply.id}}" data-name="{{reply.authorName}}" bindtap="onReply">回复</text>
+                <text wx:if="{{reply.canDelete}}" class="comment-action danger" data-id="{{reply.id}}" catchtap="onDeleteComment">删除</text>
+              </view>
+              <view class="comment-like">
+                <view class="comment-like-ic"></view>
+                <text>{{reply.likeCount || 0}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{item.canExpand}}" class="expand-row" data-id="{{item.id}}" bindtap="onExpandGroup">
+          <view class="expand-line"></view>
+          <text class="expand-btn">展开{{item.hiddenCount}}条回复</text>
+        </view>
+        <view wx:elif="{{item.canCollapse}}" class="expand-row" data-id="{{item.id}}" bindtap="onCollapseGroup">
+          <view class="expand-line"></view>
+          <text class="expand-btn">收起回复</text>
+        </view>
+      </view>
+      <view wx:if="{{canExpandMoreComments}}" class="expand-more-row" bindtap="onExpandMoreComments">
+        <text class="expand-btn">展开更多评论（还有{{hiddenRootCount}}条）</text>
+      </view>
+      <view wx:elif="{{canCollapseMoreComments}}" class="expand-more-row" bindtap="onCollapseMoreComments">
+        <text class="expand-btn">收起评论</text>
+      </view>
+    </block>
+    <view wx:elif="{{commentsReady}}" class="comment-empty">还没有评论，第一个回复吧</view>
+  </view>
+</view>
+
+<view wx:elif="{{loadError}}" class="empty">
+  <view class="empty-title">加载失败</view>
+  <view>{{loadError}}</view>
+  <view class="manage-link accent" style="margin-top: 24rpx;" bindtap="retryPost">重试</view>
+</view>
+
+<view wx:else class="empty">
+  <view class="empty-title">内容暂不可查看</view>
+  <view>原帖可能已下架或不存在</view>
+  <view class="manage-link accent" style="margin-top: 24rpx;" bindtap="goHome">返回首页</view>
+</view>
+
+<view wx:if="{{post && post.reviewStatus === 'approved' && canSpeak}}" class="composer" style="bottom: {{keyboardHeight}}px;">
+  <view wx:if="{{replyTo}}" class="composer-reply">
+    <text>回复 @{{replyTo.name}}</text>
+    <text class="composer-reply-clear" bindtap="clearReply">取消</text>
+  </view>
+  <view wx:if="{{draftImages.length}}" class="composer-images">
+    <view wx:for="{{draftImages}}" wx:key="*this" class="composer-thumb">
+      <image src="{{item}}" mode="aspectFill" data-scope="draft" data-index="{{index}}" bindtap="previewImage" />
+      <view class="composer-thumb-x" data-index="{{index}}" catchtap="removeDraftImage">×</view>
+    </view>
+  </view>
+  <view class="composer-row">
+    <view class="composer-photo" bindtap="chooseCommentImages"></view>
+    <textarea
+      placeholder="{{draftPlaceholder}}"
+      placeholder-class="muted"
+      value="{{draft}}"
+      auto-height
+      adjust-position="{{false}}"
+      bindkeyboardheightchange="onKeyboard"
+      bindinput="onDraftInput"
+      confirm-type="send"
+      bindconfirm="onSend"
+    />
+    <view class="send" bindtap="onSend">{{submitting ? '…' : '发送'}}</view>
+  </view>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_LOGIN'}}" class="composer guest-bar" bindtap="goLogin">
+  <text>开通后即可评论</text>
+  <text class="accent">去开通</text>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_AUTH'}}" class="composer guest-bar" bindtap="goAuth">
+  <text>认证学校后即可评论</text>
+  <text class="accent">去认证</text>
+</view>
+<view wx:elif="{{post && post.reviewStatus === 'approved'}}" class="composer guest-bar">
+  <text>{{speakMessage || '当前账号暂不能评论'}}</text>
+</view>
+
+<view wx:if="{{moreSheetOpen}}" class="share-sheet-mask" catchtouchmove="noop" bindtap="closeMoreSheet">
+  <view class="share-sheet" catchtap="noop">
+    <view class="share-sheet-title">更多操作</view>
+    <view wx:if="{{post.canManage}}" class="share-sheet-item" bindtap="onPin">{{post.pinned ? '取消置顶' : '置顶'}}</view>
+    <view wx:if="{{!post.isOwner}}" class="share-sheet-item" bindtap="onReportFromMore">举报</view>
+    <view wx:if="{{post.isOwner || post.canManage}}" class="share-sheet-item" style="color:#e11d48;" bindtap="onDeleteFromMore">删除</view>
+    <view class="share-sheet-cancel" bindtap="closeMoreSheet">取消</view>
+  </view>
+</view>
+
+<view wx:if="{{shareSheetOpen}}" class="share-sheet-mask" catchtouchmove="noop" bindtap="closeShareSheet">
+  <view class="share-sheet" catchtap="noop">
+    <view class="share-sheet-title">分享至</view>
+    <view class="share-picks">
+      <button class="share-pick" open-type="share" bindtap="closeShareSheet">
+        <view class="share-pick-icon wx"><view class="share-pick-glyph chat"></view></view>
+        <view class="share-pick-label">微信好友</view>
+      </button>
+      <view class="share-pick" bindtap="onGeneratePoster">
+        <view class="share-pick-icon poster"><view class="share-pick-glyph image"></view></view>
+        <view class="share-pick-label">生成分享图</view>
+      </view>
+    </view>
+    <view class="share-sheet-cancel" bindtap="closeShareSheet">取消</view>
+  </view>
+</view>
+<privacy-popup />
+<report-sheet id="report-sheet" />

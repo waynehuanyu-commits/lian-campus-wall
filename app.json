@@ -1,0 +1,67 @@
+{
+  "pages": [
+    "pages/forum/forum",
+    "pages/messages/messages",
+    "pages/wall/wall",
+    "pages/mine/mine",
+    "pages/edit-nickname/edit-nickname",
+    "pages/forum-detail/forum-detail",
+    "pages/forum-publish/forum-publish",
+    "pages/wall-detail/wall-detail",
+    "pages/wall-publish/wall-publish",
+    "pages/school-auth/school-auth",
+    "pages/digest/digest",
+    "pages/weekly-hot/weekly-hot",
+    "pages/my-posts/my-posts",
+    "pages/my-engage/my-engage",
+    "pages/inbox-comments/inbox-comments",
+    "pages/inbox-likes/inbox-likes",
+    "pages/share-poster/share-poster",
+    "pages/my-messages/my-messages",
+    "pages/dm-chat/dm-chat",
+    "pages/user-profile/user-profile",
+    "pages/about/about",
+    "pages/agreement/agreement"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTitleText": "黎安话事",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FFFFFF",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#333333",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/forum/forum",
+        "text": "首页",
+        "iconPath": "images/tab/home-normal.png",
+        "selectedIconPath": "images/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/messages/messages",
+        "text": "消息",
+        "iconPath": "images/tab/msg-normal.png",
+        "selectedIconPath": "images/tab/msg-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "images/tab/mine-normal.png",
+        "selectedIconPath": "images/tab/mine-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "__usePrivacyCheck__": true,
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup",
+    "report-sheet": "/components/report-sheet/report-sheet"
+  }
+}

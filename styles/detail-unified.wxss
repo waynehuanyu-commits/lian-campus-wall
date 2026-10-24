@@ -1,0 +1,422 @@
+.detail-page {
+  padding: 0;
+  background: #f5f5f5;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.detail-card {
+  background: #fff;
+  padding: 28rpx 32rpx 24rpx;
+  margin-bottom: 16rpx;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.author-row .avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #eef2f7;
+}
+
+.author-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.author-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+  line-height: 1.2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.author-side {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  align-self: flex-start;
+  margin-top: 2rpx;
+}
+
+.author-time {
+  flex-shrink: 0;
+  color: #b0b4ba;
+  font-size: 24rpx;
+  line-height: 1;
+}
+
+.author-school {
+  margin: 0;
+  color: #999;
+  font-size: 22rpx;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.author-more {
+  flex-shrink: 0;
+  width: 40rpx;
+  height: 40rpx;
+  color: #2f7dff;
+  font-size: 36rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.detail-title {
+  margin-top: 20rpx;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #222;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.detail-content {
+  margin-top: 10rpx;
+  font-size: 30rpx;
+  color: #333;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.detail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.detail-foot-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+  flex: 1;
+}
+
+.detail-foot .category-pill {
+  margin-top: 0;
+}
+
+.view-count {
+  flex-shrink: 0;
+  color: #b0b4ba;
+  font-size: 24rpx;
+  line-height: 1;
+}
+
+.detail-foot .engage-bar {
+  flex: none;
+  margin-top: 0;
+  padding: 0;
+  border-top: none;
+  justify-content: flex-end;
+  gap: 20rpx;
+}
+
+.detail-foot .engage-bar .engage-item,
+.detail-foot .engage-bar .engage-cta {
+  flex: none;
+  height: 48rpx;
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-top: 20rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  background: #f5f5f5;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.category-hash {
+  color: #2f7dff;
+  font-size: 24rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.category-text {
+  color: #666;
+  font-size: 24rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.detail-extra {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.comment-panel {
+  background: #fff;
+  border-radius: 0;
+  padding: 4rpx 0 8rpx;
+  box-shadow: none;
+}
+
+.comment-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 22rpx 28rpx 8rpx;
+}
+
+.comment-sorts {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.comment-sort {
+  font-size: 28rpx;
+  color: #9aa3af;
+  font-weight: 500;
+}
+
+.comment-sort.active {
+  color: #333;
+  font-weight: 600;
+}
+
+.comment-total {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #b0b6bf;
+}
+
+.comment-group {
+  padding: 8rpx 28rpx 4rpx;
+}
+
+.comment-group + .comment-group {
+  border-top: 1rpx solid #f2f3f5;
+  margin-top: 8rpx;
+  padding-top: 12rpx;
+}
+
+.comment-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 18rpx 0 8rpx;
+}
+
+.comment-item.reply {
+  margin-left: 80rpx;
+  padding: 12rpx 0 4rpx;
+}
+
+.comment-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #eef2f7;
+}
+
+.comment-item.reply .comment-avatar {
+  width: 48rpx;
+  height: 48rpx;
+}
+
+.comment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-name {
+  font-size: 26rpx;
+  color: #9aa3af;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.comment-text {
+  margin-top: 8rpx;
+  font-size: 30rpx;
+  color: #2c3138;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.comment-reply-to {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #9aa3af;
+  font-weight: 400;
+}
+
+.comment-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.comment-images image {
+  width: 148rpx;
+  height: 148rpx;
+  border-radius: 12rpx;
+  background: #f3f5f8;
+}
+
+.comment-foot {
+  margin-top: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  min-width: 0;
+  font-size: 24rpx;
+  color: #c0c4cc;
+}
+
+.comment-action {
+  color: #9aa3af;
+}
+
+.comment-action.danger {
+  color: #e11d48;
+}
+
+.comment-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  color: #c0c4cc;
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+
+.comment-like-ic {
+  width: 30rpx;
+  height: 30rpx;
+  background: #c5cad3;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M16.5 3.5c-1.74 0-3.41.81-4.5 2.09C10.91 4.31 9.24 3.5 7.5 3.5 4.42 3.5 2 5.92 2 9c0 3.78 3.4 6.86 8.55 11.54L12 21.85l1.45-1.32C18.6 15.86 22 12.78 22 9c0-3.08-2.42-5.5-5.5-5.5zm-4.4 15.55-.1.1-.1-.1C7.14 14.74 4 11.89 4 9c0-2 1.5-3.5 3.5-3.5 1.54 0 3.04.99 3.57 2.36h1.87C13.46 6.49 14.96 5.5 16.5 5.5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M16.5 3.5c-1.74 0-3.41.81-4.5 2.09C10.91 4.31 9.24 3.5 7.5 3.5 4.42 3.5 2 5.92 2 9c0 3.78 3.4 6.86 8.55 11.54L12 21.85l1.45-1.32C18.6 15.86 22 12.78 22 9c0-3.08-2.42-5.5-5.5-5.5zm-4.4 15.55-.1.1-.1-.1C7.14 14.74 4 11.89 4 9c0-2 1.5-3.5 3.5-3.5 1.54 0 3.04.99 3.57 2.36h1.87C13.46 6.49 14.96 5.5 16.5 5.5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.expand-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-left: 80rpx;
+  padding: 6rpx 0 16rpx 64rpx;
+}
+
+.expand-line {
+  width: 36rpx;
+  height: 2rpx;
+  background: #e6e8ee;
+  flex-shrink: 0;
+}
+
+.expand-btn {
+  color: #576b95;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.expand-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 24rpx 28rpx;
+}
+
+.comment-empty,
+.comment-error {
+  padding: 48rpx 24rpx 56rpx;
+  text-align: center;
+  color: #999;
+  font-size: 26rpx;
+}
+
+.comment-error .retry {
+  margin-top: 16rpx;
+  color: #2f7dff;
+  font-weight: 500;
+}
+
+.composer .composer-photo {
+  color: transparent !important;
+  font-size: 0 !important;
+  position: relative;
+}
+
+.composer .composer-photo::before {
+  content: "";
+  width: 34rpx;
+  height: 34rpx;
+  display: block;
+  background: #6b7280;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 3l1.2 2H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2.8L10 3h-1zm3 5.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5zm0 2A2.5 2.5 0 1 1 9.5 13 2.5 2.5 0 0 1 12 10.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 3l1.2 2H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2.8L10 3h-1zm3 5.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5zm0 2A2.5 2.5 0 1 1 9.5 13 2.5 2.5 0 0 1 12 10.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.composer-row {
+  align-items: flex-end;
+}
+
+.composer-row textarea {
+  flex: 1;
+  min-height: 72rpx;
+  max-height: 180rpx;
+  background: #f3f5f8;
+  border-radius: 24rpx;
+  padding: 18rpx 24rpx;
+  font-size: 26rpx;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.composer .composer-photo {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  border: 1rpx solid #e6e8ee;
+  box-shadow: none;
+  color: transparent;
+}

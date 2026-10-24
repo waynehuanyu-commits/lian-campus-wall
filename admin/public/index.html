@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>黎安话事运营后台</title>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div id="login-view" class="login-wrap">
+    <div class="login-atmosphere" aria-hidden="true"></div>
+    <section class="login-card">
+      <p class="brand-mark"><span class="logo-tile">黎</span>黎安话事</p>
+      <h1>内容风控运营后台</h1>
+      <p class="muted login-lead">与学生小程序分离。审帖、词库、账号处置在这里完成。</p>
+      <label for="account">管理员账号</label>
+      <input id="account" autocomplete="username" value="admin" />
+      <label for="password">密码</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <button id="login-btn" type="button">进入后台</button>
+      <p id="login-error" class="error"></p>
+    </section>
+  </div>
+
+  <div id="app-view" class="app hidden">
+    <aside>
+      <div class="aside-brand">
+        <p class="brand-mark compact"><span class="logo-tile">黎</span>黎安话事</p>
+        <h2>运营工作台</h2>
+        <p id="mode-badge" class="mode-badge">云端数据</p>
+      </div>
+      <nav>
+        <button data-nav="overview" class="active">概览</button>
+        <button data-nav="review">审帖</button>
+        <button data-nav="keywords">词库</button>
+        <button data-nav="accounts">账号</button>
+        <button data-nav="whitelist">白名单</button>
+        <button data-nav="official">官方登录</button>
+        <button data-nav="staff">运营账号</button>
+        <button data-nav="reports">举报</button>
+        <button data-nav="digest">推送</button>
+        <button data-nav="weekly">热榜</button>
+        <button data-nav="groups">客户群</button>
+        <button data-nav="school">学校审核</button>
+        <button data-nav="student">学生认证</button>
+        <button data-nav="more">更多</button>
+      </nav>
+      <button id="logout-btn" class="ghost logout" type="button">退出登录</button>
+    </aside>
+    <main>
+      <header class="top">
+        <div>
+          <p class="kicker" id="nav-kicker">OVERVIEW</p>
+          <h1 id="nav-title">今日概览</h1>
+        </div>
+        <p class="account-chip" id="account-name"></p>
+      </header>
+      <section id="panel" class="panel-stage"></section>
+    </main>
+  </div>
+  <div id="drawer" class="drawer hidden">
+    <div class="drawer-mask" id="drawer-mask"></div>
+    <div class="drawer-panel" id="drawer-panel"></div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+.digest-head {
+  background: #fff;
+  padding: 36rpx 32rpx 32rpx;
+  margin-bottom: 16rpx;
+}
+
+.digest-count {
+  font-size: 22rpx;
+  color: #2f7dff;
+  font-weight: 600;
+}
+
+.digest-title {
+  margin-top: 10rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.digest-desc {
+  margin-top: 12rpx;
+  color: #8c8c8c;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.item-title {
+  margin-top: 14rpx;
+  font-size: 32rpx;
+  font-weight: 650;
+}
+
+.item-summary {
+  margin-top: 10rpx;
+  color: #666;
+  font-size: 28rpx;
+  line-height: 1.55;
+}
+
+.go {
+  margin-top: 16rpx;
+  color: #2f7dff;
+  font-size: 24rpx;
+  font-weight: 600;
+}

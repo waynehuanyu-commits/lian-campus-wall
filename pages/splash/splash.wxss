@@ -1,0 +1,30 @@
+.splash {
+  position: relative;
+  width: 100vw;
+  min-height: 100vh;
+  height: 100vh;
+  background: #fff;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.splash.ready {
+  opacity: 1;
+}
+
+.splash.leaving {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.hero {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

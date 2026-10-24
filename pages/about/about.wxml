@@ -1,0 +1,37 @@
+<view class="about-page">
+  <view class="about-hero">
+    <view class="about-mark">{{about.alias}}</view>
+    <view class="about-name">{{about.name}}</view>
+    <view class="about-tagline">{{about.tagline}}</view>
+  </view>
+
+  <view class="about-card">
+    <view class="about-intro">{{about.intro}}</view>
+  </view>
+
+  <view class="about-card feature-card">
+    <view
+      wx:for="{{about.features}}"
+      wx:key="title"
+      class="feature-item"
+    >
+      <view class="feature-title">{{item.title}}</view>
+      <view class="feature-desc">{{item.desc}}</view>
+    </view>
+  </view>
+
+  <view class="nav-block">
+    <view class="nav-item" bindtap="goAgreement" hover-class="nav-item-hover">
+      <view class="nav-left">
+        <view class="nav-dot legal"></view>
+        <view class="nav-copy">
+          <view class="nav-title">用户协议及隐私政策</view>
+          <view class="nav-desc">使用规则与个人信息说明</view>
+        </view>
+      </view>
+      <view class="nav-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="about-foot">版本 {{about.version}}</view>
+</view>

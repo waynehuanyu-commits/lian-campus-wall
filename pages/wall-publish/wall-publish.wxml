@@ -1,0 +1,100 @@
+<view class="page padded publish-page">
+  <view wx:if="{{blocked}}" class="empty">
+    <view class="empty-title">{{blockTitle}}</view>
+    <view>{{blockDesc}}</view>
+    <button wx:if="{{blockAction === 'login'}}" class="btn-primary submit-btn" bindtap="goLogin">去开通发言</button>
+    <button wx:elif="{{blockAction === 'auth'}}" class="btn-primary submit-btn" bindtap="goAuth">去认证学校</button>
+  </view>
+
+  <block wx:else>
+    <view class="form-label">选择板块</view>
+    <scroll-view class="chips" scroll-x>
+      <view
+        wx:for="{{boards}}"
+        wx:key="*this"
+        class="chip {{tag === item ? 'active' : ''}}"
+        data-name="{{item}}"
+        bindtap="onTagTap"
+      >{{item}}</view>
+    </scroll-view>
+
+    <view class="form-label">{{titleLabel || '标题'}}</view>
+    <view class="field">
+      <input maxlength="40" placeholder="{{titlePlaceholder}}" value="{{title}}" bindinput="onTitleInput" />
+    </view>
+
+    <block wx:if="{{isRide}}">
+      <view class="form-label">出发地（选填）</view>
+      <view class="field">
+        <input maxlength="20" placeholder="例如：信息学部 / 东区大门" value="{{routeFrom}}" bindinput="onRouteFromInput" />
+      </view>
+      <view class="form-label">目的地（选填）</view>
+      <view class="field">
+        <input maxlength="20" placeholder="例如：汉口火车站 / 光谷" value="{{routeTo}}" bindinput="onRouteToInput" />
+      </view>
+      <view class="form-label">出发时间（选填）</view>
+      <view class="field">
+        <input maxlength="30" placeholder="例如：周五 16:00" value="{{departTime}}" bindinput="onDepartTimeInput" />
+      </view>
+      <view class="form-label">空位 / 人数（选填）</view>
+      <view class="field">
+        <input maxlength="20" placeholder="例如：还可坐 2 人" value="{{extra}}" bindinput="onExtraInput" />
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="form-label">{{extraLabel}}（选填）</view>
+      <view class="field">
+        <input maxlength="30" placeholder="{{extraPlaceholder}}" value="{{extraField}}" bindinput="onExtraFieldInput" />
+      </view>
+    </block>
+
+    <view class="form-label">补充说明（选填）</view>
+    <view class="field">
+      <textarea
+        maxlength="800"
+        placeholder="{{contentPlaceholder}}"
+        value="{{content}}"
+        auto-height
+        bindinput="onContentInput"
+      />
+    </view>
+
+    <view class="form-label">图片（最多 {{maxImages}} 张，选图会自动压缩）</view>
+    <view class="upload-grid">
+      <view wx:for="{{images}}" wx:key="*this" class="upload-item">
+        <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewImage" />
+        <view class="upload-remove" data-index="{{index}}" catchtap="removeImage">×</view>
+      </view>
+      <view wx:if="{{images.length < maxImages}}" class="upload-add" bindtap="chooseImages">
+        <text style="font-size: 48rpx; line-height: 1;">＋</text>
+        <text>添加图片</text>
+      </view>
+    </view>
+
+    <view class="form-label">微信号（选填，不进正文）</view>
+    <view class="field">
+      <input
+        maxlength="30"
+        type="text"
+        placeholder="例如：campus_ride"
+        value="{{contactValue}}"
+        bindinput="onContactInput"
+      />
+    </view>
+    <view class="contact-tip">
+      需要对接时再填微信号，不填也可以发。请勿写进正文或图片。线下交易请注意安全，平台不介入纠纷。
+    </view>
+
+    <view class="switch-row" style="margin-top: 28rpx;">
+      <view>
+        <view class="section-title">匿名发布</view>
+        <view class="meta">拼车和二手建议实名，方便对接</view>
+      </view>
+      <switch checked="{{anonymous}}" color="#2F7DFF" bindchange="onAnonymousChange" />
+    </view>
+
+    <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布到互助广场'}}</button>
+  </block>
+  <privacy-popup />
+</view>

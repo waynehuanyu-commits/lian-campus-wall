@@ -1,0 +1,24 @@
+<view wx:if="{{items.length}}" class="gallery {{countClass}}">
+  <view
+    wx:for="{{items}}"
+    wx:key="key"
+    class="gallery-cell {{countClass === 'one' ? (item.isLong ? 'one-long' : 'one-natural') : ''}}"
+    style="{{countClass === 'one' && item.boxStyle ? item.boxStyle : ''}}"
+    data-index="{{index}}"
+    bindtap="onTap"
+  >
+    <image
+      wx:if="{{item.status !== 'fail'}}"
+      class="gallery-img"
+      src="{{item.displaySrc || item.src}}"
+      mode="{{countClass === 'one' ? 'aspectFit' : 'aspectFill'}}"
+      data-index="{{index}}"
+      bindload="onImgLoad"
+      binderror="onImgError"
+      show-menu-by-longpress
+      lazy-load
+    />
+    <view wx:elif="{{item.status === 'loading'}}" class="gallery-fail muted">加载中</view>
+    <view wx:else class="gallery-fail" data-index="{{index}}" catchtap="onRetry">重试</view>
+  </view>
+</view>

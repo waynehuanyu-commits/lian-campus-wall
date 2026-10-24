@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "分享图",
+  "navigationBarBackgroundColor": "#F7F9FC",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#F7F9FC",
+  "disableScroll": false,
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
+  }
+}
