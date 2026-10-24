@@ -6,6 +6,9 @@ const media = require('../../utils/media')
 
 const defaultProfile = require('../../utils/default-profile')
 const postNav = require('../../utils/post-nav')
+const { readNavMetrics } = require('../../utils/nav-bar')
+const coverStore = require('../../utils/cover')
+
 
 const DEFAULT_AVATAR = defaultProfile.DEFAULT_AVATARS[0]
 const AVATAR_VIEW_KEY = 'cw_mine_avatar_v1'
@@ -13,6 +16,8 @@ const AVATAR_VIEW_TTL = 7 * 24 * 60 * 60 * 1000
 
 Page({
   data: {
+    nav: { top: 20, height: 44, capsule: 100 },
+    cover: coverStore.DEFAULT_COVER,
     user: { nickname: '访客', bio: '', id: '' },
     isGuest: true,
     schoolText: '',
@@ -27,7 +32,19 @@ Page({
   },
 
   onLoad() {
+    this.setData({ nav: readNavMetrics(), cover: coverStore.cachedCover() })
     this.paintGuestFirst()
+    this.refreshCover()
+  },
+
+  async refreshCover() {
+    const next = await coverStore.fetchCover()
+    if (!coverStore.sameCover(this.data.cover, next)) this.setData({ cover: next })
+  },
+
+  onCoverError() {
+    if (coverStore.sameCover(this.data.cover, coverStore.DEFAULT_COVER)) return
+    this.setData({ cover: coverStore.fallbackCover() })
   },
 
   async onShow() {

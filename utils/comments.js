@@ -30,6 +30,7 @@ function shapeRow(node, formatTime, depth = 0) {
     authorId: node.authorId,
     authorName: node.authorName,
     authorAvatar: node.authorAvatar,
+    anonymous: !!node.anonymous,
     createdAt: node.createdAt,
     parentId: node.parentId || '',
     replyToId: node.replyToId || '',
@@ -197,6 +198,20 @@ function flattenCommentThread(list = [], formatTime) {
   return out
 }
 
+// 点赞后就地更新：保留各组的展开状态，不重建评论树
+function patchCommentLike(groups = [], id, liked, likeCount) {
+  const key = String(id)
+  const patchRow = (row) => (
+    row && String(row.id) === key ? { ...row, liked: !!liked, likeCount: Math.max(0, Number(likeCount) || 0) } : row
+  )
+  return (groups || []).map((group) => {
+    const root = patchRow(group.root)
+    const replies = (group.replies || []).map(patchRow)
+    if (root === group.root && replies.every((row, i) => row === group.replies[i])) return group
+    return { ...group, root, replies, likeCount: Number(root.likeCount) || 0 }
+  })
+}
+
 module.exports = {
   COMMENT_IMAGE_MAX,
   COMMENT_INDENT_MAX,
@@ -211,5 +226,6 @@ module.exports = {
   visibleRepliesForGroup,
   countAllComments,
   expandGroupForTarget,
-  flattenCommentThread
+  flattenCommentThread,
+  patchCommentLike
 }

@@ -1,0 +1,36 @@
+<view class="app-backdrop"></view>
+<view class="search-page">
+  <view class="search-head">
+    <view class="search-bar search-input-bar">
+      <view class="search-ic"></view>
+      <input
+        class="search-input"
+        focus
+        confirm-type="search"
+        placeholder="搜索话题、标题或正文"
+        placeholder-class="search-ph"
+        value="{{draft}}"
+        bindinput="onInput"
+        bindconfirm="onConfirm"
+      />
+    </view>
+    <text class="search-cancel" bindtap="onCancel">取消</text>
+  </view>
+
+  <view wx:if="{{history.length}}" class="history">
+    <view class="history-head">
+      <text class="history-title">最近搜索</text>
+      <text class="history-clear" bindtap="clearHistory">清空</text>
+    </view>
+    <view class="history-list">
+      <view
+        wx:for="{{history}}"
+        wx:key="*this"
+        class="history-chip"
+        hover-class="history-chip-on"
+        data-word="{{item}}"
+        bindtap="onHistoryTap"
+      >{{item}}</view>
+    </view>
+  </view>
+</view>

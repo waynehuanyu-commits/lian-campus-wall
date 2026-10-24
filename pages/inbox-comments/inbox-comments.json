@@ -1,7 +1,7 @@
 {
   "navigationBarTitleText": "评论和@",
-  "navigationBarBackgroundColor": "#FFFFFF",
+  "navigationBarBackgroundColor": "#E6EEFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#FFFFFF",
+  "backgroundColor": "#F2F5FA",
   "enablePullDownRefresh": true
 }

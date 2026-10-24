@@ -1,6 +1,6 @@
 {
-  "navigationBarTitleText": "每周精选",
-  "navigationBarBackgroundColor": "#FFFFFF",
-  "backgroundColor": "#F5F6F8",
+  "navigationBarTitleText": "园区热议",
+  "navigationBarBackgroundColor": "#E6EEFF",
+  "backgroundColor": "#F2F5FA",
   "enablePullDownRefresh": true
 }

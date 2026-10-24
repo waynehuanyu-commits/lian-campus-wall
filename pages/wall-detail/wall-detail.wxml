@@ -1,3 +1,4 @@
+<view class="app-backdrop"></view>
 <view wx:if="{{loading}}" class="page-loading">
   <view class="page-loading-dot"></view>
   <view>加载中…</view>
@@ -82,6 +83,8 @@
     </view>
   </view>
 
+  <campus-qr-card />
+
   <view class="comment-panel">
     <view class="comment-toolbar">
       <view class="comment-sorts">
@@ -109,10 +112,11 @@
             src="{{item.root.authorAvatar}}"
             mode="aspectFill"
             data-userid="{{item.root.authorId}}"
+            data-anonymous="{{item.root.anonymous}}"
             catchtap="onCommentAuthorTap"
           />
           <view class="comment-body">
-            <view class="comment-name" data-userid="{{item.root.authorId}}" catchtap="onCommentAuthorTap">{{item.root.authorName}}</view>
+            <view class="comment-name" data-userid="{{item.root.authorId}}" data-anonymous="{{item.root.anonymous}}" catchtap="onCommentAuthorTap">{{item.root.authorName}}</view>
             <view wx:if="{{item.root.content}}" class="comment-text">{{item.root.content}}</view>
             <view wx:if="{{item.root.images && item.root.images.length}}" class="comment-images">
               <image
@@ -134,7 +138,7 @@
                 <text class="comment-action" data-id="{{item.root.id}}" data-name="{{item.root.authorName}}" bindtap="onReply">回复</text>
                 <text wx:if="{{item.root.canDelete}}" class="comment-action danger" data-id="{{item.root.id}}" catchtap="onDeleteComment">删除</text>
               </view>
-              <view class="comment-like">
+              <view class="comment-like {{item.root.liked ? 'liked' : ''}}" data-id="{{item.root.id}}" catchtap="onCommentLike">
                 <view class="comment-like-ic"></view>
                 <text>{{item.root.likeCount || 0}}</text>
               </view>
@@ -148,10 +152,11 @@
             src="{{reply.authorAvatar}}"
             mode="aspectFill"
             data-userid="{{reply.authorId}}"
+            data-anonymous="{{reply.anonymous}}"
             catchtap="onCommentAuthorTap"
           />
           <view class="comment-body">
-            <view class="comment-name" data-userid="{{reply.authorId}}" catchtap="onCommentAuthorTap">{{reply.authorName}}</view>
+            <view class="comment-name" data-userid="{{reply.authorId}}" data-anonymous="{{reply.anonymous}}" catchtap="onCommentAuthorTap">{{reply.authorName}}</view>
             <view wx:if="{{reply.replyToName}}" class="comment-reply-to">回复 @{{reply.replyToName}}</view>
             <view wx:if="{{reply.content}}" class="comment-text">{{reply.content}}</view>
             <view wx:if="{{reply.images && reply.images.length}}" class="comment-images">
@@ -174,7 +179,7 @@
                 <text class="comment-action" data-id="{{reply.id}}" data-name="{{reply.authorName}}" bindtap="onReply">回复</text>
                 <text wx:if="{{reply.canDelete}}" class="comment-action danger" data-id="{{reply.id}}" catchtap="onDeleteComment">删除</text>
               </view>
-              <view class="comment-like">
+              <view class="comment-like {{reply.liked ? 'liked' : ''}}" data-id="{{reply.id}}" catchtap="onCommentLike">
                 <view class="comment-like-ic"></view>
                 <text>{{reply.likeCount || 0}}</text>
               </view>
@@ -227,6 +232,7 @@
   </view>
   <view class="composer-row">
     <view class="composer-photo" bindtap="chooseCommentImages"></view>
+    <view class="composer-anon {{draftAnonymous ? 'on' : ''}}" bindtap="toggleDraftAnonymous">匿名</view>
     <textarea
       placeholder="{{draftPlaceholder}}"
       placeholder-class="muted"

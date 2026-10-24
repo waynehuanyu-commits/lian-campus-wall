@@ -1,194 +1,219 @@
 .msg-page {
-  min-height: 100%;
-  background: #fff;
+  min-height: 100vh;
+  padding: 24rpx 0 calc(48rpx + env(safe-area-inset-bottom));
+  background: transparent;
   box-sizing: border-box;
-  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
 }
 
 .msg-entries {
   display: flex;
-  justify-content: space-evenly;
-  padding: 40rpx 48rpx 28rpx;
+  gap: 20rpx;
+  margin: 0 24rpx 20rpx;
 }
 
 .msg-entry {
-  width: 180rpx;
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-sizing: border-box;
+  transition: transform 0.15s ease;
 }
 
 .msg-entry-on {
-  opacity: 0.72;
+  transform: scale(0.98);
+  background: #f8faff;
 }
 
 .msg-ico-wrap {
   position: relative;
-  width: 96rpx;
-  height: 96rpx;
-}
-
-.msg-ico {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 22rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 34rpx;
-  font-weight: 700;
 }
 
-.msg-ico.like {
-  background: #ff2442;
+.msg-ico-wrap.like {
+  background: #ffeef1;
 }
 
-.msg-ico.comment {
-  background: #2f7dff;
+.msg-ico-wrap.comment {
+  background: var(--brand-soft);
+}
+
+.msg-ico {
+  width: 44rpx;
+  height: 44rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.msg-ico-heart {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff3b5c'%3E%3Cpath d='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z'/%3E%3C/svg%3E");
+}
+
+.msg-ico-comment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230a5cff'%3E%3Cpath d='M21 15a4 4 0 0 1-4 4H8l-5 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z'/%3E%3C/svg%3E");
 }
 
 .msg-dot {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 16rpx;
-  height: 16rpx;
+  top: -6rpx;
+  right: -6rpx;
+  width: 20rpx;
+  height: 20rpx;
   border-radius: 50%;
-  background: #ff2442;
-  border: 4rpx solid #fff;
-  box-sizing: content-box;
+  background: var(--like);
+  border: 4rpx solid var(--surface);
 }
 
 .msg-label {
-  margin-top: 16rpx;
-  font-size: 26rpx;
+  color: var(--ink);
+  font-size: 30rpx;
+  font-weight: 700;
   line-height: 1.2;
-  color: #333;
-  font-weight: 500;
 }
 
-.msg-sep {
-  height: 16rpx;
-  background: #f5f5f5;
+
+.msg-entry.active {
+  background: #fff;
+  border-color: rgba(10, 92, 255, 0.35);
+  box-shadow: 0 10rpx 24rpx rgba(10, 42, 122, 0.08);
 }
 
-.msg-section-title {
-  padding: 28rpx 32rpx 8rpx;
+.msg-entry.active .msg-label {
+  color: var(--brand);
+}
+
+.msg-list {
+  margin: 0 24rpx 20rpx;
+  padding: 4rpx 0;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  overflow: hidden;
+}
+
+.msg-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  padding: 24rpx 28rpx;
+}
+
+.msg-row + .msg-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 112rpx;
+  right: 28rpx;
+  height: 1rpx;
+  background: var(--line);
+}
+
+.msg-row-on {
+  background: rgba(10, 92, 255, 0.04);
+}
+
+.msg-row-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #e9edf4;
+}
+
+.msg-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.msg-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.msg-row-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink);
   font-size: 28rpx;
   font-weight: 600;
-  color: #333;
 }
 
-.msg-chats {
-  background: #fff;
-}
-
-.msg-chat {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  padding: 24rpx 32rpx;
-  position: relative;
-}
-
-.msg-chat + .msg-chat::before {
-  content: '';
-  position: absolute;
-  left: 140rpx;
-  right: 0;
-  top: 0;
-  height: 1rpx;
-  background: #f0f0f0;
-}
-
-.msg-chat-on {
-  background: #fafafa;
-}
-
-.msg-avatar-wrap {
-  position: relative;
-  width: 88rpx;
-  height: 88rpx;
+.msg-row-action {
   flex-shrink: 0;
-}
-
-.msg-avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: #f2f2f2;
-  display: block;
-}
-
-.msg-avatar-dot {
-  position: absolute;
-  top: 2rpx;
-  right: 2rpx;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #ff2442;
-  border: 4rpx solid #fff;
-  box-sizing: content-box;
-}
-
-.msg-chat-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.msg-chat-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.msg-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 30rpx;
-  font-weight: 500;
-  color: #333;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.msg-time {
-  flex-shrink: 0;
-  font-size: 22rpx;
-  color: #bbb;
-}
-
-.msg-preview {
-  display: block;
-  margin-top: 8rpx;
+  color: var(--ink-3);
   font-size: 24rpx;
-  color: #999;
+}
+
+.msg-row-body {
+  margin-top: 8rpx;
+  color: var(--ink);
+  font-size: 28rpx;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+}
+
+.msg-row-time {
+  margin-top: 8rpx;
+  color: var(--ink-4);
+  font-size: 22rpx;
+}
+
+.msg-row-thumb {
+  width: 104rpx;
+  height: 104rpx;
+  flex-shrink: 0;
+  border-radius: 14rpx;
+  background: #e9edf4;
+}
+
+.msg-row-thumb-text {
+  box-sizing: border-box;
+  padding: 10rpx;
+  background: var(--paper);
+  color: var(--ink-3);
+  font-size: 20rpx;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
 }
 
 .msg-empty {
-  padding: 80rpx 48rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 64rpx 24rpx;
+  text-align: center;
 }
 
 .msg-empty-title {
+  color: var(--ink-2);
   font-size: 28rpx;
-  color: #666;
-  font-weight: 500;
-  text-align: center;
+  font-weight: 600;
 }
 
 .msg-empty-desc {
-  margin-top: 12rpx;
+  margin-top: 10rpx;
+  color: var(--ink-4);
   font-size: 24rpx;
-  color: #bbb;
-  text-align: center;
 }

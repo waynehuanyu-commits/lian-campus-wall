@@ -1372,6 +1372,8 @@ function decorate(list, type, user, liked) {
     next.contactType = item.contactType || ''
     next.contactTypeLabel = contactTypeLabel(item.contactType)
     delete next.contactValue
+    // 匿名帖不向客户端下发真实作者 id（是否本人已由 isOwner 给出）
+    if (item.anonymous) next.authorId = ''
     next.reviewStatusLabel = moderation.reviewStatusLabel(item.reviewStatus)
     if (!moderation.isPublicStatus(item.reviewStatus) && !next.isOwner) {
       next.content = item.reviewNote || '内容审核中'
@@ -2332,24 +2334,59 @@ async function readLoginTicket(ticket) {
   }
 }
 
-function shapeComments(rows, user) {
+// 发给客户端前去掉内部账号字段；匿名评论连作者 id 一起抹掉，避免反查身份
+function publicCommentFields(item) {
+  const { postAuthorId, replyToUserId, ...rest } = item
+  return item.anonymous ? { ...rest, authorId: '' } : rest
+}
+
+// 当前用户在某帖下点过赞的评论 id；游客或查询失败返回空集合
+async function commentLikedIds(user, targetType, targetId) {
   const viewerId = user && user.id !== 'guest_readonly' ? user.id : ''
-  return (rows || []).map((item) => ({
+  if (!viewerId) return new Set()
+  try {
+    const res = await db.collection('comment_likes').where({ userId: viewerId, targetType, targetId }).limit(200).get()
+    return new Set((res.data || []).map((item) => item.commentId))
+  } catch (err) {
+    return new Set()
+  }
+}
+
+function shapeComments(rows, user, likedIds) {
+  const viewerId = user && user.id !== 'guest_readonly' ? user.id : ''
+  const liked = likedIds instanceof Set ? likedIds : new Set()
+  return (rows || []).map((item) => publicCommentFields({
     ...item,
     parentId: item.parentId || '',
     replyToId: item.replyToId || '',
     replyToName: item.replyToName || '',
     images: Array.isArray(item.images) ? item.images : [],
-    authorAvatar: defaultProfile.isLegacyAvatar(item.authorAvatar) && user && item.authorId === user.id && defaultProfile.isCustomAvatar(user.avatar)
+    authorAvatar: !item.anonymous && defaultProfile.isLegacyAvatar(item.authorAvatar) && user && item.authorId === user.id && defaultProfile.isCustomAvatar(user.avatar)
       ? user.avatar
-      : defaultProfile.resolveAvatar(item.authorAvatar, item.authorId),
+      : defaultProfile.resolveAvatar(item.authorAvatar, item.anonymous ? item.id : item.authorId),
     depth: Number(item.depth) || 0,
+    likeCount: Math.max(0, Number(item.likeCount) || 0),
+    liked: liked.has(item.id),
     reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus || 'approved'),
     mine: !!(viewerId && item.authorId === viewerId),
     canDelete: !!(viewerId && (item.authorId === viewerId || item.postAuthorId === viewerId || canModerate(user)))
   })).filter((item) => (
-    moderation.isPublicStatus(item.reviewStatus || 'approved') || (user && item.authorId === user.id)
+    moderation.isPublicStatus(item.reviewStatus || 'approved') || item.mine
   )).sort((a, b) => a.createdAt - b.createdAt)
+}
+
+const MINE_COVER_TTL = 5 * 60 * 1000
+const mineCoverCache = { at: 0, cover: null }
+
+function shapeMineCover(row) {
+  if (!row || row.enabled === false) return null
+  const src = String(row.src || '').trim()
+  if (!/^(cloud:\/\/|https:\/\/)/.test(src)) return null
+  return {
+    src,
+    credit: String(row.credit || '').trim().slice(0, 30),
+    updatedAt: Number(row.updatedAt) || 0
+  }
 }
 
 const handlers = {
@@ -2867,20 +2904,21 @@ const handlers = {
       const res = await db.collection(collection).doc(id).get()
       const post = res && res.data
       if (!post) return { ok: true, post: null, notFound: true, comments: payload.includeComments ? [] : undefined }
-      const [liked, commentRows] = await Promise.all([
+      const [liked, commentRows, commentLiked] = await Promise.all([
         user ? likedIds(user.id, type, [id]) : Promise.resolve([]),
         payload.includeComments
           ? db.collection('comments').where({ targetType: type, targetId: id }).limit(200).get()
             .then((rows) => (rows && rows.data) || [])
             .catch(() => [])
-          : Promise.resolve(null)
+          : Promise.resolve(null),
+        payload.includeComments ? commentLikedIds(user, type, id) : Promise.resolve(null)
       ])
       const decorated = (await hydrateLegacyAvatars(decorate([post], type, user, liked), user))[0]
       if (!moderation.isPublicStatus(decorated.reviewStatus) && !decorated.isOwner) {
         return { ok: true, post: null, notFound: true, comments: payload.includeComments ? [] : undefined }
       }
       const body = { ok: true, post: decorated, speakGate: speakGate(user) }
-      if (commentRows) body.comments = shapeComments(commentRows, user)
+      if (commentRows) body.comments = shapeComments(commentRows, user, commentLiked)
       return body
     } catch (err) {
       const msg = (err && (err.errMsg || err.message)) || '读取帖子失败'
@@ -3172,11 +3210,61 @@ const handlers = {
   },
 
   async listComments(payload, user) {
-    const rows = await db.collection('comments').where({
-      targetType: payload.type,
-      targetId: payload.id
-    }).limit(200).get()
-    return { ok: true, comments: shapeComments(rows.data || [], user) }
+    const [rows, likedSet] = await Promise.all([
+      db.collection('comments').where({
+        targetType: payload.type,
+        targetId: payload.id
+      }).limit(200).get(),
+      commentLikedIds(user, payload.type, payload.id)
+    ])
+    return { ok: true, comments: shapeComments(rows.data || [], user, likedSet) }
+  },
+
+  async toggleCommentLike(payload, user) {
+    if (!user || user.id === 'guest_readonly') {
+      return { ok: false, code: 'NEED_LOGIN', message: '请先登录' }
+    }
+    const commentId = String(payload.id || '').trim()
+    if (!commentId) return { ok: false, message: '评论不存在' }
+    let comment = null
+    try {
+      const snap = await db.collection('comments').doc(commentId).get()
+      comment = snap && snap.data
+    } catch (err) {
+      comment = null
+    }
+    if (!comment || !moderation.isPublicStatus(comment.reviewStatus || 'approved')) {
+      return { ok: false, message: '评论不存在' }
+    }
+    const likeId = `${user.id}_${commentId}`
+    let liked = false
+    try {
+      await db.collection('comment_likes').doc(likeId).get()
+      liked = true
+    } catch (err) {
+      liked = false
+    }
+    const current = Math.max(0, Number(comment.likeCount) || 0)
+    if (liked) {
+      await Promise.all([
+        db.collection('comment_likes').doc(likeId).remove(),
+        db.collection('comments').doc(commentId).update({ data: { likeCount: _.inc(-1) } })
+      ])
+      return { ok: true, liked: false, likeCount: Math.max(0, current - 1) }
+    }
+    await Promise.all([
+      db.collection('comment_likes').doc(likeId).set({
+        data: {
+          userId: user.id,
+          commentId,
+          targetType: comment.targetType,
+          targetId: comment.targetId,
+          createdAt: Date.now()
+        }
+      }),
+      db.collection('comments').doc(commentId).update({ data: { likeCount: _.inc(1) } })
+    ])
+    return { ok: true, liked: true, likeCount: current + 1 }
   },
 
   async addComment(payload, user) {
@@ -3244,6 +3332,7 @@ const handlers = {
     }
 
     const postAuthorId = (postDoc && postDoc.authorId) || ''
+    const anonymous = !!payload.anonymous
 
     const comment = {
       id: uid('c_'),
@@ -3258,8 +3347,12 @@ const handlers = {
       replyToName,
       depth,
       authorId: user.id,
-      authorName: user.nickname,
-      authorAvatar: defaultProfile.resolveAvatar(user.avatar, user.id),
+      authorName: anonymous ? '匿名同学' : user.nickname,
+      authorAvatar: anonymous
+        ? defaultProfile.stableAvatar(`${payload.id}:${user.id}`)
+        : defaultProfile.resolveAvatar(user.avatar, user.id),
+      anonymous,
+      likeCount: 0,
       ...reviewPatch(review),
       createdAt: Date.now()
     }
@@ -3271,7 +3364,7 @@ const handlers = {
       invalidateFeedCache(collection)
       return {
         ok: true,
-        comment,
+        comment: shapeComments([comment], user)[0],
         commentCount: (Number(postDoc && postDoc.commentCount) || 0) + 1
       }
     }
@@ -3279,7 +3372,7 @@ const handlers = {
     return {
       ok: true,
       code: comment.reviewStatus,
-      comment,
+      comment: shapeComments([comment], user)[0],
       message: review.message || '评论已提交，审核通过后可见'
     }
   },
@@ -3621,7 +3714,7 @@ const handlers = {
       const canOpen = !!(post && (homeFeed.isPublicPost(post) || post.authorId === user.id))
       const postImages = post && Array.isArray(post.images) ? post.images.filter(Boolean) : []
       return {
-        ...item,
+        ...publicCommentFields(item),
         parentId: item.parentId || '',
         images: Array.isArray(item.images) ? item.images : [],
         postExists: canOpen,
@@ -3701,7 +3794,7 @@ const handlers = {
     const comments = rows.map((item) => {
       const post = item.targetType === 'wall' ? wallById[item.targetId] : forumById[item.targetId]
       return {
-        ...item,
+        ...publicCommentFields(item),
         parentId: item.parentId || '',
         images: Array.isArray(item.images) ? item.images : [],
         postExists: !!post,
@@ -3985,6 +4078,24 @@ const handlers = {
       digests = (res.data || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     }
     return { ok: true, digests }
+  },
+
+  // 「我的」页顶部照片，运营后台写 meta/mine_cover；没配或格式不对时返回 null，小程序用包内默认图
+  async getMineCover() {
+    const now = Date.now()
+    if (mineCoverCache.at && now - mineCoverCache.at < MINE_COVER_TTL) {
+      return { ok: true, cover: mineCoverCache.cover }
+    }
+    let row = null
+    try {
+      row = (await db.collection('meta').doc('mine_cover').get()).data
+    } catch (err) {
+      row = null
+    }
+    const cover = shapeMineCover(row)
+    mineCoverCache.at = now
+    mineCoverCache.cover = cover
+    return { ok: true, cover }
   },
 
   async getWeeklyHot(payload = {}) {
@@ -4457,6 +4568,7 @@ const GUEST_OK = new Set([
   'bumpView',
   'listComments',
   'getWeeklyHot',
+  'getMineCover',
   'getPublicProfile',
   'listUserPosts',
   'getDigests',

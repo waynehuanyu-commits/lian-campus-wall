@@ -1,22 +1,32 @@
+<view class="app-backdrop"></view>
 <view class="page home-page">
+  <view class="masthead" style="padding-top: {{masthead.top}}px;">
+    <view class="masthead-bar" style="height: {{masthead.height}}px; padding-right: {{masthead.capsule}}px;">
+      <image class="masthead-logo" src="/images/brand-icon.png" mode="aspectFill" />
+      <text class="masthead-name">黎安话事</text>
+    </view>
+  </view>
+
   <view class="top-bar home-top">
-    <view class="search-bar" bindtap="openSearch">
-      <text class="search-icon">⌕</text>
+    <view class="search-bar" bindtap="openSearch" hover-class="search-bar-on">
+      <view class="search-ic"></view>
       <text class="home-search-text {{keyword ? '' : 'muted'}}">{{keyword || '搜索话题、标题或正文'}}</text>
+      <view wx:if="{{keyword}}" class="search-clear" catchtap="clearSearch"></view>
     </view>
-    <view class="home-tabs-row">
-      <scroll-view class="tabs-scroll" scroll-x show-scrollbar="{{false}}">
-        <view class="tabs-line home-tabs-line">
-          <view
-            wx:for="{{topics}}"
-            wx:key="*this"
-            class="tab-line home-tab-item {{topic === item ? 'active' : ''}}"
-            data-name="{{item}}"
-            bindtap="onTopicTap"
-          >{{item}}</view>
-        </view>
-      </scroll-view>
-    </view>
+  </view>
+
+  <view class="home-tabs-row" style="top: {{masthead.top + masthead.height}}px;">
+    <scroll-view class="tabs-scroll" scroll-x show-scrollbar="{{false}}">
+      <view class="tabs-line home-tabs-line">
+        <view
+          wx:for="{{topics}}"
+          wx:key="*this"
+          class="tab-line home-tab-item {{topic === item ? 'active' : ''}}"
+          data-name="{{item}}"
+          bindtap="onTopicTap"
+        >{{item}}</view>
+      </view>
+    </scroll-view>
     <view class="sort-row">
       <view
         wx:for="{{sortOptions}}"
@@ -32,8 +42,7 @@
     <view class="hot-board-head" bindtap="goWeeklyHot">
       <view class="hot-mark">精选</view>
       <view class="hot-board-copy">
-        <text class="hot-board-title">每周精选</text>
-        <text class="hot-board-sub">{{weeklyHot.subtitle || '本周校园好帖'}}</text>
+        <text class="hot-board-title">园区热议</text>
       </view>
       <text class="hot-board-more">全部</text>
     </view>
@@ -72,6 +81,8 @@
       wx:for="{{posts}}"
       wx:key="uniq"
       class="feed-item feed-item-v2"
+      hover-class="feed-item-on"
+      hover-stay-time="80"
       data-id="{{item.id}}"
       data-type="{{item.contentType}}"
       data-key="{{item.feedKey}}"
@@ -103,18 +114,34 @@
       <text wx:if="{{item.bodyLong}}" class="body-more" catchtap="toggleBody" data-id="{{item.id}}" data-type="{{item.contentType}}">{{item.bodyOpen ? '收起' : '展开'}}</text>
       <view wx:if="{{item.images && item.images.length}}" class="image-grid thumbs {{item.images.length > 1 ? 'multi' : 'single'}}">
         <image
-          wx:for="{{item.images}}"
-          wx:for-item="img"
-          wx:for-index="imgIndex"
-          wx:key="*this"
-          src="{{img}}"
-          mode="aspectFill"
+          wx:if="{{item.images.length === 1}}"
+          class="thumb-single"
+          style="{{item.thumbStyle}}"
+          src="{{item.images[0]}}"
+          mode="aspectFit"
           lazy-load
+          data-key="{{item.feedKey}}"
           data-postid="{{item.id}}"
           data-type="{{item.contentType}}"
-          data-index="{{imgIndex}}"
+          data-index="0"
+          bindload="onThumbLoad"
           catchtap="previewImage"
         />
+        <block wx:else>
+          <view
+            wx:for="{{item.images}}"
+            wx:for-item="img"
+            wx:for-index="imgIndex"
+            wx:key="*this"
+            class="thumb-cell"
+            data-postid="{{item.id}}"
+            data-type="{{item.contentType}}"
+            data-index="{{imgIndex}}"
+            catchtap="previewImage"
+          >
+            <image src="{{img}}" mode="aspectFit" lazy-load />
+          </view>
+        </block>
       </view>
       <view class="feed-foot">
         <view class="feed-stats" catchtap="preventBubble">
@@ -152,8 +179,16 @@
     <view class="feed-end">{{loadingMore ? '正在加载更早的帖子' : (hasMore ? '上拉加载更多' : '没有更多了 · 共' + posts.length + '条')}}</view>
   </view>
 
-  <view wx:elif="{{loading}}" class="empty">
-    <view class="empty-title">正在加载</view>
+  <view wx:elif="{{loading}}" class="feed skeleton-feed">
+    <view wx:for="{{[1, 2, 3]}}" wx:key="*this" class="feed-item skeleton-card">
+      <view class="sk-head">
+        <view class="sk sk-avatar"></view>
+        <view class="sk sk-name"></view>
+      </view>
+      <view class="sk sk-line"></view>
+      <view class="sk sk-line"></view>
+      <view class="sk sk-line short"></view>
+    </view>
   </view>
 
   <view wx:elif="{{!loading}}" class="empty">
@@ -162,32 +197,9 @@
   </view>
 
   <view class="fab" bindtap="goPublish" hover-class="fab-hover">
-    <view class="fab-icon">
-      <text class="fab-plus">＋</text>
-      <text class="fab-heart">♥</text>
-    </view>
+    <view class="fab-icon"></view>
     <text class="fab-text">发帖</text>
   </view>
 </view>
 
-<view wx:if="{{searchOpen}}" class="home-mask" bindtap="cancelSearch">
-  <view class="search-sheet" catchtap="preventBubble">
-    <view class="search-bar">
-      <text class="search-icon">⌕</text>
-      <input
-        focus
-        placeholder="搜索话题、标题或正文"
-        placeholder-class="muted"
-        value="{{keywordDraft}}"
-        confirm-type="search"
-        bindinput="onDraftInput"
-        bindconfirm="confirmSearch"
-      />
-    </view>
-    <view class="search-actions">
-      <text class="search-cancel" bindtap="cancelSearch">取消</text>
-      <text class="search-ok" bindtap="confirmSearch">搜索</text>
-    </view>
-  </view>
-</view>
 

@@ -5,6 +5,7 @@
     "pages/wall/wall",
     "pages/mine/mine",
     "pages/edit-nickname/edit-nickname",
+    "pages/search/search",
     "pages/forum-detail/forum-detail",
     "pages/forum-publish/forum-publish",
     "pages/wall-detail/wall-detail",
@@ -31,10 +32,10 @@
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#333333",
+    "color": "#9A9EA6",
+    "selectedColor": "#0A5CFF",
     "backgroundColor": "#FFFFFF",
-    "borderStyle": "black",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/forum/forum",

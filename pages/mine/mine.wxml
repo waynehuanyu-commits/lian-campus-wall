@@ -1,4 +1,10 @@
+<view class="app-backdrop"></view>
 <view class="mine-page">
+  <view class="mine-cover">
+    <image class="mine-cover-img" src="{{cover.src}}" mode="aspectFill" binderror="onCoverError" />
+    <view class="mine-cover-fade"></view>
+    <text wx:if="{{cover.credit}}" class="mine-cover-credit">{{cover.credit}}</text>
+  </view>
   <view class="hero">
     <view class="hero-bg">
       <view class="hero-wash"></view>
@@ -65,95 +71,53 @@
 
   <view class="nav-block">
     <view class="nav-item" bindtap="goMyPosts" hover-class="nav-item-hover">
-      <view class="nav-left">
-        <view class="nav-dot posts"><view class="nav-ic ic-post"></view></view>
-        <view class="nav-copy">
-          <view class="nav-title">我的帖子</view>
-          <view class="nav-desc">我发过的帖子</view>
-        </view>
+      <view class="nav-copy">
+        <view class="nav-title">我的帖子</view>
+        <view class="nav-desc">我发过的帖子</view>
       </view>
-      <view class="nav-arrow">›</view>
     </view>
     <view class="nav-item" bindtap="goMyEngage" hover-class="nav-item-hover">
-      <view class="nav-left">
-        <view class="nav-dot engage"><view class="nav-ic ic-heart"></view></view>
-        <view class="nav-copy">
-          <view class="nav-title-row">
-            <view class="nav-title">我赞过的 / 我评论过的</view>
-          </view>
-          <view class="nav-desc">我主动做过的互动历史</view>
-        </view>
+      <view class="nav-copy">
+        <view class="nav-title">我赞过的 / 我评论过的</view>
+        <view class="nav-desc">我主动做过的互动历史</view>
       </view>
-      <view class="nav-tail">
-        <view class="nav-arrow">›</view>
-      </view>
-    </view>
-  </view>
-
-  <view wx:if="{{!isGuest && user.schoolLocked}}" class="setting-block">
-    <view class="setting-item">
-      <view class="setting-copy">
-        <view class="setting-title">展示学校标签</view>
-        <view class="setting-desc">开启后发帖旁显示学校</view>
-      </view>
-      <switch checked="{{user.showSchoolTag}}" color="#2F7DFF" bindchange="onShowSchoolTagChange" />
-    </view>
-    <view class="setting-item" bindtap="goSchool" hover-class="nav-item-hover">
-      <view class="setting-copy">
-        <view class="setting-title">学生认证</view>
-        <view class="setting-desc">{{studentAuthText}}</view>
-      </view>
-      <view class="setting-link">{{studentAuthAction}}</view>
-    </view>
-  </view>
-
-  <view wx:if="{{!isGuest && user.id && !user.officialLogin}}" class="setting-block">
-    <view class="setting-item" bindtap="copyAccountId" hover-class="nav-item-hover">
-      <view class="setting-copy">
-        <view class="setting-title">账号编号</view>
-        <view class="setting-desc account-id-value">{{user.id}}</view>
-      </view>
-      <view class="setting-link">复制</view>
-    </view>
-  </view>
-
-  <view wx:if="{{!isGuest && (user.officialLogin || user.officialLoginAllowed)}}" class="setting-block">
-    <view wx:if="{{user.officialLogin}}" class="setting-item" bindtap="leaveOfficial" hover-class="nav-item-hover">
-      <view class="setting-copy">
-        <view class="setting-title">退出黎安校园墙</view>
-        <view class="setting-desc">回到你自己的微信账号</view>
-      </view>
-      <view class="setting-link">退出</view>
-    </view>
-    <view wx:else class="setting-item" bindtap="enterOfficial" hover-class="nav-item-hover">
-      <view class="setting-copy">
-        <view class="setting-title">登录黎安校园墙</view>
-        <view class="setting-desc">发帖和评论会显示为黎安校园墙</view>
-      </view>
-      <view class="setting-link">登录</view>
     </view>
   </view>
 
   <view class="setting-block">
-    <view class="setting-item" bindtap="openClipboardPost" hover-class="nav-item-hover">
-      <view class="setting-copy">
-        <view class="setting-title">从剪贴板打开帖子</view>
-        <view class="setting-desc">读取剪贴板里的帖子链接</view>
+    <block wx:if="{{!isGuest && user.schoolLocked}}">
+      <view class="setting-item">
+        <view class="setting-title">展示学校标签</view>
+        <switch checked="{{user.showSchoolTag}}" color="#0A5CFF" bindchange="onShowSchoolTagChange" />
       </view>
+      <view class="setting-item" bindtap="goSchool" hover-class="nav-item-hover">
+        <view class="setting-title">学生认证</view>
+        <view class="setting-value">{{studentAuthText}}</view>
+        <view class="setting-link">{{studentAuthAction}}</view>
+      </view>
+    </block>
+    <view wx:if="{{!isGuest && user.id && !user.officialLogin}}" class="setting-item" bindtap="copyAccountId" hover-class="nav-item-hover">
+      <view class="setting-title">账号编号</view>
+      <view class="setting-value account-id-value">{{user.id}}</view>
+      <view class="setting-link">复制</view>
+    </view>
+    <block wx:if="{{!isGuest && (user.officialLogin || user.officialLoginAllowed)}}">
+      <view wx:if="{{user.officialLogin}}" class="setting-item" bindtap="leaveOfficial" hover-class="nav-item-hover">
+        <view class="setting-title">退出黎安校园墙</view>
+        <view class="setting-link">退出</view>
+      </view>
+      <view wx:else class="setting-item" bindtap="enterOfficial" hover-class="nav-item-hover">
+        <view class="setting-title">登录黎安校园墙</view>
+        <view class="setting-link">登录</view>
+      </view>
+    </block>
+    <view class="setting-item" bindtap="openClipboardPost" hover-class="nav-item-hover">
+      <view class="setting-title">从剪贴板打开帖子</view>
       <view class="setting-link">打开</view>
     </view>
-  </view>
-
-  <view class="nav-block">
-    <view class="nav-item" bindtap="goAbout" hover-class="nav-item-hover">
-      <view class="nav-left">
-        <view class="nav-dot about"><view class="nav-ic ic-about"></view></view>
-        <view class="nav-copy">
-          <view class="nav-title">关于我们</view>
-          <view class="nav-desc">产品介绍与用户协议及隐私政策</view>
-        </view>
-      </view>
-      <view class="nav-arrow">›</view>
+    <view class="setting-item" bindtap="goAbout" hover-class="nav-item-hover">
+      <view class="setting-title">关于我们</view>
+      <view class="setting-link setting-arrow">›</view>
     </view>
   </view>
 

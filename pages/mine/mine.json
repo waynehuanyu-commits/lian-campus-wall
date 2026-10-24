@@ -1,9 +1,9 @@
 {
   "navigationBarTitleText": "我的",
-  "navigationBarBackgroundColor": "#FFFFFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#F5F5F5",
+  "backgroundColor": "#F2F5FA",
   "usingComponents": {
     "privacy-popup": "/components/privacy-popup/privacy-popup"
-  }
+  },
+  "navigationStyle": "custom"
 }

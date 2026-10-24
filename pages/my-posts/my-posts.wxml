@@ -1,3 +1,4 @@
+<view class="app-backdrop"></view>
 <view class="page home-page mine-posts">
   <view class="top-bar home-top">
     <view class="home-tabs-row">
@@ -37,11 +38,11 @@
         </view>
       </view>
       <view wx:if="{{item.showTitle}}" class="post-title">
-        <text wx:if="{{item.reviewLabel}}" class="pin-tag">{{item.reviewLabel}}</text>
+        <text wx:if="{{item.reviewLabel}}" class="pin-tag review">{{item.reviewLabel}}</text>
         <text wx:if="{{item.official}}" class="pin-tag official">官方</text>{{item.title}}
       </view>
       <view wx:elif="{{item.reviewLabel || item.official}}" class="post-title post-title-flags">
-        <text wx:if="{{item.reviewLabel}}" class="pin-tag">{{item.reviewLabel}}</text>
+        <text wx:if="{{item.reviewLabel}}" class="pin-tag review">{{item.reviewLabel}}</text>
         <text wx:if="{{item.official}}" class="pin-tag official">官方</text>
       </view>
       <view wx:if="{{item.bodyText}}" class="post-content {{item.bodyOpen ? 'open' : ''}}">{{item.bodyText}}</view>

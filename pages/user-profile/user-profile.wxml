@@ -1,14 +1,20 @@
+<view class="app-backdrop"></view>
+<view class="up-nav" style="padding-top: {{nav.top}}px; height: {{nav.height}}px;">
+  <view class="up-back" bindtap="goBack" hover-class="up-back-on"></view>
+</view>
 <view wx:if="{{loading}}" class="page-loading">
   <view class="page-loading-dot"></view>
   <view>加载中…</view>
 </view>
 
 <view wx:elif="{{profile}}" class="profile-page">
-  <view class="hero">
-    <view class="hero-wash"></view>
-    <view class="hero-orb hero-orb-a"></view>
-    <view class="hero-orb hero-orb-b"></view>
+  <view class="up-cover">
+    <image class="up-cover-img" src="{{cover.src}}" mode="aspectFill" binderror="onCoverError" />
+    <view class="up-cover-fade"></view>
+    <text wx:if="{{cover.credit}}" class="up-cover-credit">{{cover.credit}}</text>
+  </view>
 
+  <view class="hero">
     <view class="profile">
       <image class="avatar-lg" src="{{profile.avatar}}" mode="aspectFill" />
       <view class="profile-main">
@@ -16,33 +22,29 @@
           <view class="nickname">{{profile.nickname}}</view>
           <view class="profile-more" catchtap="openMore">⋯</view>
         </view>
-        <view class="bio">{{profile.bio}}</view>
+        <view wx:if="{{profile.bio}}" class="bio">{{profile.bio}}</view>
         <view class="pill-row">
           <view wx:if="{{profile.schoolText}}" class="school-pill">{{profile.schoolText}}</view>
           <view wx:if="{{profile.studentAuthApproved}}" class="soft-pill ok">学生已认证</view>
         </view>
       </view>
     </view>
+  </view>
 
-    <view class="stats-row">
-      <view class="stat">
-        <view class="stat-num">{{stats.postCount}}</view>
-        <view class="stat-label">发布</view>
-      </view>
-      <view class="stat-line"></view>
-      <view class="stat">
-        <view class="stat-num">{{stats.receivedLikes}}</view>
-        <view class="stat-label">获赞</view>
-      </view>
-      <view class="stat-line"></view>
-      <view class="stat">
-        <view class="stat-num">{{stats.receivedComments}}</view>
-        <view class="stat-label">评论</view>
-      </view>
+  <view class="stats-row">
+    <view class="stat">
+      <view class="stat-num">{{stats.postCount}}</view>
+      <view class="stat-label">发布</view>
     </view>
-
-    <view class="profile-actions">
-      <view class="dm-btn" bindtap="onMessageTap">{{messaging ? '连接中…' : '发私信'}}</view>
+    <view class="stat-line"></view>
+    <view class="stat">
+      <view class="stat-num">{{stats.receivedLikes}}</view>
+      <view class="stat-label">获赞</view>
+    </view>
+    <view class="stat-line"></view>
+    <view class="stat">
+      <view class="stat-num">{{stats.receivedComments}}</view>
+      <view class="stat-label">评论</view>
     </view>
   </view>
 

@@ -1,3 +1,4 @@
+<view class="app-backdrop"></view>
 <view class="xhs-note">
   <view wx:if="{{loading}}" class="xhs-empty">
     <view class="xhs-empty-ico comment"></view>
@@ -9,7 +10,7 @@
     <view class="xhs-empty-desc">下拉可重试</view>
   </view>
   <block wx:else>
-    <view wx:if="{{list.length}}">
+    <view wx:if="{{list.length}}" class="xhs-list">
       <view
         wx:for="{{list}}"
         wx:key="id"

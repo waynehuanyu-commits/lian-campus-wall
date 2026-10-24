@@ -12,11 +12,22 @@ const {
   decorateCommentGroups,
   sliceRootCommentGroups,
   countAllComments,
-  expandGroupForTarget
+  expandGroupForTarget,
+  patchCommentLike
 } = require('../../utils/comments')
 const { formatTime } = require('../../utils/util')
 const sharePoster = require('../../utils/share-poster')
 const postNav = require('../../utils/post-nav')
+
+function findCommentRow(groups, id) {
+  const key = String(id)
+  for (const group of groups) {
+    if (group.root && String(group.root.id) === key) return group.root
+    const hit = (group.replies || []).find((row) => String(row.id) === key)
+    if (hit) return hit
+  }
+  return null
+}
 
 Page({
   data: {
@@ -41,6 +52,7 @@ Page({
     draft: '',
     draftImages: [],
     replyTo: null,
+    draftAnonymous: false,
     draftPlaceholder: '说点什么…',
     submitting: false,
     canSpeak: false,
@@ -290,8 +302,33 @@ Page({
   },
 
   onCommentAuthorTap(e) {
-    const userId = e.currentTarget.dataset.userid
-    userNav.openProfile({ userId })
+    const { userid, anonymous } = e.currentTarget.dataset
+    userNav.openProfile({ userId: userid, anonymous })
+  },
+
+  async onCommentLike(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this._likingComments = this._likingComments || {}
+    if (this._likingComments[id]) return
+    const row = findCommentRow(this._groups || [], id)
+    if (!row) return
+    const nextLiked = !row.liked
+    const nextCount = Math.max(0, (Number(row.likeCount) || 0) + (nextLiked ? 1 : -1))
+    this._likingComments[id] = true
+    this.paintComments(patchCommentLike(this._groups || [], id, nextLiked, nextCount))
+    const result = await repo.toggleCommentLike(id)
+    this._likingComments[id] = false
+    if (!result || result.ok === false) {
+      this.paintComments(patchCommentLike(this._groups || [], id, row.liked, row.likeCount))
+      auth.showActionError(result || { ok: false, message: '操作失败' })
+      return
+    }
+    this.paintComments(patchCommentLike(this._groups || [], id, result.liked, result.likeCount))
+  },
+
+  toggleDraftAnonymous() {
+    this.setData({ draftAnonymous: !this.data.draftAnonymous })
   },
 
   onKeyboard(e) {
@@ -380,6 +417,7 @@ Page({
       parentId: replyTo ? replyTo.id : '',
       replyToId: replyTo ? replyTo.id : '',
       replyToName: replyTo ? replyTo.name : '',
+      anonymous: !!this.data.draftAnonymous,
       images
     })
     this.setData({ submitting: false })

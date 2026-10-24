@@ -1,7 +1,8 @@
-<view class="page padded publish-page">
+<view class="app-backdrop"></view>
+<view class="page padded auth-page">
   <view wx:if="{{!locked}}" class="panel notice">
     <view class="section-title">学校认证</view>
-    <view class="notice-text">发言、评论和查看联系方式前需认证学校。请填写真实学校全称，下方常用学校可点选。提交后不可修改。</view>
+    <view class="notice-text">发言、评论和查看联系方式前需认证学校。请填写真实学校全称。提交后不可修改。</view>
   </view>
 
   <block wx:if="{{locked}}">
@@ -59,27 +60,19 @@
   </block>
 
   <block wx:else>
-    <view class="form-label">学校名称</view>
+    <view class="panel">
+    <view class="form-label first">学校名称</view>
     <view class="field">
-      <input maxlength="40" placeholder="请输入学校全称，也可点选下方常用学校" value="{{schoolName}}" bindinput="onSchoolInput" />
+      <input maxlength="40" placeholder="请输入学校全称" value="{{schoolName}}" bindinput="onSchoolInput" />
     </view>
-    <scroll-view class="chips" scroll-x>
-      <view
-        wx:for="{{suggestions}}"
-        wx:key="*this"
-        class="chip {{schoolName === item ? 'active' : ''}}"
-        data-name="{{item}}"
-        bindtap="onSuggestTap"
-      >{{item}}</view>
-    </scroll-view>
-    <view class="notice-text">以上为常用学校，找不到时直接输入全称即可。</view>
 
     <view class="form-label">校区（选填）</view>
     <view class="field">
       <input maxlength="20" placeholder="如：主校区 / 东校区" value="{{schoolCampus}}" bindinput="onCampusInput" />
     </view>
+    </view>
 
-    <view class="panel notice" style="margin-top: 24rpx;">
+    <view class="panel notice">
       <view class="rule-title">注意</view>
       <view class="notice-text">提交后学校信息不可修改。学校标签默认不在个人主页展示，可在「我的」自行开启。</view>
     </view>

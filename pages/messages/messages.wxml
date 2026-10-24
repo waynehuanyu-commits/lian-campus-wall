@@ -1,57 +1,71 @@
+<view class="app-backdrop"></view>
 <view class="msg-page">
   <view class="msg-entries">
-    <view class="msg-entry" bindtap="goLikes" hover-class="msg-entry-on">
-      <view class="msg-ico-wrap">
-        <view class="msg-ico like">赞</view>
+    <view class="msg-entry {{tab === 'likes' ? 'active' : ''}}" data-tab="likes" bindtap="onTabTap" hover-class="msg-entry-on">
+      <view class="msg-ico-wrap like">
+        <view class="msg-ico msg-ico-heart"></view>
         <view wx:if="{{unreadLikes}}" class="msg-dot"></view>
       </view>
       <text class="msg-label">赞和收藏</text>
     </view>
-    <view class="msg-entry" bindtap="goComments" hover-class="msg-entry-on">
-      <view class="msg-ico-wrap">
-        <view class="msg-ico comment">评</view>
+    <view class="msg-entry {{tab === 'comments' ? 'active' : ''}}" data-tab="comments" bindtap="onTabTap" hover-class="msg-entry-on">
+      <view class="msg-ico-wrap comment">
+        <view class="msg-ico msg-ico-comment"></view>
         <view wx:if="{{unreadComments}}" class="msg-dot"></view>
       </view>
       <text class="msg-label">评论和@</text>
     </view>
   </view>
 
-  <view class="msg-sep"></view>
-  <view class="msg-section-title">私信</view>
-
-  <view wx:if="{{list.length}}" class="msg-chats">
-    <view
-      wx:for="{{list}}"
-      wx:key="id"
-      class="msg-chat"
-      data-id="{{item.id}}"
-      bindtap="goChat"
-      hover-class="msg-chat-on"
-    >
-      <view class="msg-avatar-wrap">
-        <image class="msg-avatar" src="{{item.peerAvatar}}" mode="aspectFill" />
-        <view wx:if="{{item.hasUnread}}" class="msg-avatar-dot"></view>
-      </view>
-      <view class="msg-chat-main">
-        <view class="msg-chat-top">
-          <text class="msg-name">{{item.peerName}}</text>
-          <text class="msg-time">{{item.timeText}}</text>
+  <view class="msg-list">
+    <view wx:if="{{loading}}" class="msg-empty">
+      <view class="msg-empty-title">加载中</view>
+    </view>
+    <view wx:elif="{{loadError}}" class="msg-empty">
+      <view class="msg-empty-title">{{loadError}}</view>
+      <view class="msg-empty-desc">下拉可重试</view>
+    </view>
+    <block wx:elif="{{list.length}}">
+      <view
+        wx:for="{{list}}"
+        wx:key="uniq"
+        class="msg-row"
+        data-id="{{item.postId}}"
+        data-type="{{item.contentType}}"
+        data-exists="{{item.postExists}}"
+        bindtap="goPost"
+        hover-class="msg-row-on"
+      >
+        <image
+          class="msg-row-avatar"
+          src="{{item.actorAvatar || '/images/default-avatars/avatar-01.jpg'}}"
+          mode="aspectFill"
+          data-userid="{{item.actorId}}"
+          data-anonymous="{{item.anonymous}}"
+          catchtap="goAuthor"
+        />
+        <view class="msg-row-main">
+          <view class="msg-row-head">
+            <text class="msg-row-name">{{item.actorName}}</text>
+            <text class="msg-row-action">{{item.action}}</text>
+          </view>
+          <view wx:if="{{item.content}}" class="msg-row-body">{{item.content}}</view>
+          <view wx:elif="{{item.images.length}}" class="msg-row-body">[图片]</view>
+          <view class="msg-row-time">{{item.timeText}}</view>
         </view>
-        <text class="msg-preview">{{item.lastPreview || '暂无消息'}}</text>
+        <image wx:if="{{item.postCover}}" class="msg-row-thumb" src="{{item.postCover}}" mode="aspectFill" />
+        <view wx:else class="msg-row-thumb msg-row-thumb-text">{{item.postExists ? item.postTitle : '不可用'}}</view>
       </view>
+    </block>
+    <view wx:elif="{{tab === 'likes'}}" class="msg-empty">
+      <view class="msg-empty-title">还没有收到赞</view>
+      <view class="msg-empty-desc">别人点赞你的帖子会出现在这里</view>
+    </view>
+    <view wx:else class="msg-empty">
+      <view class="msg-empty-title">还没有评论和@</view>
+      <view class="msg-empty-desc">别人评论你的帖子会出现在这里</view>
     </view>
   </view>
 
-  <view wx:elif="{{loading}}" class="msg-empty">
-    <view class="msg-empty-title">正在加载私信…</view>
-  </view>
-
-  <view wx:elif="{{loadError}}" class="msg-empty">
-    <view class="msg-empty-title">{{loadError}}</view>
-  </view>
-
-  <view wx:else class="msg-empty">
-    <view class="msg-empty-title">还没有私信</view>
-    <view class="msg-empty-desc">去同学主页点「发私信」开始聊天</view>
-  </view>
+  <campus-qr-card />
 </view>

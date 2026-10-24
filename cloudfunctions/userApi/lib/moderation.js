@@ -303,35 +303,12 @@ function evaluateRules({ hits, entities, imageFlags, channel, contentType }) {
   if (academicCore && !requestHit && !provider && !transaction && !discussion) {
     matched.push({ id: 'A02', outcome: OUTCOMES.MANUAL_REVIEW, message: '内容需人工复核，通过后才会公开' })
   }
-  if (academicVariant && !academicCore && !actualContact) {
-    matched.push({
-      id: 'A03',
-      outcome: OUTCOMES.PASS,
-      message: '',
-      tip: contactIntent || courseTime || transaction ? '可通过评论沟通；请勿在正文留微信号或手机号' : ''
-    })
-  }
-  if (academicVariant && actualContact) {
-    matched.push({
-      id: 'A04',
-      outcome: OUTCOMES.EDIT_REQUIRED,
-      message: channelAllowsContact(channel)
-        ? '请勿在正文留微信号/手机号/二维码，请改填到专用联系方式字段'
-        : '请勿在正文或图片中留微信号、手机号、QQ或二维码'
-    })
+  // 私信已下线，正文和评论允许直接留联系方式；联系方式只作为诈骗/曝光类规则的加重信号
+  if (academicVariant && !academicCore) {
+    matched.push({ id: 'A03', outcome: OUTCOMES.PASS, message: '' })
   }
   if (discussion && !transaction && !actualContact) {
     matched.push({ id: 'A05', outcome: OUTCOMES.PASS, message: '' })
-  }
-  // 帖子与评论均禁止正文直接留联系方式；私信场景放行
-  if (contentType !== 'dm' && actualContact) {
-    matched.push({
-      id: 'C02',
-      outcome: OUTCOMES.EDIT_REQUIRED,
-      message: channelAllowsContact(channel) && contentType !== 'comment'
-        ? '请将微信号/手机号/QQ移到专用联系方式字段，正文不要直接填写'
-        : '请勿在正文或评论中直接留微信号、手机号、QQ或二维码'
-    })
   }
   if (hasSignal(hits, 'fraud_core')) {
     matched.push({ id: 'F01', outcome: OUTCOMES.MANUAL_REVIEW, message: '疑似诈骗引流，已隐藏并转人工审核', priority: 'high' })
@@ -450,20 +427,13 @@ function evaluateRules({ hits, entities, imageFlags, channel, contentType }) {
     })
   }
 
-  // 二维码 / 营销广告图：自动隐藏进人工审（正文留联方式仍走 C02 要求修改）
-  if (imageFlags.qr || imageFlags.marketingAd || imageFlags.ad) {
+  // 营销广告图：自动隐藏进人工审；二维码图片放行（私信下线，同学靠二维码加好友）
+  if (imageFlags.marketingAd || imageFlags.ad) {
     matched.push({
       id: 'D01',
       outcome: OUTCOMES.MANUAL_REVIEW,
-      message: '图片疑似二维码或营销广告，已隐藏并转人工审核',
+      message: '图片疑似营销广告，已隐藏并转人工审核',
       priority: 'high'
-    })
-  }
-  if ((entities.qrHints && entities.qrHints.length) && contentType !== 'dm' && !channelAllowsContact(channel)) {
-    matched.push({
-      id: 'D02',
-      outcome: OUTCOMES.MANUAL_REVIEW,
-      message: '疑似扫码引流，已隐藏并转人工审核'
     })
   }
 
