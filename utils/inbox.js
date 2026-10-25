@@ -1,6 +1,7 @@
 const repo = require('./repo')
 
-const MESSAGE_TAB_INDEX = 1
+// 底部 tab：首页 0、黎安攻略 1、消息 2、我的 3
+const MESSAGE_TAB_INDEX = 2
 const empty = { unreadLikes: 0, unreadComments: 0, unreadMessages: 0 }
 
 let cache = { ...empty, at: 0, userId: '' }

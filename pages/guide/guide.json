@@ -1,0 +1,9 @@
+{
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "黎安攻略",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 300,
+  "backgroundTextStyle": "dark",
+  "backgroundColor": "#F2F5FA"
+}

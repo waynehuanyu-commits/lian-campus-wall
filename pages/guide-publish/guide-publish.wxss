@@ -1,0 +1,9 @@
+@import "../../styles/publish.wxss";
+@import "../../styles/guide-cover.wxss";
+
+.gd-preview {
+  overflow: hidden;
+  margin: 24rpx 24rpx 20rpx;
+  border-radius: 24rpx;
+  box-shadow: 0 2rpx 10rpx rgba(10, 42, 122, 0.05);
+}

@@ -2389,6 +2389,96 @@ function shapeMineCover(row) {
   }
 }
 
+
+// 黎安攻略：公众号推文（运营在后台录入）和用户投稿（人工审核后上线）混在一个信息流里，
+// 分类按生活需求分，存在 meta/guide_categories，后台可改
+const GUIDE_DEFAULT_CATEGORIES = ['吃喝玩乐', '学习', '生活办事', '出行', '新生必看']
+const GUIDE_PAGE_SIZE = 20
+const GUIDE_TITLE_MAX = 40
+const GUIDE_CONTENT_MAX = 3000
+const GUIDE_CATEGORY_TTL = 5 * 60 * 1000
+const guideCategoryCache = { at: 0, list: null }
+
+async function getGuideCategories() {
+  const now = Date.now()
+  if (guideCategoryCache.list && now - guideCategoryCache.at < GUIDE_CATEGORY_TTL) return guideCategoryCache.list
+  let list = []
+  try {
+    const row = (await db.collection('meta').doc('guide_categories').get()).data
+    list = ((row && row.list) || []).map((item) => String(item || '').trim()).filter(Boolean)
+  } catch (err) {
+    list = []
+  }
+  if (!list.length) list = GUIDE_DEFAULT_CATEGORIES.slice()
+  guideCategoryCache.at = now
+  guideCategoryCache.list = list
+  return list
+}
+
+// 圈选的帖子：原帖被删或不再公开时，攻略流里也不展示
+async function dropHiddenPicks(rows) {
+  const picks = rows.filter((row) => row.kind === 'pick' && row.refId)
+  if (!picks.length) return rows
+  const visible = new Set()
+  await Promise.all(['forum', 'wall'].map(async (type) => {
+    const ids = picks.filter((row) => (row.refType === 'wall' ? 'wall' : 'forum') === type).map((row) => row.refId)
+    if (!ids.length) return
+    try {
+      const res = await db.collection(type === 'wall' ? 'wall_posts' : 'forum_posts')
+        .where({ id: _.in(ids) })
+        .limit(ids.length)
+        .get()
+      ;(res.data || []).forEach((post) => {
+        if (moderation.isPublicStatus(post.reviewStatus || 'approved')) visible.add(`${type}:${post.id || post._id}`)
+      })
+    } catch (err) {
+      console.warn('[dropHiddenPicks]', type, err && err.message)
+    }
+  }))
+  return rows.filter((row) => row.kind !== 'pick'
+    || visible.has(`${row.refType === 'wall' ? 'wall' : 'forum'}:${row.refId}`))
+}
+
+function guideExcerpt(text, size) {
+  return String(text || '').replace(/\s+/g, ' ').trim().slice(0, size)
+}
+
+// kind：article 公众号推文 / post 攻略页投稿 / pick 运营从首页帖子圈选（点开进原帖）
+function guideKind(row) {
+  if (row.kind === 'article' || row.kind === 'pick') return row.kind
+  return 'post'
+}
+
+function shapeGuide(row, viewer, withBody) {
+  if (!row) return null
+  const kind = guideKind(row)
+  const article = kind === 'article'
+  const item = {
+    id: row.id || row._id,
+    kind,
+    refType: kind === 'pick' ? (row.refType === 'wall' ? 'wall' : 'forum') : '',
+    refId: kind === 'pick' ? (row.refId || '') : '',
+    category: row.category || '',
+    title: row.title || '',
+    summary: row.summary || guideExcerpt(row.content, 60),
+    cover: article ? (row.cover || '') : '',
+    articleUrl: article ? (row.articleUrl || '') : '',
+    authorName: article ? OFFICIAL_AUTHOR_NAME : (row.authorName || ''),
+    authorAvatar: article ? '' : (row.authorAvatar || ''),
+    official: article || !!row.authorOfficial,
+    imageCount: (row.images || []).length,
+    viewCount: Number(row.viewCount) || 0,
+    publishedAt: Number(row.publishedAt || row.createdAt) || 0,
+    reviewStatus: row.reviewStatus || '',
+    mine: !!(viewer && row.authorId && viewer.id === row.authorId)
+  }
+  if (withBody) {
+    item.content = row.content || ''
+    item.images = row.images || []
+  }
+  return item
+}
+
 const handlers = {
   async bootstrap(payload, user) {
     const body = { ok: true, user: publicUser(user), speakGate: speakGate(user) }
@@ -4098,6 +4188,127 @@ const handlers = {
     return { ok: true, cover }
   },
 
+  async listGuides(payload = {}, user) {
+    const categories = await getGuideCategories()
+    const category = categories.includes(payload.category) ? payload.category : ''
+    const page = Math.max(0, Math.floor(Number(payload.page) || 0))
+    const where = category ? { reviewStatus: 'approved', category } : { reviewStatus: 'approved' }
+    let rows = []
+    try {
+      const res = await db.collection('guides')
+        .where(where)
+        .orderBy('publishedAt', 'desc')
+        .skip(page * GUIDE_PAGE_SIZE)
+        .limit(GUIDE_PAGE_SIZE)
+        .get()
+      rows = res.data || []
+    } catch (err) {
+      // 集合还没建时当作空列表
+      rows = []
+    }
+    // 先按原始条数判断还有没有下一页，再滤掉原帖已不公开的圈选
+    const hasMore = rows.length === GUIDE_PAGE_SIZE
+    rows = await dropHiddenPicks(rows)
+    return withTempMedia({
+      ok: true,
+      categories,
+      items: rows.map((row) => shapeGuide(row, user, false)),
+      hasMore
+    })
+  },
+
+  async getGuideCategories() {
+    return { ok: true, categories: await getGuideCategories() }
+  },
+
+  async getGuide(payload = {}, user) {
+    const id = String(payload.id || '').trim()
+    if (!id) return { ok: false, message: '攻略不存在' }
+    let row = null
+    try {
+      row = (await db.collection('guides').doc(id).get()).data
+    } catch (err) {
+      row = null
+    }
+    const mine = !!(row && user && row.authorId === user.id)
+    if (!row || (row.reviewStatus !== 'approved' && !mine)) return { ok: false, message: '攻略不存在或还在审核' }
+    if (row.reviewStatus === 'approved') {
+      db.collection('guides').doc(id).update({ data: { viewCount: _.inc(1) } }).catch(() => {})
+    }
+    return withTempMedia({ ok: true, guide: shapeGuide(row, user, true) })
+  },
+
+  // 用户投稿：机审拦掉违规内容，其余一律进人工审核，运营在后台通过后才上线
+  async submitGuide(payload = {}, user) {
+    const gate = speakGate(user)
+    if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
+    const categories = await getGuideCategories()
+    const category = String(payload.category || '').trim()
+    const title = String(payload.title || '').trim()
+    const content = String(payload.content || '').trim()
+    if (!categories.includes(category)) return { ok: false, message: '请选择分类' }
+    if (!title) return { ok: false, message: '请填写标题' }
+    if (title.length > GUIDE_TITLE_MAX) return { ok: false, message: `标题最多 ${GUIDE_TITLE_MAX} 个字` }
+    if (content.length < 10) return { ok: false, message: '正文至少写 10 个字' }
+    if (content.length > GUIDE_CONTENT_MAX) return { ok: false, message: `正文最多 ${GUIDE_CONTENT_MAX} 个字` }
+    const guideFingerprint = (item) => security.contentFingerprint(item.category, item.title, item.content)
+    const fingerprint = guideFingerprint({ category, title, content })
+    const [mineRes, limit] = await Promise.all([
+      db.collection('guides').where({ authorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
+      consumeRateLimit(user.id, 'post', user)
+    ])
+    if (!user.postWhitelist && !user.appAdmin
+      && security.hasDuplicateContent(mineRes.data || [], user.id, fingerprint, guideFingerprint)) {
+      return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复投稿相同内容' }
+    }
+    if (!limit.ok) return limit
+    let images = []
+    try {
+      images = await persistCloudFiles(payload.images || [], 'guides')
+    } catch (err) {
+      return { ok: false, message: err.message || '图片上传失败' }
+    }
+    const review = await runContentReview({
+      title,
+      content,
+      contentType: 'guide',
+      category,
+      channel: category,
+      images
+    }, user)
+    const blocked = [moderation.OUTCOMES.REJECT, moderation.OUTCOMES.EMERGENCY_BLOCK, moderation.OUTCOMES.EDIT_REQUIRED]
+      .includes(review.outcome)
+    const now = Date.now()
+    const id = `gd_${crypto.randomBytes(8).toString('hex')}`
+    const guide = {
+      id,
+      kind: 'post',
+      category,
+      title,
+      content,
+      summary: guideExcerpt(content, 60),
+      images,
+      authorId: user.id,
+      authorName: user.nickname,
+      authorAvatar: defaultProfile.resolveAvatar(user.avatar, user.id),
+      authorOfficial: !!user.appAdmin || user.id === OFFICIAL_AUTHOR_ID,
+      ...reviewPatch(review),
+      // 机审拦下的也留档，统一记为 rejected（具体结论在 reviewOutcome），后台「已下线 / 未通过」里能查到
+      reviewStatus: blocked ? 'rejected' : 'pending',
+      createdAt: now,
+      publishedAt: 0,
+      viewCount: 0
+    }
+    await db.collection('guides').doc(id).set({ data: guide })
+    if (blocked) {
+      if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
+        await handleReviewViolation(user, review, '攻略投稿')
+      }
+      return { ok: false, code: 'REJECTED', message: review.message || '内容不符合规范，无法投稿' }
+    }
+    return { ok: true, guide: shapeGuide(guide, user, false), message: '已投稿，审核通过后会出现在黎安攻略' }
+  },
+
   async getWeeklyHot(payload = {}) {
     const tab = payload.tab || '全部'
     const cacheKey = `weekly_${tab}`
@@ -4598,6 +4809,9 @@ const GUEST_OK = new Set([
   'listComments',
   'getWeeklyHot',
   'getMineCover',
+  'listGuides',
+  'getGuide',
+  'getGuideCategories',
   'getPublicProfile',
   'listUserPosts',
   'getDigests',

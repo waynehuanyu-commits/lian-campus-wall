@@ -7,10 +7,10 @@
 
 const BRAND = '黎安话事'
 const SLOGAN = '同在一片园区，共享每一种校园生活'
-/** 朋友圈推荐方图 */
-const COVER_SQUARE = '/images/brand.jpg'
-/** 群聊卡片兜底图 */
-const COVER_CARD = '/images/brand.jpg'
+/** 朋友圈推荐方图（1:1） */
+const COVER_SQUARE = '/images/share-square.jpg'
+/** 群聊卡片兜底图（5:4，微信转发卡片比例） */
+const COVER_CARD = '/images/share-card.jpg'
 
 function clip(text, max = 36) {
   const s = String(text || '')
@@ -124,15 +124,15 @@ function digestCard(digest = {}) {
 }
 
 function weeklyHotCard(board = {}) {
-  const titleText = (board && board.title) || '本周热榜'
+  const titleText = (board && board.title) || '园区热议'
   return {
     appMessage: {
-      title: appMessageTitle({ title: titleText, section: '热榜' }),
+      title: appMessageTitle({ title: titleText, section: '园区热议' }),
       path: `/pages/weekly-hot/weekly-hot?${buildQuery({ from: 'share' })}`,
       imageUrl: COVER_CARD
     },
     timeline: {
-      title: timelineTitle({ title: titleText, section: '本周热榜' }),
+      title: timelineTitle({ title: titleText, section: '园区热议' }),
       query: buildQuery({ from: 'timeline' }),
       imageUrl: COVER_SQUARE
     }
@@ -158,7 +158,43 @@ function homeCard(surface = 'forum') {
   }
 }
 
+/** 黎安攻略：列表页用品牌图；单条攻略有封面/配图就用，没有用品牌图 */
+function guideListCard() {
+  return {
+    appMessage: {
+      title: `${BRAND}｜黎安攻略`,
+      path: `/pages/guide/guide?${buildQuery({ from: 'share' })}`,
+      imageUrl: COVER_CARD
+    },
+    timeline: {
+      title: `${BRAND}｜黎安攻略`,
+      query: buildQuery({ from: 'timeline' }),
+      imageUrl: COVER_SQUARE
+    }
+  }
+}
+
+function guideCard(guide = {}) {
+  const id = guide.id || ''
+  const image = guide.cover || firstImage(guide.images)
+  return {
+    appMessage: {
+      title: appMessageTitle({ title: guide.title, tag: guide.category }),
+      path: `/pages/guide-detail/guide-detail?${buildQuery({ id, from: 'share' })}`,
+      imageUrl: image || COVER_CARD
+    },
+    timeline: {
+      title: timelineTitle({ title: guide.title, tag: guide.category }),
+      query: buildQuery({ id, from: 'timeline' }),
+      imageUrl: image || COVER_SQUARE
+    }
+  }
+}
+
 module.exports = {
+  COVER_CARD,
+  guideListCard,
+  guideCard,
   BRAND,
   COVER_SQUARE,
   enableMenus,

@@ -763,6 +763,30 @@ async function getMineCover() {
   return (result && result.ok && result.cover) || null
 }
 
+// 黎安攻略：列表和详情游客可看，投稿要先开通发言
+async function listGuides(payload = {}) {
+  if (!config.useCloud) return store.listGuides(payload)
+  return callCloud('listGuides', payload)
+}
+
+async function getGuideCategories() {
+  if (!config.useCloud) return { ok: true, categories: store.GUIDE_CATEGORIES.slice() }
+  return callCloud('getGuideCategories')
+}
+
+async function getGuide(id) {
+  if (!config.useCloud) return store.getGuide(id)
+  return callCloud('getGuide', { id })
+}
+
+async function submitGuide(payload) {
+  const blocked = requireLoginResult()
+  if (blocked) return blocked
+  if (!config.useCloud) return store.submitGuide(payload)
+  const images = await uploadImages(payload.images || [], 'guides')
+  return callCloud('submitGuide', { ...payload, images })
+}
+
 async function getWeeklyHot(options = {}) {
   if (!config.useCloud) return store.getWeeklyHot(options)
   const now = Date.now()
@@ -1110,6 +1134,10 @@ module.exports = {
   addComment,
   toggleCommentLike,
   getMineCover,
+  listGuides,
+  getGuide,
+  getGuideCategories,
+  submitGuide,
   deleteComment,
   myPosts,
   myLiked,

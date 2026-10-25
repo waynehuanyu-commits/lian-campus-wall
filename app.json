@@ -2,6 +2,9 @@
   "pages": [
     "pages/forum/forum",
     "pages/messages/messages",
+    "pages/guide/guide",
+    "pages/guide-detail/guide-detail",
+    "pages/guide-publish/guide-publish",
     "pages/wall/wall",
     "pages/mine/mine",
     "pages/edit-nickname/edit-nickname",
@@ -42,6 +45,12 @@
         "text": "首页",
         "iconPath": "images/tab/home-normal.png",
         "selectedIconPath": "images/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/guide/guide",
+        "text": "黎安攻略",
+        "iconPath": "images/tab/guide-normal.png",
+        "selectedIconPath": "images/tab/guide-active.png"
       },
       {
         "pagePath": "pages/messages/messages",

@@ -6,6 +6,7 @@ const { loadEnv } = require('../server/load-env')
 const service = require('./lib/service')
 const staff = require('./lib/staff')
 const cover = require('./lib/cover')
+const guides = require('./lib/guides')
 
 loadEnv()
 const localEnv = path.join(__dirname, '.env')
@@ -477,6 +478,48 @@ const routes = {
   },
 
   'POST /api/mine-cover/upload': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await cover.uploadCover(await readBody(req, 4 * 1024 * 1024)))
+  },
+
+  'GET /api/guides': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const status = new URL(req.url, 'http://local').searchParams.get('status') || 'pending'
+    json(res, 200, await guides.listGuides(status))
+  },
+
+  'POST /api/guides/article': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.saveArticle(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/guides/status': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.updateStatus(await readBody(req), session.name || session.account || ''))
+  },
+
+  'GET /api/guides/posts': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const keyword = new URL(req.url, 'http://local').searchParams.get('keyword') || ''
+    json(res, 200, await guides.searchPosts(keyword))
+  },
+
+  'POST /api/guides/pick': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.pickPost(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/guides/categories': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.saveCategories(await readBody(req), session.name || session.account || ''))
+  },
+
+  // 推文封面和「我的页封面」共用上传逻辑（2MB 以内，云模式存云存储 covers/）
+  'POST /api/guides/upload': async (req, res) => {
     if (!requireAdmin(req, res)) return
     json(res, 200, await cover.uploadCover(await readBody(req, 4 * 1024 * 1024)))
   },

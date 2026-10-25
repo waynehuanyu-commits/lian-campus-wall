@@ -7,6 +7,10 @@ const state = {
   lexiconSignal: 'academic_core',
   weeklyKeyword: '',
   coverDraft: null,
+  guideStatus: 'pending',
+  guideView: 'list',
+  guideDraft: null,
+  guidePickKeyword: '',
   selectedReview: null,
   reportStatus: 'pending',
   accountQuery: '',
@@ -29,6 +33,7 @@ const titles = {
   digest: ['', '公众号推文'],
   weekly: ['', '园区热议'],
   cover: ['', '我的页封面'],
+  guides: ['', '黎安攻略'],
   groups: ['', '企微群发'],
   school: ['', '学校修改审核'],
   student: ['', '学生认证审核'],
@@ -838,6 +843,11 @@ async function render() {
     return
   }
 
+  if (state.nav === 'guides') {
+    renderGuides(panel, data.guides)
+    return
+  }
+
   if (state.nav === 'weekly') {
     const weekly = data.weeklyHot || { board: { items: [] }, candidates: [], max: 20 }
     const board = weekly.board || { enabled: true, items: [] }
@@ -1580,6 +1590,328 @@ function readCoverForm(panel) {
   }
 }
 
+// ---- 黎安攻略（guides 集合 + meta/guide_categories）----
+// 三种来源混在小程序同一个信息流：公众号推文（运营录入）、攻略页投稿（人工审核）、首页帖子圈选（运营挑）
+const GUIDE_VIEWS = [
+  { view: 'list', label: '攻略列表' },
+  { view: 'article', label: '添加公众号推文' },
+  { view: 'pick', label: '从帖子圈选' },
+  { view: 'categories', label: '分类设置' }
+]
+const GUIDE_TABS = [
+  { status: 'pending', label: '待审核' },
+  { status: 'approved', label: '已上线' },
+  { status: 'offline', label: '已下线 / 未通过' }
+]
+const GUIDE_TONES = 5
+const GUIDE_KIND_LABEL = { article: '公众号推文', post: '攻略投稿', pick: '帖子圈选' }
+
+async function reloadGuides() {
+  const result = await api(`/api/guides?status=${encodeURIComponent(state.guideStatus)}`)
+  if (!result.ok) return
+  state.data = state.data || {}
+  state.data.guides = result
+  if (state.guideView === 'pick') {
+    const posts = await api(`/api/guides/posts?keyword=${encodeURIComponent(state.guidePickKeyword || '')}`)
+    state.data.guidePosts = posts.ok ? posts.items : []
+  }
+  if (state.nav === 'guides') render()
+}
+
+function guideThumb(item, categories) {
+  if (item.kind === 'article' && item.coverUrl) {
+    return `<img class="gd-thumb" src="${esc(item.coverUrl)}" alt="" />`
+  }
+  const tone = Math.max(0, categories.indexOf(item.category)) % GUIDE_TONES
+  return `<div class="gd-thumb gd-tthumb tone-${tone}"><strong>${esc(item.title)}</strong></div>`
+}
+
+function guideCategorySelect(attr, categories, current) {
+  return `<select ${attr}>${categories.map((c) => (
+    `<option value="${esc(c)}" ${c === current ? 'selected' : ''}>${esc(c)}</option>`
+  )).join('')}</select>`
+}
+
+function guideRow(item, categories) {
+  const status = item.reviewStatus || 'pending'
+  const kind = item.kind === 'article' || item.kind === 'pick' ? item.kind : 'post'
+  const author = kind === 'article'
+    ? ''
+    : ` · ${item.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(item.authorName || '')}${item.authorId ? `（${esc(item.authorId)}）` : ''}`
+  const catSelect = guideCategorySelect(`data-guide-cat="${esc(item.id)}"`, categories, item.category)
+  let ops = ''
+  if (status === 'pending') {
+    ops = `${catSelect}
+      <button type="button" data-guide-act="approve" data-id="${esc(item.id)}">通过</button>
+      <button type="button" class="quiet warn" data-guide-act="reject" data-id="${esc(item.id)}">不通过</button>`
+  } else if (status === 'approved') {
+    ops = `${kind === 'article' ? `<button type="button" class="quiet" data-guide-edit="${esc(item.id)}">编辑</button>` : ''}
+      <button type="button" class="quiet warn" data-guide-act="offline" data-id="${esc(item.id)}">下线</button>`
+  } else {
+    ops = `${catSelect}
+      <button type="button" class="quiet" data-guide-act="restore" data-id="${esc(item.id)}">重新上线</button>
+      <button type="button" class="quiet warn" data-guide-act="delete" data-id="${esc(item.id)}">删除</button>`
+  }
+  const body = item.content
+    ? `<details class="gd-body"><summary>看正文${item.imageUrls && item.imageUrls.length ? `（${item.imageUrls.length} 图）` : ''}</summary><p>${esc(item.content)}</p>${(item.imageUrls || []).map((u) => `<img src="${esc(u)}" alt="" />`).join('')}</details>`
+    : (kind === 'pick' && item.summary ? `<span class="meta">${esc(item.summary)}</span>` : '')
+  return `
+    <div class="gd-row">
+      ${guideThumb(item, categories)}
+      <div class="gd-copy">
+        <strong>${esc(item.title)}</strong>
+        <span class="meta"><span class="gd-kind ${kind}">${GUIDE_KIND_LABEL[kind]}</span> ${esc(item.category || '')}${author} · ${formatTime(item.publishedAt || item.createdAt)}${status === 'rejected' ? ` · 未通过：${esc(item.reviewNote || '')}` : ''}</span>
+        ${body}
+        ${kind === 'article' ? `<a class="meta gd-link" href="${esc(item.articleUrl)}" target="_blank" rel="noopener">${esc(item.articleUrl)}</a>` : ''}
+      </div>
+      <div class="gd-ops">${ops}</div>
+    </div>`
+}
+
+function guideListView(guides, categories) {
+  const counts = guides.counts || {}
+  return `
+    <div class="card">
+      <div class="gd-tabs">
+        ${GUIDE_TABS.map((tab) => {
+          const n = tab.status === 'offline' ? (counts.offline || 0) + (counts.rejected || 0) : (counts[tab.status] || 0)
+          return `<button type="button" class="${state.guideStatus === tab.status ? 'active' : ''}" data-guide-tab="${tab.status}">${tab.label} ${n}</button>`
+        }).join('')}
+      </div>
+      <p class="muted">${state.guideStatus === 'pending' ? '用户在小程序「黎安攻略」里的投稿，机审通过后全部在这里等人工审核，通过才会在小程序里显示。' : ''}</p>
+      ${(guides.items || []).length
+        ? guides.items.map((item) => guideRow(item, categories)).join('')
+        : '<p class="muted">这里还没有内容。</p>'}
+    </div>`
+}
+
+function guideArticleView(categories) {
+  const draft = state.guideDraft || { id: '', title: '', category: categories[0] || '', cover: '', coverUrl: '', articleUrl: '' }
+  state.guideDraft = draft
+  const local = (state.data && state.data.overview && state.data.overview.mode) !== 'cloud'
+  return `
+    <div class="card">
+      <h3>${draft.id ? '编辑公众号推文' : '添加公众号推文'}</h3>
+      <p class="muted">上传横版封面（公众号封面比例 2.35:1，如 900×383），填推文链接，保存后直接出现在小程序「黎安攻略」，用户点开直接进推文。</p>
+      <div class="gd-form">
+        <div class="gd-cover-pick">
+          ${draft.coverUrl ? `<img src="${esc(draft.coverUrl)}" alt="" />` : '<span class="muted">还没上传封面</span>'}
+        </div>
+        <div class="gd-fields">
+          <div class="row gap">
+            <label class="upload-btn">上传封面<input id="gd-file" type="file" accept="image/jpeg,image/png,image/webp" hidden /></label>
+            <span id="gd-upload-status" class="muted"></span>
+          </div>
+          <input id="gd-title" maxlength="40" placeholder="标题" value="${esc(draft.title)}" />
+          <input id="gd-url" placeholder="推文链接 https://mp.weixin.qq.com/..." value="${esc(draft.articleUrl)}" />
+          ${guideCategorySelect('id="gd-category"', categories, draft.category)}
+          <div class="row gap">
+            <button id="gd-save" type="button">${draft.id ? '保存修改' : '保存并上线'}</button>
+            ${draft.id ? '<button id="gd-cancel" type="button" class="quiet">取消编辑</button>' : ''}
+          </div>
+          ${local ? '<p class="muted">当前是本地演示模式：上传的封面只用于后台预览，小程序读不到。</p>' : ''}
+        </div>
+      </div>
+    </div>`
+}
+
+function guidePickView(categories) {
+  const posts = (state.data && state.data.guidePosts) || []
+  return `
+    <div class="card">
+      <h3>从帖子圈选</h3>
+      <p class="muted">从首页已通过的帖子里挑，设为攻略后在小程序「黎安攻略」里显示成横版卡片，点开进入原帖（评论、点赞都在原帖）。原帖被删或下架时，攻略里也会自动不显示。</p>
+      <div class="row gap">
+        <input id="gd-pick-keyword" placeholder="搜标题或正文" value="${esc(state.guidePickKeyword || '')}" />
+        <button id="gd-pick-search" type="button">搜索</button>
+      </div>
+      ${posts.length ? posts.map((post) => `
+        <div class="gd-pick-row">
+          <div class="gd-copy">
+            <strong>${esc(post.title)}</strong>
+            ${post.excerpt && post.excerpt !== post.title ? `<span class="meta gd-excerpt">${esc(post.excerpt)}</span>` : ''}
+            <span class="meta">${post.tag ? `${esc(post.tag)} · ` : ''}${post.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(post.authorName)} · ${formatTime(post.createdAt)} · 赞 ${post.likeCount} · 评 ${post.commentCount}</span>
+          </div>
+          <div class="gd-ops">
+            ${post.picked
+              ? '<span class="muted">已在攻略里</span>'
+              : `${guideCategorySelect(`data-pick-cat="${esc(post.contentId)}"`, categories, categories[0])}
+                 <button type="button" data-guide-pick="${esc(post.contentId)}" data-type="${esc(post.contentType)}">设为攻略</button>`}
+          </div>
+        </div>`).join('') : '<p class="muted">没有找到已通过的帖子。</p>'}
+    </div>`
+}
+
+function guideCategoryView(categories) {
+  return `
+    <div class="card">
+      <h3>分类设置</h3>
+      <p class="muted">小程序攻略页顶部的分类，按顺序显示，用顿号或逗号分隔，最多 12 个、每个最多 6 个字。删掉的分类下已有的攻略不会被删，只是不再单独显示这个分类。</p>
+      <div class="row gap">
+        <input id="gd-cats" value="${esc(categories.join('、'))}" />
+        <button id="gd-cats-save" type="button">保存分类</button>
+      </div>
+    </div>`
+}
+
+function renderGuides(panel, data) {
+  const guides = data || { items: [], categories: [], counts: {} }
+  const categories = guides.categories || []
+  const view = state.guideView || 'list'
+  const body = view === 'article' ? guideArticleView(categories)
+    : view === 'pick' ? guidePickView(categories)
+      : view === 'categories' ? guideCategoryView(categories)
+        : guideListView(guides, categories)
+  panel.innerHTML = `
+    <div class="subtabs">
+      ${GUIDE_VIEWS.map((item) => `<button type="button" data-guide-view="${item.view}" class="${item.view === view ? 'active' : ''}">${item.label}${item.view === 'list' && (guides.counts || {}).pending ? ` · 待审 ${guides.counts.pending}` : ''}</button>`).join('')}
+    </div>
+    ${body}`
+
+  panel.querySelectorAll('[data-guide-view]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (btn.dataset.guideView === state.guideView) return
+      state.guideView = btn.dataset.guideView
+      if (state.guideView === 'pick') await reloadGuides()
+      else render()
+    }
+  })
+  if (view === 'article') bindGuideArticle(panel)
+  if (view === 'pick') bindGuidePick(panel)
+  if (view === 'categories') bindGuideCategories(panel)
+  if (view === 'list') bindGuideList(panel, guides)
+}
+
+function bindGuideArticle(panel) {
+  const readDraft = () => ({
+    ...state.guideDraft,
+    title: panel.querySelector('#gd-title').value.trim(),
+    articleUrl: panel.querySelector('#gd-url').value.trim(),
+    category: panel.querySelector('#gd-category').value
+  })
+  const status = panel.querySelector('#gd-upload-status')
+  panel.querySelector('#gd-file').onchange = async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    status.textContent = '上传中…'
+    try {
+      const dataUrl = await shrinkImage(file)
+      const result = await api('/api/guides/upload', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'image/jpeg', data: dataUrl })
+      })
+      if (!result.ok) {
+        status.textContent = result.message || '上传失败'
+        return
+      }
+      state.guideDraft = { ...readDraft(), cover: result.src, coverUrl: result.previewUrl }
+      render()
+    } catch (err) {
+      status.textContent = (err && err.message) || '上传失败'
+    }
+  }
+  const saveBtn = panel.querySelector('#gd-save')
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true
+    const result = await api('/api/guides/article', { method: 'POST', body: JSON.stringify(readDraft()) })
+    saveBtn.disabled = false
+    if (!result.ok) return alert(result.message || '保存失败')
+    state.guideDraft = null
+    state.guideView = 'list'
+    state.guideStatus = 'approved'
+    await reloadGuides()
+  }
+  const cancel = panel.querySelector('#gd-cancel')
+  if (cancel) {
+    cancel.onclick = () => {
+      state.guideDraft = null
+      state.guideView = 'list'
+      render()
+    }
+  }
+}
+
+function bindGuidePick(panel) {
+  const search = async () => {
+    state.guidePickKeyword = panel.querySelector('#gd-pick-keyword').value.trim()
+    await reloadGuides()
+  }
+  panel.querySelector('#gd-pick-search').onclick = search
+  panel.querySelector('#gd-pick-keyword').onkeydown = (e) => {
+    if (e.key === 'Enter') search()
+  }
+  panel.querySelectorAll('[data-guide-pick]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.guidePick
+      const select = panel.querySelector(`[data-pick-cat="${CSS.escape(id)}"]`)
+      btn.disabled = true
+      const result = await api('/api/guides/pick', {
+        method: 'POST',
+        body: JSON.stringify({ contentType: btn.dataset.type, contentId: id, category: select ? select.value : '' })
+      })
+      btn.disabled = false
+      if (!result.ok) return alert(result.message || '设为攻略失败')
+      await reloadGuides()
+    }
+  })
+}
+
+function bindGuideCategories(panel) {
+  panel.querySelector('#gd-cats-save').onclick = async () => {
+    const list = panel.querySelector('#gd-cats').value
+    const result = await api('/api/guides/categories', { method: 'POST', body: JSON.stringify({ list }) })
+    if (!result.ok) return alert(result.message || '保存失败')
+    alert('分类已保存，小程序最多 5 分钟后生效')
+    await reloadGuides()
+  }
+}
+
+function bindGuideList(panel, guides) {
+  panel.querySelectorAll('[data-guide-edit]').forEach((btn) => {
+    btn.onclick = () => {
+      const item = (guides.items || []).find((row) => row.id === btn.dataset.guideEdit)
+      if (!item) return
+      state.guideDraft = {
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        cover: item.cover,
+        coverUrl: item.coverUrl,
+        articleUrl: item.articleUrl
+      }
+      state.guideView = 'article'
+      render()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+  panel.querySelectorAll('[data-guide-tab]').forEach((btn) => {
+    btn.onclick = async () => {
+      state.guideStatus = btn.dataset.guideTab
+      await reloadGuides()
+    }
+  })
+  panel.querySelectorAll('[data-guide-act]').forEach((btn) => {
+    btn.onclick = async () => {
+      const action = btn.dataset.guideAct
+      const id = btn.dataset.id
+      const select = panel.querySelector(`[data-guide-cat="${CSS.escape(id)}"]`)
+      const body = { id, action, category: select ? select.value : '' }
+      if (action === 'reject') {
+        const note = prompt('不通过的原因（选填，仅后台可见）', '')
+        if (note === null) return
+        body.note = note
+      }
+      if (action === 'delete' && !confirm('删除后不能恢复，确定删除？')) return
+      if (action === 'offline' && !confirm('下线后小程序里不再显示，可以在「已下线」里重新上线。确定下线？')) return
+      btn.disabled = true
+      const result = await api('/api/guides/status', { method: 'POST', body: JSON.stringify(body) })
+      btn.disabled = false
+      if (!result.ok) return alert(result.message || '操作失败')
+      await reloadGuides()
+    }
+  })
+}
+
 async function reloadWeekly() {
   const result = await api(`/api/weekly-hot?keyword=${encodeURIComponent(state.weeklyKeyword || '')}`)
   if (!result.ok) return
@@ -1604,6 +1936,7 @@ async function loadNav(nav) {
   }
   if (nav === 'weekly') return reloadWeekly()
   if (nav === 'cover') return reloadCover()
+  if (nav === 'guides') return reloadGuides()
   if (nav === 'digest') return refreshDigest()
   if (nav === 'reports') {
     const result = await api('/api/reports?status=' + encodeURIComponent('全部'))

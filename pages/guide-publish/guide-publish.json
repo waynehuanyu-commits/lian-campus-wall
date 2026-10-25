@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "投稿攻略",
+  "navigationBarBackgroundColor": "#E6EEFF",
+  "backgroundColor": "#F2F5FA",
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
+  }
+}
