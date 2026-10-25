@@ -1,0 +1,77 @@
+<view class="page guide-page">
+  <view class="masthead" style="padding-top: {{masthead.top}}px;">
+    <view class="masthead-bar" style="height: {{masthead.height}}px; padding-right: {{masthead.capsule}}px;">
+      <image class="masthead-logo" src="/images/brand-icon.png" mode="aspectFill" />
+      <text class="masthead-name">黎安攻略</text>
+    </view>
+  </view>
+
+  <view class="gd-tabs" style="top: {{masthead.top + masthead.height}}px;">
+    <scroll-view class="gd-tabs-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="gd-tabs-line">
+        <view
+          wx:for="{{categories}}"
+          wx:key="*this"
+          class="tab-line gd-tab {{active === item ? 'active' : ''}}"
+          data-name="{{item}}"
+          bindtap="onTabTap"
+        >{{item}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="gd-feed">
+    <block wx:if="{{loading && !items.length}}">
+      <view wx:for="{{[1, 2, 3]}}" wx:key="*this" class="gd-card gd-sk">
+        <view class="gd-sk-cover"></view>
+        <view class="gd-sk-line"></view>
+        <view class="gd-sk-line short"></view>
+      </view>
+    </block>
+
+    <view wx:elif="{{error && !items.length}}" class="empty">
+      <view class="empty-title">{{error}}</view>
+      <view>下拉可重试</view>
+    </view>
+
+    <view wx:elif="{{!items.length}}" class="empty">
+      <view class="empty-title">这个分类还没有攻略</view>
+    </view>
+
+    <block wx:else>
+      <view
+        wx:for="{{items}}"
+        wx:key="id"
+        class="gd-card"
+        hover-class="gd-card-on"
+        hover-stay-time="80"
+        data-index="{{index}}"
+        bindtap="openGuide"
+      >
+        <image wx:if="{{item.kind === 'article' && item.cover}}" class="gd-cover" src="{{item.cover}}" mode="aspectFill" lazy-load />
+        <view wx:else class="gd-cover gd-tcover tone-{{item.tone}}">
+          <view class="gd-tcover-quote">“</view>
+          <view class="gd-tcover-title">{{item.title}}</view>
+          <view wx:if="{{item.summary}}" class="gd-tcover-text">{{item.summary}}</view>
+          <view class="gd-tcover-tag">#{{item.category}}</view>
+        </view>
+        <view class="gd-body">
+          <view class="gd-title">{{item.title}}</view>
+          <view class="gd-meta">
+            <image wx:if="{{item.official}}" class="gd-avatar" src="/images/campus-wall-avatar.jpg" mode="aspectFill" />
+            <image wx:elif="{{item.authorAvatar}}" class="gd-avatar" src="{{item.authorAvatar}}" mode="aspectFill" />
+            <text class="gd-name">{{item.authorName}}</text>
+            <text wx:if="{{item.kind === 'article'}}" class="gd-badge">公众号</text>
+            <text class="gd-cat">{{item.category}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="feed-end">{{loadingMore ? '加载中' : (hasMore ? '' : '没有更多了')}}</view>
+    </block>
+  </view>
+
+  <view class="gd-fab" hover-class="gd-fab-on" bindtap="goPublish">
+    <text class="gd-fab-plus">+</text>
+    <text>投稿</text>
+  </view>
+</view>

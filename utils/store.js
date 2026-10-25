@@ -30,6 +30,7 @@ const KEYS = {
   LEXICON_META: 'cw_lexicon_meta',
   LIKE_META: 'cw_like_meta',
   REPORTS: 'cw_reports',
+  GUIDES: 'cw_guides_v2',
   INITIALIZED: 'cw_initialized_v12'
 }
 
@@ -2033,6 +2034,18 @@ function reportReasonLabel(id) {
 
 function escalateReportedTarget(targetType, targetId, reportCount) {
   const note = `用户举报满 ${reportCount} 次，自动进入人工审核`
+  if (targetType === 'comment') {
+    saveComments(getComments().map((item) => (item.id !== targetId ? item : {
+      ...item,
+      reportCount,
+      reviewStatus: 'manual_review',
+      reviewOutcome: 'manual_review',
+      reviewNote: note,
+      reviewPriority: 'high',
+      reportEscalatedAt: Date.now()
+    })))
+    return { escalated: true, kind: 'comment' }
+  }
   if (targetType === 'forum' || targetType === 'wall') {
     const key = targetType === 'wall' ? KEYS.WALL_POSTS : KEYS.FORUM_POSTS
     const list = wx.getStorageSync(key) || []
@@ -2074,7 +2087,7 @@ function escalateReportedTarget(targetType, targetId, reportCount) {
 function submitReport({ targetType, targetId, reason, note } = {}) {
   const type = String(targetType || '').trim()
   const id = String(targetId || '').trim()
-  if (!['forum', 'wall', 'user'].includes(type) || !id) {
+  if (!['forum', 'wall', 'comment', 'user'].includes(type) || !id) {
     return { ok: false, message: '举报对象无效' }
   }
   const reasonMeta = REPORT_REASONS.find((item) => item.id === reason) || REPORT_REASONS.find((item) => item.id === 'other')
@@ -2085,6 +2098,11 @@ function submitReport({ targetType, targetId, reason, note } = {}) {
     const post = getPost(type, id)
     if (!post) return { ok: false, message: '内容不存在' }
     if (post.authorId === user.id) return { ok: false, message: '不能举报自己的帖子' }
+  }
+  if (type === 'comment') {
+    const comment = getComments().find((item) => item.id === id)
+    if (!comment) return { ok: false, message: '评论不存在' }
+    if (comment.authorId === user.id) return { ok: false, message: '不能举报自己的评论' }
   }
   const list = getReports()
   if (list.some((item) => item.reporterId === user.id && item.targetType === type && item.targetId === id && item.status !== 'dismissed')) {
@@ -3336,7 +3354,7 @@ const WEEKLY_HOT_MAX = 20
 function defaultWeeklyHot() {
   return {
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '管理员精选热榜',
     enabled: true,
     items: [],
@@ -3379,7 +3397,7 @@ function buildSeedWeeklyHot(wallPosts, forumPosts) {
     .slice(0, 8)
   return {
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '本周校园精选',
     enabled: true,
     schemaVersion: 2,
@@ -3590,7 +3608,183 @@ function updateWeeklyHotMeta({ title, subtitle, enabled } = {}) {
   return { ok: true, board: getWeeklyHot({ includeDisabled: true }) }
 }
 
+
+// 黎安攻略（本地演示）：公众号推文 + 用户投稿混排，投稿默认待审核
+const GUIDE_CATEGORIES = ['吃喝玩乐', '学习', '生活办事', '出行', '新生必看']
+const GUIDE_PAGE_SIZE = 20
+
+// 演示数据：一篇真实的公众号推文（可直接打开）、两条攻略页投稿、一条从首页帖子圈选的攻略
+function seedGuides() {
+  const now = Date.now()
+  const hour = 3600 * 1000
+  const post = (id, category, title, content, authorName, offset) => ({
+    id, kind: 'post', category, title, content, summary: content.slice(0, 60), images: [],
+    authorId: `u_demo_${id}`, authorName, authorAvatar: defaultProfile.stableAvatar(id),
+    reviewStatus: 'approved', createdAt: now - offset, publishedAt: now - offset, viewCount: 0
+  })
+  return [
+    {
+      id: 'gd_demo_print',
+      kind: 'article',
+      category: '生活办事',
+      title: '别再满园区找打印店了！黎安大学城打印地图+价格表，请收好~',
+      // 演示用包内已有图片占位，不额外打包封面
+      cover: '/images/mine-cover.jpg',
+      articleUrl: 'https://mp.weixin.qq.com/s/Hhx0IFGOxZC92ziYU9NgUw',
+      summary: '',
+      reviewStatus: 'approved',
+      createdAt: now - hour,
+      publishedAt: now - hour,
+      viewCount: 0
+    },
+    post('gd_demo_2', '吃喝玩乐', '学校后街 8 家小店，人均 20 吃到撑', '第三家的酸汤粉晚上十点还要排队，老板会多给一勺酸菜。往里走第五家的烤冷面也不错。', '晚风吹过操场', 2 * hour),
+    {
+      id: 'gd_demo_pick',
+      kind: 'pick',
+      refType: 'forum',
+      refId: 'f_2',
+      category: '学习',
+      title: '高数期中复习资料共享，自取不谢',
+      summary: '整理了一份高数上下册的错题和公式速记，覆盖极限、导数、积分和级数。',
+      authorName: '',
+      authorAvatar: '',
+      reviewStatus: 'approved',
+      createdAt: now - 3 * hour,
+      publishedAt: now - 3 * hour,
+      viewCount: 0
+    },
+    post('gd_demo_5', '生活办事', '校园卡丢了怎么办？补办只要 10 分钟', '带身份证去行政楼一楼，20 块工本费，当场拿新卡，原卡余额会自动转过来。', '小林', 8 * hour)
+  ]
+}
+
+function getGuides() {
+  let list = wx.getStorageSync(KEYS.GUIDES)
+  if (!Array.isArray(list)) {
+    list = seedGuides()
+    wx.setStorageSync(KEYS.GUIDES, list)
+  }
+  return list
+}
+
+function guideKind(row) {
+  if (row.kind === 'article' || row.kind === 'pick') return row.kind
+  return 'post'
+}
+
+// 圈选的攻略：作者信息跟原帖走，原帖被删或不公开时不展示
+function pickSource(row) {
+  const list = row.refType === 'wall' ? getWallPosts() : getForumPosts()
+  const post = list.find((item) => item.id === row.refId)
+  return post && (!post.reviewStatus || post.reviewStatus === 'approved') ? post : null
+}
+
+function shapeGuide(row, withBody) {
+  const user = getUser()
+  const kind = guideKind(row)
+  const article = kind === 'article'
+  const source = kind === 'pick' ? pickSource(row) : null
+  const item = {
+    id: row.id,
+    kind,
+    refType: kind === 'pick' ? (row.refType === 'wall' ? 'wall' : 'forum') : '',
+    refId: kind === 'pick' ? row.refId : '',
+    category: row.category,
+    title: row.title,
+    summary: row.summary || String(row.content || '').slice(0, 60),
+    cover: article ? row.cover : '',
+    articleUrl: article ? row.articleUrl : '',
+    authorName: article ? homeFeed.OFFICIAL_AUTHOR_NAME : ((source && source.authorName) || row.authorName),
+    authorAvatar: article ? '' : ((source && source.authorAvatar) || row.authorAvatar),
+    official: article,
+    imageCount: (row.images || []).length,
+    viewCount: row.viewCount || 0,
+    publishedAt: row.publishedAt || row.createdAt,
+    reviewStatus: row.reviewStatus,
+    mine: !!(user && row.authorId === user.id)
+  }
+  if (withBody) {
+    item.content = row.content || ''
+    item.images = row.images || []
+  }
+  return item
+}
+
+function listGuides(payload = {}) {
+  const category = GUIDE_CATEGORIES.indexOf(payload.category) >= 0 ? payload.category : ''
+  const page = Math.max(0, Math.floor(Number(payload.page) || 0))
+  const rows = getGuides()
+    .filter((row) => row.reviewStatus === 'approved' && (!category || row.category === category))
+    .filter((row) => guideKind(row) !== 'pick' || pickSource(row))
+    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+  const slice = rows.slice(page * GUIDE_PAGE_SIZE, (page + 1) * GUIDE_PAGE_SIZE)
+  return {
+    ok: true,
+    categories: GUIDE_CATEGORIES.slice(),
+    items: slice.map((row) => shapeGuide(row, false)),
+    hasMore: rows.length > (page + 1) * GUIDE_PAGE_SIZE
+  }
+}
+
+function getGuide(id) {
+  const user = getUser()
+  const row = getGuides().find((item) => item.id === id)
+  if (!row || (row.reviewStatus !== 'approved' && row.authorId !== user.id)) {
+    return { ok: false, message: '攻略不存在或还在审核' }
+  }
+  return { ok: true, guide: shapeGuide(row, true) }
+}
+
+function submitGuide(payload = {}) {
+  const gate = getSpeakGate()
+  if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
+  const user = getUser()
+  const category = String(payload.category || '').trim()
+  const title = String(payload.title || '').trim()
+  const content = String(payload.content || '').trim()
+  if (GUIDE_CATEGORIES.indexOf(category) < 0) return { ok: false, message: '请选择分类' }
+  if (!title) return { ok: false, message: '请填写标题' }
+  if (title.length > 40) return { ok: false, message: '标题最多 40 个字' }
+  if (content.length < 10) return { ok: false, message: '正文至少写 10 个字' }
+  if (content.length > 3000) return { ok: false, message: '正文最多 3000 个字' }
+  const guideFingerprint = (item) => security.contentFingerprint(item.category, item.title, item.content)
+  if (!user.postWhitelist
+    && security.hasDuplicateContent(getGuides(), user.id, guideFingerprint({ category, title, content }), guideFingerprint)) {
+    return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复投稿相同内容' }
+  }
+  if (!user.postWhitelist) {
+    const limit = consumeRateLimit('post')
+    if (!limit.ok) return limit
+  }
+  const review = runContentReview({ title, content, contentType: 'guide', category, channel: category })
+  const blocked = [moderation.OUTCOMES.REJECT, moderation.OUTCOMES.EMERGENCY_BLOCK, moderation.OUTCOMES.EDIT_REQUIRED]
+    .indexOf(review.outcome) >= 0
+  if (blocked) return { ok: false, code: 'REJECTED', message: review.message || '内容不符合规范，无法投稿' }
+  const now = Date.now()
+  const guide = {
+    id: uid('gd_'),
+    kind: 'post',
+    category,
+    title,
+    content,
+    summary: content.slice(0, 60),
+    images: payload.images || [],
+    authorId: user.id,
+    authorName: user.nickname,
+    authorAvatar: defaultProfile.resolveAvatar(user.avatar, user.id),
+    reviewStatus: 'pending',
+    createdAt: now,
+    publishedAt: 0,
+    viewCount: 0
+  }
+  wx.setStorageSync(KEYS.GUIDES, [guide].concat(getGuides()))
+  return { ok: true, guide: shapeGuide(guide, false), message: '已投稿，审核通过后会出现在黎安攻略' }
+}
+
 module.exports = {
+  GUIDE_CATEGORIES,
+  listGuides,
+  getGuide,
+  submitGuide,
   FORUM_CATEGORIES,
   HOME_TOPICS: homeFeed.HOME_TOPICS,
   OTHER_TOPIC: homeFeed.OTHER_TOPIC,

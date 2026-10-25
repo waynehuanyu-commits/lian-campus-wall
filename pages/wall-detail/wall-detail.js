@@ -660,6 +660,26 @@ Page({
     this.refresh({ soft: true })
   },
 
+  onReportComment(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const sheet = this.selectComponent('#report-sheet')
+    if (!sheet) {
+      wx.showToast({ title: '举报菜单没打开', icon: 'none' })
+      return
+    }
+    sheet.open({
+      targetType: 'comment',
+      targetId: id,
+      onSubmit: async (payload) => {
+        const result = await repo.submitReport(payload)
+        // 满 3 人举报后评论已转人工审核，刷新让它立即从列表消失
+        if (result && result.ok && result.escalated) this.refresh({ soft: true })
+        return result
+      }
+    })
+  },
+
   findCommentImages(cid) {
     const groups = this.data.commentGroups || []
     for (let i = 0; i < groups.length; i += 1) {

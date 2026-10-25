@@ -1,0 +1,70 @@
+/* 黎安攻略封面：攻略流和投稿页预览共用 */
+/* 封面统一 2.35:1（公众号封面比例），702rpx 宽 → 299rpx 高；
+   不用 aspect-ratio，老版本 iOS 不支持 */
+.gd-cover {
+  display: block;
+  width: 100%;
+  height: 299rpx;
+  background: var(--brand-soft);
+}
+
+/* 用户投稿的文字封面：标题 + 正文开头，颜色按分类轮换 */
+.gd-tcover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10rpx;
+  padding: 0 36rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.gd-tcover-quote {
+  position: absolute;
+  top: -40rpx;
+  right: 24rpx;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 220rpx;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.14;
+}
+
+.gd-tcover-title {
+  position: relative;
+  font-size: 38rpx;
+  font-weight: 800;
+  line-height: 1.32;
+  letter-spacing: 1rpx;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gd-tcover-text {
+  position: relative;
+  font-size: 24rpx;
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gd-tcover-tag {
+  position: absolute;
+  left: 36rpx;
+  bottom: 18rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  opacity: 0.7;
+}
+
+.tone-0 { background: var(--lime); color: var(--ink); }
+.tone-1 { background: var(--brand); color: #fff; }
+.tone-2 { background: var(--brand-soft); color: var(--brand-deep); }
+.tone-3 { background: var(--brand-deep); color: #fff; }
+.tone-3 .gd-tcover-title { color: var(--lime); }
+.tone-4 { background: var(--lime-soft); color: var(--brand-deep); }

@@ -151,11 +151,20 @@ async function listCustomerGroups(wecomToken, cursor = '') {
   )
 }
 
+function extractDeniedIp(errmsg) {
+  const text = String(errmsg || '')
+  const match = text.match(/from ip:\s*([0-9.]+)/i)
+  return match ? match[1] : ''
+}
+
 function formatGroupListError(data) {
   const code = data && data.errcode
   const msg = (data && data.errmsg) || '拉客户群失败'
   if (code === 60020) {
-    return '60020 当前出口 IP 不在应用「企业可信IP」里。先到企微后台该自建应用填可信域名，再添加本机出口 IP。'
+    const ip = extractDeniedIp(msg)
+    return ip
+      ? `60020 出口 IP ${ip} 不在应用「企业可信IP」里。到企微后台 → 应用管理 → 该自建应用 → 企业可信IP，添加 ${ip} 后重试。`
+      : '60020 当前出口 IP 不在应用「企业可信IP」里。到企微后台该自建应用添加出口 IP 后重试。'
   }
   if (code === 81017) {
     return '81017 应用可见范围人数超过 1000。请在 .env 填写 WECOM_OWNER_USERID（群主 userid），用 owner_filter 缩小范围。'
@@ -276,7 +285,7 @@ async function distributeDigest(card, targets = []) {
 
 module.exports = {
   envStatus,
-  generateUrlLink,
+  generateGroupLink,
   sendDigestByRobot,
   sendDigestToExternalGroup,
   ownerUserids,

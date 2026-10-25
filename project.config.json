@@ -102,7 +102,7 @@
     "minifyWXML": true,
     "showES6CompileOption": false,
     "useCompilerPlugins": false,
-    "ignoreUploadUnusedFiles": true,
+    "ignoreUploadUnusedFiles": false,
     "compileWorklet": false,
     "localPlugins": false,
     "condition": false,

@@ -4,6 +4,7 @@ const security = require('../../utils/security')
 const distribute = require('../../utils/distribute')
 const moderation = require('../../utils/moderation')
 const { uid } = require('../../utils/util')
+const homeFeed = require('../../utils/home-feed')
 const db = require('./db')
 const cache = require('./cache')
 
@@ -425,6 +426,7 @@ async function getReviewDetail(type, id) {
       headline: type === 'wall' ? wallHeadline(item) : (item.title || String(item.content || '').slice(0, 40)),
       channel: type === 'wall' ? item.tag : (type === 'forum' ? item.category : `${item.targetType}/${item.targetId}`),
       reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus),
+      anonymous: !!item.anonymous,
       authorRisk: author ? {
         id: author.id,
         nickname: author.nickname,
@@ -719,7 +721,7 @@ function wecomHumanMessage(wecom) {
   if (!wecom) return '还没调用企微。先把企业ID、Secret、群主账号配进 server/.env。'
   if (wecom.error) return `企微失败：${wecom.error}`
   const results = wecom.results || []
-  if (!results.length) return '没有可发送的客户群。先到「客户群」点拉取并绑定。'
+  if (!results.length) return '没有可发送的客户群。先到「企微群发」点拉取并绑定。'
   const failed = results.filter((item) => item.result && item.result.errcode)
   const okItems = results.filter((item) => item.result && !item.result.errcode)
   if (failed.length) {
@@ -957,10 +959,22 @@ async function listDigestCandidates(limit = 30) {
     recentApproved('wall_posts', take),
     recentApproved('forum_posts', take)
   ])
-  return walls.map((post) => toDigestItem(post, 'wall'))
-    .concat(forums.map((post) => toDigestItem(post, 'forum')))
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  const rows = walls.map((post) => ({ post, item: toDigestItem(post, 'wall') }))
+    .concat(forums.map((post) => ({ post, item: toDigestItem(post, 'forum') })))
+    .sort((a, b) => (b.item.createdAt || 0) - (a.item.createdAt || 0))
     .slice(0, limit)
+  // 挑帖页逐行列出：话题按小程序首页的口径显示，附正文预览和互动数，方便运营判断
+  return rows.map(({ post, item }) => ({
+    ...item,
+    topic: homeFeed.isOfficialPost(post)
+      ? homeFeed.OFFICIAL_TOPIC
+      : homeFeed.normalizeTopic(homeFeed.primaryTag(post, item.contentType)),
+    imageCount: Array.isArray(post.images) ? post.images.length : 0,
+    excerpt: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+    authorName: post.anonymous ? '匿名' : (post.authorName || ''),
+    likeCount: Number(post.likeCount) || 0,
+    commentCount: Number(post.commentCount) || 0
+  }))
 }
 
 async function publishDigest(items) {
@@ -1016,10 +1030,12 @@ async function publishDigest(items) {
       // 正文已落库，文字链失败不挡返回
     }
   }
+  // 文字链写完再清缓存，否则推文列表要等 20 秒才出现新稿
+  bustReadCache()
   return {
     ok: true,
     digest: saved,
-    message: '汇总文案已生成。到「推送」页复制，贴进公众号即可。'
+    message: '汇总文案已生成。到「公众号推文」页复制，贴进公众号即可。'
   }
 }
 
@@ -1029,18 +1045,23 @@ async function buildDigestByTime(range) {
     const now = Date.now()
     let list = candidates
     let label = '最近 10 条'
-    if (range === '24h') {
+    let limit = DIGEST_SIZE
+    if (range === 'latest5') {
+      limit = 5
+      label = '最近 5 条'
+    } else if (range === '24h') {
       list = candidates.filter((item) => now - (item.createdAt || 0) < 24 * 60 * 60 * 1000)
       label = '最近 24 小时'
     } else if (range === '7d') {
       list = candidates.filter((item) => now - (item.createdAt || 0) < 7 * 24 * 60 * 60 * 1000)
       label = '最近 7 天'
     }
-    const picked = list.slice(0, DIGEST_SIZE)
+    const picked = list.slice(0, limit)
     if (!picked.length) return { ok: false, message: `${label}里没有已通过的帖子` }
     const result = await publishDigest(picked)
     if (result.ok) {
-      const extra = list.length > picked.length ? `。这个范围共 ${list.length} 条，已取最新 ${picked.length} 条` : ''
+      const byTime = range === '24h' || range === '7d'
+      const extra = byTime && list.length > picked.length ? `。这个范围共 ${list.length} 条，已取最新 ${picked.length} 条` : ''
       result.message = `已按时间生成${label}的推文${extra}。复制后贴进公众号即可。`
     }
     return result
@@ -1156,7 +1177,7 @@ const WEEKLY_HOT_MAX = 20
 function defaultWeeklyHot() {
   return {
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '管理员精选热榜',
     enabled: true,
     items: [],
@@ -1386,7 +1407,7 @@ async function resolveReport(reportId, { action, note, muteHours } = {}) {
       })
     }
   }
-  if ((act === 'delete' || act === 'hide') && (row.targetType === 'forum' || row.targetType === 'wall')) {
+  if ((act === 'delete' || act === 'hide') && ['forum', 'wall', 'comment'].includes(row.targetType)) {
     await reviewContent(row.targetType, row.targetId, {
       outcome: act === 'delete' ? 'rejected' : 'manual_review',
       note: resolveNote || (act === 'delete' ? '因举报核实后下架' : '因举报转入人工审核')
@@ -1431,6 +1452,15 @@ async function resolveReport(reportId, { action, note, muteHours } = {}) {
   return { ok: true, report: { ...row, ...stamp }, accountResult }
 }
 
+// 匿名内容在后台显示真实账号，便于追溯处置；实名内容同样返回，统一展示
+async function realAuthorOf(target, targetType) {
+  if (!target || targetType === 'user') return null
+  const authorId = target.authorId || ''
+  if (!authorId) return null
+  const user = await db.getDoc('users', authorId)
+  return { id: authorId, nickname: (user && user.nickname) || '' }
+}
+
 async function listReportCases(status = '全部') {
   const rows = (await db.recentDocs('reports', 100)).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const groups = new Map()
@@ -1443,12 +1473,19 @@ async function listReportCases(status = '全部') {
   for (const [key, reports] of groups) {
     const sample = reports[0]
     let target = null
+    let parentPost = null
     if (sample.targetType === 'forum' || sample.targetType === 'wall') {
       const collection = sample.targetType === 'wall' ? 'wall_posts' : 'forum_posts'
       target = await db.getDoc(collection, sample.targetId)
+    } else if (sample.targetType === 'comment') {
+      target = await db.getDoc('comments', sample.targetId)
+      const parentType = sample.parentType || (target && target.targetType) || ''
+      const parentId = sample.parentId || (target && target.targetId) || ''
+      if (parentId) parentPost = await db.getDoc(parentType === 'wall' ? 'wall_posts' : 'forum_posts', parentId)
     } else if (sample.targetType === 'user') {
       target = await db.getDoc('users', sample.targetId)
     }
+    const realAuthor = await realAuthorOf(target, sample.targetType)
     const images = target && Array.isArray(target.images) ? target.images.filter(Boolean) : []
     const urlMap = images.length ? await db.resolveCloudUrls(images) : {}
     const pending = reports.filter((item) => item.status === 'pending')
@@ -1465,8 +1502,12 @@ async function listReportCases(status = '全部') {
       reportCount: reporters.length,
       latestAt: reports[0].createdAt || 0,
       title: target
-        ? (target.title || target.nickname || target.tag || '未命名')
+        ? (sample.targetType === 'comment'
+          ? `评论 · ${parentPost ? (parentPost.title || wallHeadline(parentPost) || '原帖') : '原帖已删除'}`
+          : (target.title || target.nickname || target.tag || '未命名'))
         : '原内容已删除',
+      anonymous: !!(target && target.anonymous),
+      realAuthor,
       content: target ? String(target.content || '').slice(0, 400) : '',
       images: db.applyCloudUrls(images, urlMap),
       authorName: target ? (target.authorName || target.nickname || '') : '',

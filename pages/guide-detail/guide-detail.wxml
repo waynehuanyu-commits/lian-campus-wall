@@ -1,0 +1,41 @@
+<view wx:if="{{loading}}" class="page-loading">
+  <view class="page-loading-dot"></view>
+  <view>加载中…</view>
+</view>
+
+<view wx:elif="{{guide}}" class="page detail-page gd-detail-page">
+  <view class="detail-card">
+    <view class="author-row">
+      <image class="avatar" src="{{guide.authorAvatar || '/images/campus-wall-avatar.jpg'}}" mode="aspectFill" />
+      <view class="author-meta">
+        <view class="author-name">{{guide.authorName}}</view>
+      </view>
+      <view class="author-side">
+        <text class="author-time">{{guide.timeText}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{guide.mine && guide.reviewStatus !== 'approved'}}" class="tag gd-review">{{guide.reviewLabel}}</view>
+
+    <view class="detail-title">{{guide.title}}</view>
+    <view wx:if="{{guide.content}}" class="detail-content">{{guide.content}}</view>
+
+    <post-gallery wx:if="{{guide.images && guide.images.length}}" urls="{{guide.images}}" />
+
+    <view class="detail-foot">
+      <view class="detail-foot-left">
+        <view class="category-pill">
+          <text class="category-hash">#</text>
+          <text class="category-text">{{guide.category}}</text>
+        </view>
+        <text class="view-count">{{guide.viewCount || 0}}次围观</text>
+      </view>
+    </view>
+  </view>
+
+  <campus-qr-card />
+</view>
+
+<view wx:else class="empty">
+  <view class="empty-title">{{error || '攻略不存在'}}</view>
+</view>

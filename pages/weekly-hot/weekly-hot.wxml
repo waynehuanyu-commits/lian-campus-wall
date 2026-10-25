@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="hot-page">
   <view class="hot-hero">
     <view class="hot-title">园区热议</view>

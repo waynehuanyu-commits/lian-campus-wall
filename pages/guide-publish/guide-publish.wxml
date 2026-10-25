@@ -1,0 +1,68 @@
+<view class="page publish-page">
+  <view wx:if="{{blocked}}" class="empty">
+    <view class="empty-title">{{blockTitle}}</view>
+    <view>{{blockDesc}}</view>
+    <button wx:if="{{blockAction === 'login'}}" class="btn-primary submit-btn" bindtap="goLogin">去开通发言</button>
+    <button wx:elif="{{blockAction === 'auth'}}" class="btn-primary submit-btn" bindtap="goAuth">去认证学校</button>
+  </view>
+
+  <block wx:else>
+  <view class="gd-preview">
+    <view class="gd-cover gd-tcover tone-{{tone}}">
+      <view class="gd-tcover-quote">“</view>
+      <view class="gd-tcover-title">{{title || '标题'}}</view>
+      <view wx:if="{{summary}}" class="gd-tcover-text">{{summary}}</view>
+      <view class="gd-tcover-tag">#{{category}}</view>
+    </view>
+  </view>
+
+  <view class="pub-card">
+    <view class="pub-label">分类</view>
+    <view class="topic-grid">
+      <view
+        wx:for="{{categories}}"
+        wx:key="*this"
+        class="topic-chip {{category === item ? 'active' : ''}}"
+        data-name="{{item}}"
+        bindtap="onCategoryTap"
+      >{{item}}</view>
+    </view>
+  </view>
+
+  <view class="pub-card pub-editor">
+    <input
+      class="pub-title"
+      maxlength="40"
+      placeholder="标题"
+      placeholder-class="pub-ph"
+      value="{{title}}"
+      bindinput="onTitleInput"
+    />
+    <view class="pub-divider"></view>
+    <textarea
+      class="pub-body"
+      maxlength="3000"
+      placeholder="正文"
+      placeholder-class="pub-ph"
+      value="{{content}}"
+      auto-height
+      bindinput="onContentInput"
+    />
+    <view class="upload-grid">
+      <view wx:for="{{images}}" wx:key="*this" class="upload-item">
+        <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewImage" />
+        <view class="upload-remove" data-index="{{index}}" catchtap="removeImage">×</view>
+      </view>
+      <view wx:if="{{images.length < 9}}" class="upload-add" bindtap="chooseImages">
+        <view class="upload-add-ic"></view>
+        <text>添加图片</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="pub-submit-bar">
+    <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '提交中' : '投稿'}}</button>
+  </view>
+  </block>
+  <privacy-popup />
+</view>

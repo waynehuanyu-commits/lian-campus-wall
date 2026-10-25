@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="search-page">
   <view class="search-head">
     <view class="search-bar search-input-bar">

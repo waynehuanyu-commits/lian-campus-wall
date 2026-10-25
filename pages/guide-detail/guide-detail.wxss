@@ -1,0 +1,9 @@
+@import "../../styles/detail-unified.wxss";
+
+.gd-detail-page {
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.gd-review {
+  margin-top: 16rpx;
+}

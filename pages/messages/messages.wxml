@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="msg-page">
   <view class="msg-entries">
     <view class="msg-entry {{tab === 'likes' ? 'active' : ''}}" data-tab="likes" bindtap="onTabTap" hover-class="msg-entry-on">

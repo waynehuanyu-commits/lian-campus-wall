@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="page home-page">
   <view class="masthead" style="padding-top: {{masthead.top}}px;">
     <view class="masthead-bar" style="height: {{masthead.height}}px; padding-right: {{masthead.capsule}}px;">

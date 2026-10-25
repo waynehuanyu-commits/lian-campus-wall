@@ -5,6 +5,8 @@ const crypto = require('crypto')
 const { loadEnv } = require('../server/load-env')
 const service = require('./lib/service')
 const staff = require('./lib/staff')
+const cover = require('./lib/cover')
+const guides = require('./lib/guides')
 
 loadEnv()
 const localEnv = path.join(__dirname, '.env')
@@ -73,11 +75,18 @@ function requireRoot(req, res) {
   return session
 }
 
-function readBody(req) {
+// 默认 1MB；上传封面的接口放宽到 4MB（base64 后的 2MB 图片）
+function readBody(req, limit = 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = []
-    req.on('data', (chunk) => chunks.push(chunk))
+    let size = 0
+    req.on('data', (chunk) => {
+      size += chunk.length
+      // 超限后继续读完但不再缓存，保证还能正常回包
+      if (size <= limit) chunks.push(chunk)
+    })
     req.on('end', () => {
+      if (size > limit) return reject(new Error('请求内容过大，图片请控制在 2MB 以内'))
       if (!chunks.length) return resolve({})
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
@@ -457,6 +466,64 @@ const routes = {
     json(res, 200, await service.toggleGroup(body.id, body.field))
   },
 
+  'GET /api/mine-cover': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await cover.getCover())
+  },
+
+  'POST /api/mine-cover': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await cover.saveCover(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/mine-cover/upload': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await cover.uploadCover(await readBody(req, 4 * 1024 * 1024)))
+  },
+
+  'GET /api/guides': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const status = new URL(req.url, 'http://local').searchParams.get('status') || 'pending'
+    json(res, 200, await guides.listGuides(status))
+  },
+
+  'POST /api/guides/article': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.saveArticle(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/guides/status': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.updateStatus(await readBody(req), session.name || session.account || ''))
+  },
+
+  'GET /api/guides/posts': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const keyword = new URL(req.url, 'http://local').searchParams.get('keyword') || ''
+    json(res, 200, await guides.searchPosts(keyword))
+  },
+
+  'POST /api/guides/pick': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.pickPost(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/guides/categories': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.saveCategories(await readBody(req), session.name || session.account || ''))
+  },
+
+  // 推文封面和「我的页封面」共用上传逻辑（2MB 以内，云模式存云存储 covers/）
+  'POST /api/guides/upload': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await cover.uploadCover(await readBody(req, 4 * 1024 * 1024)))
+  },
+
   'GET /api/weekly-hot': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const url = new URL(req.url, 'http://127.0.0.1')
@@ -492,6 +559,15 @@ const server = http.createServer(async (req, res) => {
     const key = `${req.method} ${req.url.split('?')[0]}`
     if (routes[key]) {
       await routes[key](req, res)
+      return
+    }
+    if (req.method === 'GET' && req.url.startsWith(cover.LOCAL_PREFIX)) {
+      if (!currentSession(req)) {
+        res.writeHead(401)
+        res.end()
+        return
+      }
+      cover.serveLocalUpload(req, res)
       return
     }
     if (req.url.startsWith('/api/')) {

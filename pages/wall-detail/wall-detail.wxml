@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view wx:if="{{loading}}" class="page-loading">
   <view class="page-loading-dot"></view>
   <view>加载中…</view>
@@ -137,6 +136,7 @@
                 <text>{{item.root.timeText}}</text>
                 <text class="comment-action" data-id="{{item.root.id}}" data-name="{{item.root.authorName}}" bindtap="onReply">回复</text>
                 <text wx:if="{{item.root.canDelete}}" class="comment-action danger" data-id="{{item.root.id}}" catchtap="onDeleteComment">删除</text>
+                <text wx:if="{{!item.root.mine}}" class="comment-action" data-id="{{item.root.id}}" catchtap="onReportComment">举报</text>
               </view>
               <view class="comment-like {{item.root.liked ? 'liked' : ''}}" data-id="{{item.root.id}}" catchtap="onCommentLike">
                 <view class="comment-like-ic"></view>
@@ -178,6 +178,7 @@
                 <text>{{reply.timeText}}</text>
                 <text class="comment-action" data-id="{{reply.id}}" data-name="{{reply.authorName}}" bindtap="onReply">回复</text>
                 <text wx:if="{{reply.canDelete}}" class="comment-action danger" data-id="{{reply.id}}" catchtap="onDeleteComment">删除</text>
+                <text wx:if="{{!reply.mine}}" class="comment-action" data-id="{{reply.id}}" catchtap="onReportComment">举报</text>
               </view>
               <view class="comment-like {{reply.liked ? 'liked' : ''}}" data-id="{{reply.id}}" catchtap="onCommentLike">
                 <view class="comment-like-ic"></view>

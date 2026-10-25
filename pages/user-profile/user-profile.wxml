@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="up-nav" style="padding-top: {{nav.top}}px; height: {{nav.height}}px;">
   <view class="up-back" bindtap="goBack" hover-class="up-back-on"></view>
 </view>

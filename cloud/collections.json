@@ -24,6 +24,7 @@
     "distribute_targets",
     "distribute_logs",
     "reports",
+    "guides",
     "meta"
   ],
   "securityRule": {

@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="page padded auth-page">
   <view wx:if="{{!locked}}" class="panel notice">
     <view class="section-title">学校认证</view>

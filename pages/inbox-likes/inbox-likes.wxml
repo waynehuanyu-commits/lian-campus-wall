@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="xhs-note">
   <view wx:if="{{loading}}" class="xhs-empty">
     <view class="xhs-empty-ico like"></view>

@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="mine-page">
   <view class="mine-cover">
     <image class="mine-cover-img" src="{{cover.src}}" mode="aspectFill" binderror="onCoverError" />

@@ -6,6 +6,11 @@ const state = {
   reviewStatus: 'queue',
   lexiconSignal: 'academic_core',
   weeklyKeyword: '',
+  coverDraft: null,
+  guideStatus: 'pending',
+  guideView: 'list',
+  guideDraft: null,
+  guidePickKeyword: '',
   selectedReview: null,
   reportStatus: 'pending',
   accountQuery: '',
@@ -18,19 +23,61 @@ const state = {
 
 const titles = {
   overview: ['', '今日概览'],
-  review: ['', '内容审帖'],
-  keywords: ['', '本地词库'],
-  accounts: ['', '账号处置'],
-  whitelist: ['', '发帖白名单'],
-  official: ['', '官方登录'],
-  staff: ['', '运营账号'],
-  reports: ['', '举报处理'],
-  digest: ['', '汇总推送'],
-  weekly: ['', '每周精选热榜'],
-  groups: ['', '客户群'],
+  review: ['', '内容审核'],
+  reports: ['', '内容审核'],
+  keywords: ['', '风控词库'],
+  accounts: ['', '用户管理'],
+  whitelist: ['', '用户管理'],
+  official: ['', '用户管理'],
+  staff: ['', '后台成员'],
+  digest: ['', '公众号推文'],
+  weekly: ['', '园区热议'],
+  cover: ['', '我的页封面'],
+  guides: ['', '黎安攻略'],
+  groups: ['', '企微群发'],
   school: ['', '学校修改审核'],
   student: ['', '学生认证审核'],
-  more: ['', '日志与说明']
+  more: ['', '风控日志与反馈']
+}
+
+// 合并后的菜单：侧栏只显示第一项，页内用子标签切换；各子页面的数据和接口保持原样
+const NAV_GROUPS = {
+  review: [
+    { nav: 'review', label: '帖子与评论' },
+    { nav: 'reports', label: '用户举报' }
+  ],
+  accounts: [
+    { nav: 'accounts', label: '账号处置' },
+    { nav: 'whitelist', label: '发帖白名单' },
+    { nav: 'official', label: '官方号登录权限' }
+  ]
+}
+
+function groupOf(nav) {
+  return Object.keys(NAV_GROUPS).find((key) => NAV_GROUPS[key].some((item) => item.nav === nav)) || nav
+}
+
+function renderSubtabs() {
+  const box = document.getElementById('subtabs')
+  if (!box) return
+  const tabs = NAV_GROUPS[groupOf(state.nav)]
+  if (!tabs) {
+    box.classList.add('hidden')
+    box.innerHTML = ''
+    return
+  }
+  box.classList.remove('hidden')
+  box.innerHTML = tabs.map((item) => (
+    `<button type="button" data-subnav="${item.nav}" class="${item.nav === state.nav ? 'active' : ''}">${item.label}</button>`
+  )).join('')
+  box.querySelectorAll('[data-subnav]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (btn.dataset.subnav === state.nav) return
+      state.nav = btn.dataset.subnav
+      render()
+      await loadNav(state.nav)
+    }
+  })
 }
 
 const TYPE_LABEL = {
@@ -77,6 +124,38 @@ function formatTime(ts) {
   return new Date(ts).toLocaleString('zh-CN', { hour12: false })
 }
 
+// 2026-10 私信下线后取消的联系方式类规则；历史数据里仍会出现这些编号
+const RETIRED_RULES = {
+  C02: '正文留联系方式',
+  A04: '学习类内容留联系方式',
+  D02: '文字扫码引流'
+}
+
+function ruleText(ids) {
+  const list = Array.isArray(ids) ? ids : []
+  if (!list.length) return '—'
+  return list.map((id) => (RETIRED_RULES[id] ? `${id}（已停用）` : id)).join('、')
+}
+
+// 只命中已停用规则的内容：按新规可以直接通过
+function retiredOnly(ids) {
+  const list = Array.isArray(ids) ? ids : []
+  return list.length > 0 && list.every((id) => RETIRED_RULES[id])
+}
+
+function retiredHint(ids) {
+  return retiredOnly(ids) ? '<span class="retired-hint">只命中已停用规则，按新规可直接通过</span>' : ''
+}
+
+// 匿名内容在后台标出来，并给出真实账号（昵称 + u_ 编号）
+function authorHtml(name, anonymous, real) {
+  if (!anonymous) return esc(name || '—')
+  const who = real && real.id
+    ? `真实账号 ${esc(real.nickname || '未设昵称')}（${esc(real.id)}）`
+    : '真实账号未知'
+  return `<span class="anon-tag">匿名</span> ${who}`
+}
+
 function esc(text) {
   return String(text || '').replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -88,8 +167,9 @@ async function render() {
   document.getElementById('nav-kicker').textContent = kicker
   document.getElementById('nav-title').textContent = title
   document.querySelectorAll('aside nav button').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.nav === state.nav)
+    btn.classList.toggle('active', btn.dataset.nav === groupOf(state.nav))
   })
+  renderSubtabs()
   const data = state.data || {}
   const panel = document.getElementById('panel')
   const mode = (data.overview && data.overview.mode) || 'local'
@@ -122,7 +202,7 @@ async function render() {
             <p class="muted">客户群 ${ov.designatedGroups || 0}/${ov.groupCount || 0}</p>
           </div>
           <div class="actions">
-            <button id="go-review" type="button">去审帖</button>
+            <button id="go-review" type="button">去审核</button>
             ${mode === 'local' ? '<button id="reset-local" class="ghost" type="button">重置演示数据</button>' : ''}
           </div>
         </div>
@@ -135,7 +215,7 @@ async function render() {
               <strong>${esc(item.headline || '')}</strong>
               <span class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel || item.reviewStatus || '')}</span>
             </div>
-            <div class="meta">${esc(TYPE_LABEL[item.contentType] || item.contentType)} · ${esc(item.channel || '')} · 规则 ${(item.reviewRuleIds || []).join('、') || '—'}</div>
+            <div class="meta">${esc(TYPE_LABEL[item.contentType] || item.contentType)} · ${esc(item.channel || '')} · 规则 ${esc(ruleText(item.reviewRuleIds))}</div>${retiredHint(item.reviewRuleIds)}
           </div>`)}
       </div>`
     panel.querySelector('#go-review').onclick = () => {
@@ -177,12 +257,12 @@ async function render() {
           ${listOrEmpty(reviews, (item) => `
             <button class="review-card ${state.selectedReview && state.selectedReview.id === item.id ? 'active' : ''}" data-open-type="${esc(item.contentType)}" data-open-id="${esc(item.id)}" type="button">
               <div class="row">
-                <strong>${esc(item.headline || '')}</strong>
+                <strong>${item.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(item.headline || '')}</strong>
                 <span class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel || '')}${item.reviewPriority === 'high' ? ' · 优先' : ''}</span>
               </div>
               <div class="meta">${esc(TYPE_LABEL[item.contentType] || '')} · ${esc(item.channel || '')} · ${formatTime(item.createdAt)}</div>
               <div class="snippet">${esc(String(item.content || '').slice(0, 90))}</div>
-              <div class="meta">${esc(item.reviewNote || '规则 ' + ((item.reviewRuleIds || []).join('、') || '—'))}</div>
+              <div class="meta">${esc(retiredOnly(item.reviewRuleIds) ? '规则 ' + ruleText(item.reviewRuleIds) : (item.reviewNote || '规则 ' + ruleText(item.reviewRuleIds)))}</div>${retiredHint(item.reviewRuleIds)}
             </button>`)}
         </div>
         <div class="review-detail card" id="review-detail">
@@ -348,7 +428,7 @@ async function render() {
           <div class="list-item">
             <div class="row"><strong>${esc(item.headline)}</strong><span class="danger">${esc(item.reviewStatusLabel || '已拦截')}</span></div>
             <div class="meta">${esc(TYPE_LABEL[item.contentType] || '')} · ${esc(item.channel || '')} · ${formatTime(item.createdAt)}</div>
-            <div class="meta">${esc(item.reviewNote || '')} · 规则 ${(item.reviewRuleIds || []).join('、') || '—'}</div>
+            <div class="meta">${esc(item.reviewNote || '')} · 规则 ${esc(ruleText(item.reviewRuleIds))}</div>${retiredHint(item.reviewRuleIds)}
           </div>`)}
       </div>`
     const search = panel.querySelector('#account-search')
@@ -630,7 +710,7 @@ async function render() {
         </div>`) : ''}
       <div class="card">
         <h3>小程序官方发帖号</h3>
-        <p class="muted">运营要共用一个微信号登录小程序、把朋友圈内容批量发到互助广场或学习分享。先让这个微信号登录一次小程序，打开「我的」复制账号编号，再到左侧「白名单」里贴上编号，点加入。白名单号不受 10 分钟 5 条、每天 15 条的发帖限制，也不会因为短时间重复内容被拦住。内容审核仍然会走。</p>
+        <p class="muted">运营要共用一个微信号登录小程序、把朋友圈内容批量发到互助广场或学习分享。先让这个微信号登录一次小程序，打开「我的」复制账号编号，再到左侧「用户管理 › 发帖白名单」里贴上编号，点加入。白名单号不受 10 分钟 5 条、每天 15 条的发帖限制，也不会因为短时间重复内容被拦住。内容审核仍然会走。</p>
       </div>`
     const createBtn = panel.querySelector('#staff-create')
     if (createBtn) {
@@ -700,7 +780,7 @@ async function render() {
     const allCases = data.reports || []
     const filter = state.reportStatus || 'pending'
     const cases = allCases.filter((item) => filter === '全部' || item.status === filter)
-    const typeLabel = { forum: '学习分享', wall: '互助广场', user: '用户' }
+    const typeLabel = { forum: '学习分享', wall: '互助广场', comment: '评论', user: '用户' }
     const actLabel = { hide: '已隐藏', delete: '已下架', mute: '已禁言', ban: '已封号', dismiss: '已忽略' }
     panel.innerHTML = `
       <div class="card">
@@ -718,7 +798,7 @@ async function render() {
             <strong>${esc(item.title || '未命名')}</strong>
             <span>${esc(typeLabel[item.targetType] || item.targetType)} · ${item.reportCount || 0} 人举报</span>
           </div>
-          <div class="meta">作者 ${esc(item.authorName || item.targetAuthorId || '—')} · 最近 ${formatTime(item.latestAt)}${item.reviewStatus ? ` · 内容状态 ${esc(item.reviewStatus)}` : ''}</div>
+          <div class="meta">作者 ${authorHtml(item.authorName || item.targetAuthorId, item.anonymous, item.realAuthor)} · 最近 ${formatTime(item.latestAt)}${item.reviewStatus ? ` · 内容状态 ${esc(item.reviewStatus)}` : ''}</div>
           ${item.content ? `<p>${esc(item.content)}</p>` : ''}
           ${item.images && item.images.length ? `<div class="image-row">${item.images.map((src) => `<a href="${esc(src)}" target="_blank" rel="noreferrer"><img class="thumb" src="${esc(src)}" alt=""></a>`).join('')}</div>` : ''}
           ${(item.reports || []).map((report) => `
@@ -758,21 +838,27 @@ async function render() {
     return
   }
 
+  if (state.nav === 'cover') {
+    renderCover(panel, data.cover)
+    return
+  }
+
+  if (state.nav === 'guides') {
+    renderGuides(panel, data.guides)
+    return
+  }
+
   if (state.nav === 'weekly') {
     const weekly = data.weeklyHot || { board: { items: [] }, candidates: [], max: 20 }
-    const board = weekly.board || { title: '每周精选', subtitle: '', enabled: true, items: [] }
+    const board = weekly.board || { enabled: true, items: [] }
     panel.innerHTML = `
       <div class="card">
-        <h3>每周精选热榜</h3>
-        <p class="muted">独立板块，类似热榜。管理员决定上架内容与排序；与群发汇总推送互不影响。</p>
-        <div class="row gap">
-          <label class="inline"><input id="weekly-enabled" type="checkbox" ${board.enabled ? 'checked' : ''}/> 对用户端展示</label>
-          <button id="weekly-save-meta" type="button">保存设置</button>
+        <h3>园区热议</h3>
+        <p class="muted">小程序首页的「园区热议」卡片和榜单页。管理员决定上架内容与排序；与群发汇总推送互不影响。标题在小程序里固定为「园区热议」，这里不用设置。</p>
+        <div class="row gap weekly-switch">
+          <label class="check-row"><input id="weekly-enabled" type="checkbox" ${board.enabled ? 'checked' : ''}/><span>在小程序里展示</span></label>
+          <button id="weekly-save-meta" type="button">保存</button>
         </div>
-        <label>标题</label>
-        <input id="weekly-title" value="${esc(board.title || '每周精选')}" />
-        <label>副标题</label>
-        <input id="weekly-subtitle" value="${esc(board.subtitle || '')}" />
         <p class="muted">当前 ${board.items.length || 0} / ${weekly.max || 20} 条</p>
       </div>
       <div class="card">
@@ -810,9 +896,7 @@ async function render() {
       const result = await api('/api/weekly-hot/meta', {
         method: 'POST',
         body: JSON.stringify({
-          enabled: panel.querySelector('#weekly-enabled').checked,
-          title: panel.querySelector('#weekly-title').value,
-          subtitle: panel.querySelector('#weekly-subtitle').value
+          enabled: panel.querySelector('#weekly-enabled').checked
         })
       })
       if (!result.ok) return alert(result.message || '保存失败')
@@ -864,30 +948,55 @@ async function render() {
     const candidates = data.candidates || []
     panel.innerHTML = `
       <div class="card">
-        <h3>按时间出成稿</h3>
+        <h3>一键生成</h3>
         <p class="muted">从已通过的学习分享和互助广场里，按发帖时间从新到旧取帖，直接生成可复制的推文。一次最多 10 条。</p>
         <div class="actions">
+          <button type="button" data-by-time="latest5">最近 5 条</button>
           <button type="button" data-by-time="latest">最近 10 条</button>
-          <button type="button" data-by-time="24h">最近 24 小时</button>
-          <button type="button" data-by-time="7d">最近 7 天</button>
+          <button type="button" class="quiet" data-by-time="24h">最近 24 小时</button>
+          <button type="button" class="quiet" data-by-time="7d">最近 7 天</button>
         </div>
       </div>
       <div class="card">
         <div class="row">
           <div>
-            <h3>自己选帖</h3>
-            <p class="muted">下面已按时间排好，默认勾选最新 10 条。改完勾选再生成。没通过审核的帖不会出现在这里。</p>
+            <h3>自己挑帖子</h3>
+            <p class="muted">勾选要放进推文的帖子，最多 10 条，按时间从新到旧排列。没通过审核的帖不会出现在这里。</p>
           </div>
-          <button id="custom-digest" type="button">用勾选的生成推文</button>
         </div>
-        ${candidates.length ? candidates.map((item, index) => `
-          <label class="row" style="align-items:flex-start;gap:12px;margin-top:14px">
-            <input type="checkbox" data-pick="1" data-type="${esc(item.contentType)}" data-id="${esc(item.contentId)}" ${index < 10 ? 'checked' : ''} />
-            <span>
-              <strong>${esc(item.title)}</strong>
-              <span class="meta" style="display:block">${formatTime(item.createdAt)} · ${esc(item.channel)}${item.summary ? ` · ${esc(item.summary)}` : ''}</span>
-            </span>
-          </label>`).join('') : '<p class="muted">还没有已通过的帖子。</p>'}
+        ${candidates.length ? `
+          <div class="pick-bar">
+            <span id="pick-count" class="pick-count"></span>
+            <button type="button" class="quiet" data-pick-top="5">选最新 5 条</button>
+            <button type="button" class="quiet" data-pick-top="10">选最新 10 条</button>
+            <button type="button" class="quiet" data-pick-top="0">全不选</button>
+          </div>
+          <div class="pick-list">
+            ${candidates.map((item) => `
+              <label class="pick-row">
+                <input type="checkbox" data-pick="1" data-type="${esc(item.contentType)}" data-id="${esc(item.contentId)}" data-title="${esc(item.title)}" />
+                <span class="pick-no"></span>
+                <span class="pick-main">
+                  <span class="pick-line">
+                    <span class="pick-topic">${esc(item.topic || '')}</span>
+                    <strong class="pick-title">${esc(item.title)}</strong>
+                  </span>
+                  ${item.excerpt && item.excerpt !== item.title ? `<span class="pick-excerpt">${esc(item.excerpt)}</span>` : ''}
+                </span>
+                <span class="pick-meta">
+                  <span>${esc(item.authorName || '')}</span>
+                  <span>${formatTime(item.createdAt)}</span>
+                  <span>赞 ${item.likeCount || 0} · 评 ${item.commentCount || 0}${item.imageCount ? ` · ${item.imageCount} 图` : ''}</span>
+                </span>
+              </label>`).join('')}
+          </div>
+          <div class="pick-dock">
+            <div class="pick-dock-info">
+              <span id="pick-dock-count" class="pick-count"></span>
+              <span id="pick-order" class="pick-order"></span>
+            </div>
+            <button id="custom-digest" type="button">用勾选的生成推文</button>
+          </div>` : '<p class="muted">还没有已通过的帖子。</p>'}
       </div>
       <div class="card">
         <div class="row">
@@ -933,12 +1042,42 @@ async function render() {
         }
       }
     })
+    // 勾选计数：行首编号就是生成后的顺序，满 10 条后其余框禁用
+    const pickBoxes = Array.from(panel.querySelectorAll('[data-pick]'))
+    const syncPicks = () => {
+      const picked = pickBoxes.filter((box) => box.checked)
+      const countText = `已选 ${picked.length} / 10`
+      ;['#pick-count', '#pick-dock-count'].forEach((sel) => {
+        const el = panel.querySelector(sel)
+        if (el) el.textContent = countText
+      })
+      const orderEl = panel.querySelector('#pick-order')
+      if (orderEl) orderEl.textContent = picked.map((box, index) => `${index + 1}. ${box.dataset.title}`).join('　')
+      pickBoxes.forEach((box) => {
+        const row = box.closest('.pick-row')
+        row.classList.toggle('picked', box.checked)
+        row.querySelector('.pick-no').textContent = box.checked ? String(picked.indexOf(box) + 1) : ''
+        box.disabled = !box.checked && picked.length >= 10
+      })
+      const btn = panel.querySelector('#custom-digest')
+      if (btn) btn.disabled = !picked.length
+    }
+    pickBoxes.forEach((box, index) => {
+      box.checked = index < 10
+      box.onchange = syncPicks
+    })
+    panel.querySelectorAll('[data-pick-top]').forEach((btn) => {
+      btn.onclick = () => {
+        const top = Number(btn.dataset.pickTop) || 0
+        pickBoxes.forEach((box, index) => { box.checked = index < top })
+        syncPicks()
+      }
+    })
+    syncPicks()
     const customBtn = panel.querySelector('#custom-digest')
     if (customBtn) {
       customBtn.onclick = async () => {
-        const items = Array.from(panel.querySelectorAll('[data-pick]'))
-          .filter((box) => box.checked)
-          .map((box) => ({ contentType: box.dataset.type, contentId: box.dataset.id }))
+        const items = pickBoxes.filter((box) => box.checked).map((box) => ({ contentType: box.dataset.type, contentId: box.dataset.id }))
         if (!items.length) return alert('先勾选要放进推文的帖子')
         if (items.length > 10) return alert('一次最多 10 条')
         customBtn.disabled = true
@@ -1175,7 +1314,7 @@ async function render() {
     <div class="card">
       <h3>使用说明</h3>
       <p>审帖、举报、禁言和封号都写回小程序正在用的云数据库。</p>
-      <p>帖子被 3 个不同的人举报后会自动隐藏，并出现在「举报」和「审帖」里。</p>
+      <p>帖子被 3 个不同的人举报后会自动隐藏，并出现在「内容审核」的「用户举报」和「帖子与评论」里。</p>
     </div>
     <div class="card">
       <h3>联系反馈</h3>
@@ -1227,7 +1366,7 @@ function renderReviewDetail(el, item) {
       </div>
       <div class="meta">${esc(TYPE_LABEL[item.contentType] || '')} · ${esc(item.channel || '')}</div>
     </div>
-    <div class="meta">${formatTime(item.createdAt)} · 作者 ${esc(item.authorName || '—')}</div>
+    <div class="meta">${formatTime(item.createdAt)} · 作者 ${authorHtml(item.authorName, item.anonymous, item.authorRisk && { id: item.authorRisk.id, nickname: item.authorRisk.nickname })}</div>
     ${item.authorRisk ? `<div class="meta">账号风险 ${item.authorRisk.riskScore || 0} · 违规 ${item.authorRisk.violateCount || 0} · ${esc(item.authorRisk.schoolName || '未认证')}</div>` : ''}
     <div class="detail-block">
       <div class="field-label">正文</div>
@@ -1237,7 +1376,7 @@ function renderReviewDetail(el, item) {
     ${item.normalizedText ? `<div class="detail-block"><div class="field-label">标准化文本</div><div class="detail-text mono">${esc(item.normalizedText)}</div></div>` : ''}
     <div class="detail-block">
       <div class="field-label">命中规则 / 信号</div>
-      <div class="meta">规则 ${(item.reviewRuleIds || []).join('、') || '—'}</div>
+      <div class="meta">规则 ${esc(ruleText(item.reviewRuleIds))}</div>${retiredHint(item.reviewRuleIds)}
       <div class="meta">${esc(signalLines(item.reviewSignals))}</div>
       <div class="meta">${esc(item.reviewNote || '')}</div>
     </div>
@@ -1326,7 +1465,451 @@ async function refreshDigest() {
   state.data = state.data || {}
   state.data.progress = result.progress
   state.data.digests = result.digests || []
+  // 原版漏存候选帖，导致「自己挑帖子」一直是空的
+  state.data.candidates = result.candidates || []
   if (state.nav === 'digest') render()
+}
+
+// ---- 我的页封面（meta/mine_cover）----
+const COVER_MAX_EDGE = 1600
+
+async function reloadCover() {
+  const result = await api('/api/mine-cover')
+  if (!result.ok) return
+  state.data = state.data || {}
+  state.data.cover = result.cover
+  state.coverDraft = null
+  if (state.nav === 'cover') render()
+}
+
+// 手机原图常超过 2MB：浏览器里先缩到长边 1600、转 JPEG 再上传
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('读取图片失败'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('图片格式无法识别'))
+      img.onload = () => {
+        const scale = Math.min(1, COVER_MAX_EDGE / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.86))
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function renderCover(panel, saved) {
+  const local = (state.data && state.data.overview && state.data.overview.mode) !== 'cloud'
+  const draft = state.coverDraft || {
+    src: (saved && saved.src) || '',
+    previewUrl: (saved && saved.previewUrl) || '',
+    credit: saved ? saved.credit : '',
+    enabled: saved ? saved.enabled : true
+  }
+  state.coverDraft = draft
+  panel.innerHTML = `
+    <div class="card cover-card">
+      <h3>我的页封面</h3>
+      <p class="muted">小程序「我的」页和个人主页顶部的照片。保存后最多 5 分钟生效；不设置或停用时，小程序用包内默认图（摄影：j07）。</p>
+      <div class="cover-layout">
+        <div class="cover-preview">
+          ${draft.previewUrl
+            ? `<img src="${esc(draft.previewUrl)}" alt="封面预览" />`
+            : '<div class="cover-empty">还没有设置，小程序正在用默认图</div>'}
+          ${draft.previewUrl && draft.credit ? `<span class="cover-credit">${esc(draft.credit)}</span>` : ''}
+        </div>
+        <div class="cover-form">
+          <label>图片</label>
+          <div class="row gap">
+            <label class="upload-btn">上传图片<input id="cover-file" type="file" accept="image/jpeg,image/png,image/webp" hidden /></label>
+            <span id="cover-upload-status" class="muted"></span>
+          </div>
+          <input id="cover-src" placeholder="或填写 cloud:// 文件 ID / https 链接" value="${esc(draft.src)}" />
+          <label>署名</label>
+          <input id="cover-credit" maxlength="30" placeholder="例如：摄影：j07" value="${esc(draft.credit || '')}" />
+          <label class="check-row"><input id="cover-enabled" type="checkbox" ${draft.enabled !== false ? 'checked' : ''}/><span>在小程序里使用这张图</span></label>
+          <div class="row gap cover-actions">
+            <button id="cover-save" type="button">保存</button>
+            ${saved && saved.updatedAt ? `<span class="muted">上次保存：${esc(formatTime(saved.updatedAt))}${saved.updatedBy ? ' · ' + esc(saved.updatedBy) : ''}</span>` : ''}
+          </div>
+          <p class="muted cover-tip">建议横图，约 1125×960，画面主体放在中上部（底部约 20% 会渐隐）。大图会自动压缩。${local ? '<br/>当前是本地演示模式：上传的图只用于后台预览，小程序读不到。' : ''}</p>
+        </div>
+      </div>
+    </div>`
+
+  const status = panel.querySelector('#cover-upload-status')
+  panel.querySelector('#cover-file').onchange = async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    status.textContent = '上传中…'
+    try {
+      const dataUrl = await shrinkImage(file)
+      const result = await api('/api/mine-cover/upload', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'image/jpeg', data: dataUrl })
+      })
+      if (!result.ok) {
+        status.textContent = result.message || '上传失败'
+        return
+      }
+      state.coverDraft = { ...readCoverForm(panel), src: result.src, previewUrl: result.previewUrl }
+      render()
+    } catch (err) {
+      status.textContent = (err && err.message) || '上传失败'
+    }
+  }
+  panel.querySelector('#cover-credit').oninput = () => {
+    state.coverDraft = { ...state.coverDraft, ...readCoverForm(panel) }
+    const tag = panel.querySelector('.cover-credit')
+    if (tag) tag.textContent = state.coverDraft.credit
+  }
+  panel.querySelector('#cover-save').onclick = async () => {
+    const form = readCoverForm(panel)
+    const result = await api('/api/mine-cover', { method: 'POST', body: JSON.stringify(form) })
+    if (!result.ok) return alert(result.message || '保存失败')
+    state.data.cover = result.cover
+    state.coverDraft = null
+    render()
+  }
+}
+
+function readCoverForm(panel) {
+  const src = panel.querySelector('#cover-src').value.trim()
+  const draft = state.coverDraft || {}
+  return {
+    src,
+    previewUrl: src === draft.src ? draft.previewUrl : (/^https:\/\//.test(src) ? src : ''),
+    credit: panel.querySelector('#cover-credit').value.trim(),
+    enabled: panel.querySelector('#cover-enabled').checked
+  }
+}
+
+// ---- 黎安攻略（guides 集合 + meta/guide_categories）----
+// 三种来源混在小程序同一个信息流：公众号推文（运营录入）、攻略页投稿（人工审核）、首页帖子圈选（运营挑）
+const GUIDE_VIEWS = [
+  { view: 'list', label: '攻略列表' },
+  { view: 'article', label: '添加公众号推文' },
+  { view: 'pick', label: '从帖子圈选' },
+  { view: 'categories', label: '分类设置' }
+]
+const GUIDE_TABS = [
+  { status: 'pending', label: '待审核' },
+  { status: 'approved', label: '已上线' },
+  { status: 'offline', label: '已下线 / 未通过' }
+]
+const GUIDE_TONES = 5
+const GUIDE_KIND_LABEL = { article: '公众号推文', post: '攻略投稿', pick: '帖子圈选' }
+
+async function reloadGuides() {
+  const result = await api(`/api/guides?status=${encodeURIComponent(state.guideStatus)}`)
+  if (!result.ok) return
+  state.data = state.data || {}
+  state.data.guides = result
+  if (state.guideView === 'pick') {
+    const posts = await api(`/api/guides/posts?keyword=${encodeURIComponent(state.guidePickKeyword || '')}`)
+    state.data.guidePosts = posts.ok ? posts.items : []
+  }
+  if (state.nav === 'guides') render()
+}
+
+function guideThumb(item, categories) {
+  if (item.kind === 'article' && item.coverUrl) {
+    return `<img class="gd-thumb" src="${esc(item.coverUrl)}" alt="" />`
+  }
+  const tone = Math.max(0, categories.indexOf(item.category)) % GUIDE_TONES
+  return `<div class="gd-thumb gd-tthumb tone-${tone}"><strong>${esc(item.title)}</strong></div>`
+}
+
+function guideCategorySelect(attr, categories, current) {
+  return `<select ${attr}>${categories.map((c) => (
+    `<option value="${esc(c)}" ${c === current ? 'selected' : ''}>${esc(c)}</option>`
+  )).join('')}</select>`
+}
+
+function guideRow(item, categories) {
+  const status = item.reviewStatus || 'pending'
+  const kind = item.kind === 'article' || item.kind === 'pick' ? item.kind : 'post'
+  const author = kind === 'article'
+    ? ''
+    : ` · ${item.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(item.authorName || '')}${item.authorId ? `（${esc(item.authorId)}）` : ''}`
+  const catSelect = guideCategorySelect(`data-guide-cat="${esc(item.id)}"`, categories, item.category)
+  let ops = ''
+  if (status === 'pending') {
+    ops = `${catSelect}
+      <button type="button" data-guide-act="approve" data-id="${esc(item.id)}">通过</button>
+      <button type="button" class="quiet warn" data-guide-act="reject" data-id="${esc(item.id)}">不通过</button>`
+  } else if (status === 'approved') {
+    ops = `${kind === 'article' ? `<button type="button" class="quiet" data-guide-edit="${esc(item.id)}">编辑</button>` : ''}
+      <button type="button" class="quiet warn" data-guide-act="offline" data-id="${esc(item.id)}">下线</button>`
+  } else {
+    ops = `${catSelect}
+      <button type="button" class="quiet" data-guide-act="restore" data-id="${esc(item.id)}">重新上线</button>
+      <button type="button" class="quiet warn" data-guide-act="delete" data-id="${esc(item.id)}">删除</button>`
+  }
+  const body = item.content
+    ? `<details class="gd-body"><summary>看正文${item.imageUrls && item.imageUrls.length ? `（${item.imageUrls.length} 图）` : ''}</summary><p>${esc(item.content)}</p>${(item.imageUrls || []).map((u) => `<img src="${esc(u)}" alt="" />`).join('')}</details>`
+    : (kind === 'pick' && item.summary ? `<span class="meta">${esc(item.summary)}</span>` : '')
+  return `
+    <div class="gd-row">
+      ${guideThumb(item, categories)}
+      <div class="gd-copy">
+        <strong>${esc(item.title)}</strong>
+        <span class="meta"><span class="gd-kind ${kind}">${GUIDE_KIND_LABEL[kind]}</span> ${esc(item.category || '')}${author} · ${formatTime(item.publishedAt || item.createdAt)}${status === 'rejected' ? ` · 未通过：${esc(item.reviewNote || '')}` : ''}</span>
+        ${body}
+        ${kind === 'article' ? `<a class="meta gd-link" href="${esc(item.articleUrl)}" target="_blank" rel="noopener">${esc(item.articleUrl)}</a>` : ''}
+      </div>
+      <div class="gd-ops">${ops}</div>
+    </div>`
+}
+
+function guideListView(guides, categories) {
+  const counts = guides.counts || {}
+  return `
+    <div class="card">
+      <div class="gd-tabs">
+        ${GUIDE_TABS.map((tab) => {
+          const n = tab.status === 'offline' ? (counts.offline || 0) + (counts.rejected || 0) : (counts[tab.status] || 0)
+          return `<button type="button" class="${state.guideStatus === tab.status ? 'active' : ''}" data-guide-tab="${tab.status}">${tab.label} ${n}</button>`
+        }).join('')}
+      </div>
+      <p class="muted">${state.guideStatus === 'pending' ? '用户在小程序「黎安攻略」里的投稿，机审通过后全部在这里等人工审核，通过才会在小程序里显示。' : ''}</p>
+      ${(guides.items || []).length
+        ? guides.items.map((item) => guideRow(item, categories)).join('')
+        : '<p class="muted">这里还没有内容。</p>'}
+    </div>`
+}
+
+function guideArticleView(categories) {
+  const draft = state.guideDraft || { id: '', title: '', category: categories[0] || '', cover: '', coverUrl: '', articleUrl: '' }
+  state.guideDraft = draft
+  const local = (state.data && state.data.overview && state.data.overview.mode) !== 'cloud'
+  return `
+    <div class="card">
+      <h3>${draft.id ? '编辑公众号推文' : '添加公众号推文'}</h3>
+      <p class="muted">上传横版封面（公众号封面比例 2.35:1，如 900×383），填推文链接，保存后直接出现在小程序「黎安攻略」，用户点开直接进推文。</p>
+      <div class="gd-form">
+        <div class="gd-cover-pick">
+          ${draft.coverUrl ? `<img src="${esc(draft.coverUrl)}" alt="" />` : '<span class="muted">还没上传封面</span>'}
+        </div>
+        <div class="gd-fields">
+          <div class="row gap">
+            <label class="upload-btn">上传封面<input id="gd-file" type="file" accept="image/jpeg,image/png,image/webp" hidden /></label>
+            <span id="gd-upload-status" class="muted"></span>
+          </div>
+          <input id="gd-title" maxlength="40" placeholder="标题" value="${esc(draft.title)}" />
+          <input id="gd-url" placeholder="推文链接 https://mp.weixin.qq.com/..." value="${esc(draft.articleUrl)}" />
+          ${guideCategorySelect('id="gd-category"', categories, draft.category)}
+          <div class="row gap">
+            <button id="gd-save" type="button">${draft.id ? '保存修改' : '保存并上线'}</button>
+            ${draft.id ? '<button id="gd-cancel" type="button" class="quiet">取消编辑</button>' : ''}
+          </div>
+          ${local ? '<p class="muted">当前是本地演示模式：上传的封面只用于后台预览，小程序读不到。</p>' : ''}
+        </div>
+      </div>
+    </div>`
+}
+
+function guidePickView(categories) {
+  const posts = (state.data && state.data.guidePosts) || []
+  return `
+    <div class="card">
+      <h3>从帖子圈选</h3>
+      <p class="muted">从首页已通过的帖子里挑，设为攻略后在小程序「黎安攻略」里显示成横版卡片，点开进入原帖（评论、点赞都在原帖）。原帖被删或下架时，攻略里也会自动不显示。</p>
+      <div class="row gap">
+        <input id="gd-pick-keyword" placeholder="搜标题或正文" value="${esc(state.guidePickKeyword || '')}" />
+        <button id="gd-pick-search" type="button">搜索</button>
+      </div>
+      ${posts.length ? posts.map((post) => `
+        <div class="gd-pick-row">
+          <div class="gd-copy">
+            <strong>${esc(post.title)}</strong>
+            ${post.excerpt && post.excerpt !== post.title ? `<span class="meta gd-excerpt">${esc(post.excerpt)}</span>` : ''}
+            <span class="meta">${post.tag ? `${esc(post.tag)} · ` : ''}${post.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(post.authorName)} · ${formatTime(post.createdAt)} · 赞 ${post.likeCount} · 评 ${post.commentCount}</span>
+          </div>
+          <div class="gd-ops">
+            ${post.picked
+              ? '<span class="muted">已在攻略里</span>'
+              : `${guideCategorySelect(`data-pick-cat="${esc(post.contentId)}"`, categories, categories[0])}
+                 <button type="button" data-guide-pick="${esc(post.contentId)}" data-type="${esc(post.contentType)}">设为攻略</button>`}
+          </div>
+        </div>`).join('') : '<p class="muted">没有找到已通过的帖子。</p>'}
+    </div>`
+}
+
+function guideCategoryView(categories) {
+  return `
+    <div class="card">
+      <h3>分类设置</h3>
+      <p class="muted">小程序攻略页顶部的分类，按顺序显示，用顿号或逗号分隔，最多 12 个、每个最多 6 个字。删掉的分类下已有的攻略不会被删，只是不再单独显示这个分类。</p>
+      <div class="row gap">
+        <input id="gd-cats" value="${esc(categories.join('、'))}" />
+        <button id="gd-cats-save" type="button">保存分类</button>
+      </div>
+    </div>`
+}
+
+function renderGuides(panel, data) {
+  const guides = data || { items: [], categories: [], counts: {} }
+  const categories = guides.categories || []
+  const view = state.guideView || 'list'
+  const body = view === 'article' ? guideArticleView(categories)
+    : view === 'pick' ? guidePickView(categories)
+      : view === 'categories' ? guideCategoryView(categories)
+        : guideListView(guides, categories)
+  panel.innerHTML = `
+    <div class="subtabs">
+      ${GUIDE_VIEWS.map((item) => `<button type="button" data-guide-view="${item.view}" class="${item.view === view ? 'active' : ''}">${item.label}${item.view === 'list' && (guides.counts || {}).pending ? ` · 待审 ${guides.counts.pending}` : ''}</button>`).join('')}
+    </div>
+    ${body}`
+
+  panel.querySelectorAll('[data-guide-view]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (btn.dataset.guideView === state.guideView) return
+      state.guideView = btn.dataset.guideView
+      if (state.guideView === 'pick') await reloadGuides()
+      else render()
+    }
+  })
+  if (view === 'article') bindGuideArticle(panel)
+  if (view === 'pick') bindGuidePick(panel)
+  if (view === 'categories') bindGuideCategories(panel)
+  if (view === 'list') bindGuideList(panel, guides)
+}
+
+function bindGuideArticle(panel) {
+  const readDraft = () => ({
+    ...state.guideDraft,
+    title: panel.querySelector('#gd-title').value.trim(),
+    articleUrl: panel.querySelector('#gd-url').value.trim(),
+    category: panel.querySelector('#gd-category').value
+  })
+  const status = panel.querySelector('#gd-upload-status')
+  panel.querySelector('#gd-file').onchange = async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    status.textContent = '上传中…'
+    try {
+      const dataUrl = await shrinkImage(file)
+      const result = await api('/api/guides/upload', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'image/jpeg', data: dataUrl })
+      })
+      if (!result.ok) {
+        status.textContent = result.message || '上传失败'
+        return
+      }
+      state.guideDraft = { ...readDraft(), cover: result.src, coverUrl: result.previewUrl }
+      render()
+    } catch (err) {
+      status.textContent = (err && err.message) || '上传失败'
+    }
+  }
+  const saveBtn = panel.querySelector('#gd-save')
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true
+    const result = await api('/api/guides/article', { method: 'POST', body: JSON.stringify(readDraft()) })
+    saveBtn.disabled = false
+    if (!result.ok) return alert(result.message || '保存失败')
+    state.guideDraft = null
+    state.guideView = 'list'
+    state.guideStatus = 'approved'
+    await reloadGuides()
+  }
+  const cancel = panel.querySelector('#gd-cancel')
+  if (cancel) {
+    cancel.onclick = () => {
+      state.guideDraft = null
+      state.guideView = 'list'
+      render()
+    }
+  }
+}
+
+function bindGuidePick(panel) {
+  const search = async () => {
+    state.guidePickKeyword = panel.querySelector('#gd-pick-keyword').value.trim()
+    await reloadGuides()
+  }
+  panel.querySelector('#gd-pick-search').onclick = search
+  panel.querySelector('#gd-pick-keyword').onkeydown = (e) => {
+    if (e.key === 'Enter') search()
+  }
+  panel.querySelectorAll('[data-guide-pick]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.guidePick
+      const select = panel.querySelector(`[data-pick-cat="${CSS.escape(id)}"]`)
+      btn.disabled = true
+      const result = await api('/api/guides/pick', {
+        method: 'POST',
+        body: JSON.stringify({ contentType: btn.dataset.type, contentId: id, category: select ? select.value : '' })
+      })
+      btn.disabled = false
+      if (!result.ok) return alert(result.message || '设为攻略失败')
+      await reloadGuides()
+    }
+  })
+}
+
+function bindGuideCategories(panel) {
+  panel.querySelector('#gd-cats-save').onclick = async () => {
+    const list = panel.querySelector('#gd-cats').value
+    const result = await api('/api/guides/categories', { method: 'POST', body: JSON.stringify({ list }) })
+    if (!result.ok) return alert(result.message || '保存失败')
+    alert('分类已保存，小程序最多 5 分钟后生效')
+    await reloadGuides()
+  }
+}
+
+function bindGuideList(panel, guides) {
+  panel.querySelectorAll('[data-guide-edit]').forEach((btn) => {
+    btn.onclick = () => {
+      const item = (guides.items || []).find((row) => row.id === btn.dataset.guideEdit)
+      if (!item) return
+      state.guideDraft = {
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        cover: item.cover,
+        coverUrl: item.coverUrl,
+        articleUrl: item.articleUrl
+      }
+      state.guideView = 'article'
+      render()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+  panel.querySelectorAll('[data-guide-tab]').forEach((btn) => {
+    btn.onclick = async () => {
+      state.guideStatus = btn.dataset.guideTab
+      await reloadGuides()
+    }
+  })
+  panel.querySelectorAll('[data-guide-act]').forEach((btn) => {
+    btn.onclick = async () => {
+      const action = btn.dataset.guideAct
+      const id = btn.dataset.id
+      const select = panel.querySelector(`[data-guide-cat="${CSS.escape(id)}"]`)
+      const body = { id, action, category: select ? select.value : '' }
+      if (action === 'reject') {
+        const note = prompt('不通过的原因（选填，仅后台可见）', '')
+        if (note === null) return
+        body.note = note
+      }
+      if (action === 'delete' && !confirm('删除后不能恢复，确定删除？')) return
+      if (action === 'offline' && !confirm('下线后小程序里不再显示，可以在「已下线」里重新上线。确定下线？')) return
+      btn.disabled = true
+      const result = await api('/api/guides/status', { method: 'POST', body: JSON.stringify(body) })
+      btn.disabled = false
+      if (!result.ok) return alert(result.message || '操作失败')
+      await reloadGuides()
+    }
+  })
 }
 
 async function reloadWeekly() {
@@ -1352,6 +1935,8 @@ async function loadNav(nav) {
     return
   }
   if (nav === 'weekly') return reloadWeekly()
+  if (nav === 'cover') return reloadCover()
+  if (nav === 'guides') return reloadGuides()
   if (nav === 'digest') return refreshDigest()
   if (nav === 'reports') {
     const result = await api('/api/reports?status=' + encodeURIComponent('全部'))

@@ -12,12 +12,20 @@ page {
   --lime: #d4f01e;
   --lime-soft: #f3fbc4;
   --like: #ff3b5c;
-  background: var(--paper);
+  /* 渐变直接画在页面背景上（固定长度，末端与窗口底色一致）。
+     不要用 position:fixed + 负 z-index 的背景层，也不要把 page 设为 100vh：
+     iOS 上会让评论框刚弹键盘就失焦收起 */
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(640rpx 460rpx at 100% 0, rgba(10, 92, 255, 0.16) 0%, rgba(10, 92, 255, 0) 70%),
+    linear-gradient(180deg, #e6eeff 0, #eff3fa 520rpx, #f2f5fa 900rpx);
+  background-repeat: no-repeat;
+  background-size: 100% 900rpx;
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   font-size: 28rpx;
   line-height: 1.5;
-  min-height: 100vh;
+  min-height: 100%;
   box-sizing: border-box;
 }
 
@@ -1365,19 +1373,6 @@ button.share-pick {
 }
 
 
-.app-backdrop {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 60% at 100% 0%, rgba(10, 92, 255, 0.16) 0%, rgba(10, 92, 255, 0) 60%),
-    radial-gradient(90% 50% at 0% 100%, rgba(212, 240, 30, 0.14) 0%, rgba(212, 240, 30, 0) 60%),
-    linear-gradient(180deg, #e6eeff 0%, #eff3fa 42%, #f2f5fa 100%);
-}
 
 .hot-line-rank.top1::after {
   content: "";

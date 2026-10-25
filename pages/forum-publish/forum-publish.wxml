@@ -1,4 +1,3 @@
-<view class="app-backdrop"></view>
 <view class="page publish-page">
   <view wx:if="{{blocked}}" class="empty">
     <view class="empty-title">{{blockTitle}}</view>

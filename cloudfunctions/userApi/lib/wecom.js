@@ -84,11 +84,20 @@ async function getCustomerGroup(wecomToken, chatId) {
   })
 }
 
+function extractDeniedIp(errmsg) {
+  const text = String(errmsg || '')
+  const match = text.match(/from ip:\s*([0-9.]+)/i)
+  return match ? match[1] : ''
+}
+
 function formatGroupListError(data) {
   const code = data && data.errcode
   const msg = (data && data.errmsg) || '拉客户群失败'
   if (code === 60020) {
-    return '60020 当前出口 IP 不在应用「企业可信IP」里。云函数出口 IP 需加到该自建应用的企业可信IP。'
+    const ip = extractDeniedIp(msg)
+    return ip
+      ? `60020 云函数出口 IP ${ip} 不在应用「企业可信IP」里。请把 ${ip} 加进该自建应用的企业可信IP。`
+      : '60020 当前出口 IP 不在应用「企业可信IP」里。云函数出口 IP 需加到该自建应用的企业可信IP。'
   }
   if (code === 81017) {
     return '81017 应用可见范围人数超过 1000。请填写 WECOM_OWNER_USERID（群主 userid）。'
