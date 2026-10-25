@@ -1,6 +1,6 @@
 .mine-posts {
   min-height: 100vh;
-  background: #f3f6fb;
+  background: transparent;
   padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 
@@ -36,7 +36,7 @@
 .mine-posts .feed-end {
   padding: 28rpx 24rpx 48rpx;
   text-align: center;
-  color: #b0b4ba;
+  color: var(--ink-4);
   font-size: 24rpx;
 }
 

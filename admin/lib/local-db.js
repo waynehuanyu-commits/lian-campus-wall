@@ -288,7 +288,7 @@ function seedStore() {
   store.school_requests = []
   store.weekly_hot = [{
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '管理员精选热榜',
     enabled: true,
     items: [],

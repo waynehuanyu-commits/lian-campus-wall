@@ -1,8 +1,11 @@
 {
   "navigationBarTitleText": "消息",
-  "navigationBarBackgroundColor": "#FFFFFF",
+  "navigationBarBackgroundColor": "#E6EEFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#FFFFFF",
+  "backgroundColor": "#F2F5FA",
   "enablePullDownRefresh": true,
-  "backgroundTextStyle": "dark"
+  "backgroundTextStyle": "dark",
+  "usingComponents": {
+    "campus-qr-card": "/components/campus-qr-card/campus-qr-card"
+  }
 }

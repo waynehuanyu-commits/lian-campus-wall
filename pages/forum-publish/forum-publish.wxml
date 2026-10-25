@@ -1,4 +1,4 @@
-<view class="page padded publish-page">
+<view class="page publish-page">
   <view wx:if="{{blocked}}" class="empty">
     <view class="empty-title">{{blockTitle}}</view>
     <view>{{blockDesc}}</view>
@@ -7,80 +7,78 @@
   </view>
 
   <block wx:else>
-  <view class="form-label">主题</view>
-  <view class="topic-grid">
-    <view
-      wx:for="{{topics}}"
-      wx:key="*this"
-      class="topic-chip {{(tagMode === 'other' && item === otherTopic) || (tagMode !== 'other' && tag === item) ? 'active' : ''}}"
-      data-name="{{item}}"
-      bindtap="onTopicTap"
-    >{{item}}</view>
-  </view>
-
-  <block wx:if="{{tagMode === 'other'}}">
-    <view class="form-label topic-custom-label">自定义话题</view>
-    <view class="field topic-field active">
+  <view class="pub-card">
+    <view class="pub-label">主题</view>
+    <view class="topic-grid">
+      <view
+        wx:for="{{topics}}"
+        wx:key="*this"
+        class="topic-chip {{(tagMode === 'other' && item === otherTopic) || (tagMode !== 'other' && tag === item) ? 'active' : ''}}"
+        data-name="{{item}}"
+        bindtap="onTopicTap"
+      >{{item}}</view>
+    </view>
+    <view wx:if="{{tagMode === 'other'}}" class="topic-field">
       <input
         maxlength="8"
         placeholder="输入自己的话题，最多 8 个字"
+        placeholder-class="pub-ph"
         value="{{customTag}}"
         focus="{{otherFocus}}"
         bindinput="onCustomInput"
       />
     </view>
-  </block>
-
-  <view class="form-label">标题</view>
-  <view class="field">
-    <input placeholder="一句话讲清楚主题（选填）" value="{{title}}" bindinput="onTitleInput" />
   </view>
 
-  <view class="form-label">正文（选填）</view>
-  <view class="field">
+  <view class="pub-card pub-editor">
+    <input class="pub-title" placeholder="一句话讲清楚主题（选填）" placeholder-class="pub-ph" value="{{title}}" bindinput="onTitleInput" />
+    <view class="pub-divider"></view>
     <textarea
+      class="pub-body"
       placeholder="分享新鲜事、提问、组队都可以"
+      placeholder-class="pub-ph"
       value="{{content}}"
       auto-height
       bindinput="onContentInput"
     />
-  </view>
-
-  <view class="form-label">图片</view>
-  <view class="upload-grid">
-    <view wx:for="{{images}}" wx:key="*this" class="upload-item">
-      <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewImage" />
-      <view class="upload-remove" data-index="{{index}}" catchtap="removeImage">×</view>
-    </view>
-    <view class="upload-add" bindtap="chooseImages">
-      <text style="font-size: 48rpx; line-height: 1;">＋</text>
-      <text>添加图片</text>
+    <view class="upload-grid">
+      <view wx:for="{{images}}" wx:key="*this" class="upload-item">
+        <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewImage" />
+        <view class="upload-remove" data-index="{{index}}" catchtap="removeImage">×</view>
+      </view>
+      <view class="upload-add" bindtap="chooseImages">
+        <view class="upload-add-ic"></view>
+        <text>添加图片</text>
+      </view>
     </view>
   </view>
 
-  <view class="form-label">微信号（选填，不进正文）</view>
-  <view class="field">
-    <input
-      maxlength="30"
-      type="text"
-      placeholder="例如：campus_helper"
-      value="{{contactValue}}"
-      bindinput="onContactInput"
-    />
-  </view>
-  <view class="contact-tip">
-    需要对接时再填，不填也能发。请勿写进正文或图片。
-  </view>
-
-  <view class="switch-row" style="margin-top: 28rpx;">
-    <view>
-      <view class="section-title">匿名发布</view>
-      <view class="meta">其他人将看不到你的昵称</view>
+  <view class="pub-card pub-list">
+    <view class="pub-row">
+      <text class="pub-row-title">微信号（选填）</text>
+      <input
+        class="pub-row-input"
+        maxlength="30"
+        type="text"
+        placeholder="例如：campus_helper"
+        placeholder-class="pub-ph"
+        value="{{contactValue}}"
+        bindinput="onContactInput"
+      />
     </view>
-    <switch checked="{{anonymous}}" color="#2F7DFF" bindchange="onAnonymousChange" />
+    <view class="pub-row">
+      <view class="pub-row-copy">
+        <text class="pub-row-title">匿名发布</text>
+        <text class="pub-row-desc">其他人将看不到你的昵称</text>
+      </view>
+      <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
+    </view>
   </view>
+  <view class="pub-note">需要对接时再填，不填也能发。</view>
 
-  <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布'}}</button>
+  <view class="pub-submit-bar">
+    <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布'}}</button>
+  </view>
   </block>
   <privacy-popup />
 </view>

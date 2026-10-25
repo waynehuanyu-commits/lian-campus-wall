@@ -30,20 +30,23 @@
         <p id="mode-badge" class="mode-badge">云端数据</p>
       </div>
       <nav>
-        <button data-nav="overview" class="active">概览</button>
-        <button data-nav="review">审帖</button>
-        <button data-nav="keywords">词库</button>
-        <button data-nav="accounts">账号</button>
-        <button data-nav="whitelist">白名单</button>
-        <button data-nav="official">官方登录</button>
-        <button data-nav="staff">运营账号</button>
-        <button data-nav="reports">举报</button>
-        <button data-nav="digest">推送</button>
-        <button data-nav="weekly">热榜</button>
-        <button data-nav="groups">客户群</button>
+        <button data-nav="overview" class="active">今日概览</button>
+        <p class="nav-group">内容管理</p>
+        <button data-nav="review">内容审核</button>
+        <button data-nav="keywords">风控词库</button>
+        <p class="nav-group">小程序展示</p>
+        <button data-nav="weekly">园区热议</button>
+        <button data-nav="cover">我的页封面</button>
+        <p class="nav-group">推送分发</p>
+        <button data-nav="digest">公众号推文</button>
+        <button data-nav="groups">企微群发</button>
+        <p class="nav-group">用户管理</p>
+        <button data-nav="accounts">用户管理</button>
         <button data-nav="school">学校审核</button>
         <button data-nav="student">学生认证</button>
-        <button data-nav="more">更多</button>
+        <p class="nav-group">后台</p>
+        <button data-nav="staff">后台成员</button>
+        <button data-nav="more">风控日志</button>
       </nav>
       <button id="logout-btn" class="ghost logout" type="button">退出登录</button>
     </aside>
@@ -55,6 +58,7 @@
         </div>
         <p class="account-chip" id="account-name"></p>
       </header>
+      <div id="subtabs" class="subtabs hidden"></div>
       <section id="panel" class="panel-stage"></section>
     </main>
   </div>

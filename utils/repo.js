@@ -756,6 +756,13 @@ async function getDigest(id) {
   return result.digest || null
 }
 
+// 运营后台配置的「我的」页封面；本地演示或未配置时返回 null
+async function getMineCover() {
+  if (!config.useCloud) return null
+  const result = await callCloud('getMineCover')
+  return (result && result.ok && result.cover) || null
+}
+
 async function getWeeklyHot(options = {}) {
   if (!config.useCloud) return store.getWeeklyHot(options)
   const now = Date.now()
@@ -770,7 +777,7 @@ async function getWeeklyHot(options = {}) {
       err.code = 'CLOUD_ERROR'
       throw err
     }
-    const board = result.board || { id: 'current', title: '每周精选', enabled: false, items: [], preview: [], count: 0, totalCount: 0 }
+    const board = result.board || { id: 'current', title: '园区热议', enabled: false, items: [], preview: [], count: 0, totalCount: 0 }
     feedLocal.weekly = { at: Date.now(), data: board, inflight: null }
     return board
   })().catch((err) => {
@@ -907,8 +914,16 @@ async function addComment(type, id, content, extra = {}) {
     parentId: extra.parentId || '',
     replyToId: extra.replyToId || '',
     replyToName: extra.replyToName || '',
+    anonymous: !!extra.anonymous,
     images
   })
+}
+
+async function toggleCommentLike(id) {
+  const blocked = requireLoginResult()
+  if (blocked) return blocked
+  if (!config.useCloud) return store.toggleCommentLike(id)
+  return callCloud('toggleCommentLike', { id })
 }
 
 async function deleteComment(id) {
@@ -1093,6 +1108,8 @@ module.exports = {
   toggleLike,
   listComments,
   addComment,
+  toggleCommentLike,
+  getMineCover,
   deleteComment,
   myPosts,
   myLiked,

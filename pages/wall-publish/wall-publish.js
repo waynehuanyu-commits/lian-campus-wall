@@ -10,13 +10,13 @@ const BOARD_META = {
     titlePlaceholder: '例如：几乎全新的《深入理解计算机系统》',
     extraLabel: '价格',
     extraPlaceholder: '例如：45 元 / 可小刀 / 面议',
-    contentPlaceholder: '成色、入手渠道、面交地点等，不要写微信号',
+    contentPlaceholder: '成色、入手渠道、面交地点等',
     maxImages: 9
   },
   '出行拼车': {
     titleLabel: '标题',
     titlePlaceholder: '例如：周五下午去汉口火车站',
-    contentPlaceholder: '费用分摊、途经点、行李空间等，不要写微信号',
+    contentPlaceholder: '费用分摊、途经点、行李空间等',
     maxImages: 3
   },
   '拼单互助': {
@@ -24,7 +24,7 @@ const BOARD_META = {
     titlePlaceholder: '例如：拼一单水果捞，差 2 人起送',
     extraLabel: '人数 / 截止时间',
     extraPlaceholder: '例如：满 3 人 · 今天下午',
-    contentPlaceholder: '店铺、配送地址、怎么分摊，不要写微信号',
+    contentPlaceholder: '店铺、配送地址、怎么分摊',
     maxImages: 3
   },
   '求物求助': {
@@ -32,7 +32,7 @@ const BOARD_META = {
     titlePlaceholder: '例如：求借一台科学计算器',
     extraLabel: '紧急程度 / 时限',
     extraPlaceholder: '例如：本周三前',
-    contentPlaceholder: '用途、归还时间、取还地点等，不要写微信号',
+    contentPlaceholder: '用途、归还时间、取还地点等',
     maxImages: 3
   },
   '失物招领': {
@@ -40,7 +40,7 @@ const BOARD_META = {
     titlePlaceholder: '例如：黑色钱包 / 校园卡',
     extraLabel: '地点 / 时间',
     extraPlaceholder: '例如：一食堂门口 · 今早',
-    contentPlaceholder: '特征、拾到或丢失时间地点等，不要写微信号',
+    contentPlaceholder: '特征、拾到或丢失时间地点等',
     maxImages: 6
   }
 }

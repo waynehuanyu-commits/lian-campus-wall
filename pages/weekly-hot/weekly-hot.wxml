@@ -1,8 +1,6 @@
 <view class="hot-page">
   <view class="hot-hero">
-    <view class="hot-kicker">HOT RANK</view>
-    <view class="hot-title">{{board.title || '每周精选'}}</view>
-    <view class="hot-sub">{{board.subtitle || '本周校园精选'}}</view>
+    <view class="hot-title">园区热议</view>
     <view wx:if="{{board.updatedText}}" class="hot-meta">更新于 {{board.updatedText}}</view>
   </view>
 
@@ -20,17 +18,19 @@
     <view
       wx:for="{{items}}"
       wx:key="key"
-      class="hot-item"
+      class="hot-item {{item.rankClass}}"
+      hover-class="hot-item-on"
+      hover-stay-time="80"
       data-id="{{item.contentId}}"
       data-type="{{item.contentType}}"
       bindtap="goDetail"
     >
       <view class="rank {{item.rankClass}}">{{item.rank}}</view>
       <view class="hot-body">
-        <view class="hot-type">{{item.tag}}</view>
         <view class="hot-item-title">{{item.title}}</view>
         <view wx:if="{{item.summary}}" class="hot-item-summary">{{item.summary}}</view>
         <view class="hot-item-meta">
+          <text wx:if="{{item.tag}}" class="hot-type">#{{item.tag}}</text>
           <view class="engage-item">
             <view class="engage-ic engage-ic-heart"></view>
             <text class="engage-num">{{item.likeCount || 0}}</text>
@@ -41,7 +41,6 @@
           </view>
         </view>
       </view>
-      <view class="hot-go">›</view>
     </view>
   </view>
 

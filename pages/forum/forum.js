@@ -8,6 +8,9 @@ const media = require('../../utils/media')
 const postNav = require('../../utils/post-nav')
 const defaultProfile = require('../../utils/default-profile')
 const { formatTime } = require('../../utils/util')
+const { readNavMetrics } = require('../../utils/nav-bar')
+
+const THUMB_MAX = { width: 320, height: 300 }
 
 function unpackHome(data) {
   if (Array.isArray(data)) {
@@ -33,11 +36,12 @@ function feedBodyOverflows(text) {
   raw.split('\n').forEach((line) => {
     lines += Math.max(1, Math.ceil(Array.from(line).length / 24))
   })
-  return lines > 3
+  return lines > 6
 }
 
 Page({
   data: {
+    masthead: { top: 20, height: 44, capsule: 100 },
     topics: ['全部', store.OFFICIAL_TOPIC, ...store.HOME_TOPICS, store.OTHER_TOPIC],
     topic: '全部',
     sortOptions: [
@@ -46,8 +50,6 @@ Page({
     ],
     sort: 'new',
     keyword: '',
-    keywordDraft: '',
-    searchOpen: false,
     posts: [],
     weeklyHot: null,
     canSpeak: false,
@@ -60,6 +62,7 @@ Page({
   },
 
   onLoad(query) {
+    this.setData({ masthead: readNavMetrics() })
     this.fromShare = (query && query.from) || ''
     try { share.enableMenus() } catch (e) { /* ignore */ }
     try { this.consumeHomeIntent() } catch (e) { /* ignore */ }
@@ -88,12 +91,6 @@ Page({
     this.refresh().catch(() => {})
   },
 
-  onHide() {
-    if (this.data.searchOpen) {
-      this.setData({ searchOpen: false })
-    }
-  },
-
   consumeHomeIntent() {
     let intent = null
     try {
@@ -117,8 +114,7 @@ Page({
     if (resolved === this.data.topic && keyword === this.data.keyword) return false
     this.setData({
       topic: resolved,
-      keyword,
-      keywordDraft: keyword
+      keyword
     })
     return true
   },
@@ -242,6 +238,7 @@ Page({
         uniq: `${feedKey}:${index}`,
         displayTag: item.displayTag || '',
         images: item.images || [],
+        thumbStyle: (this._thumbStyles || {})[feedKey] || '',
         timeText: formatTime(item.createdAt),
         bodyText,
         showTitle: !!title && !titleAsBody,
@@ -443,34 +440,28 @@ Page({
   },
 
   openSearch() {
-    this.setData({
-      searchOpen: true,
-      keywordDraft: this.data.keyword
-    })
+    wx.navigateTo({ url: `/pages/search/search?keyword=${encodeURIComponent(this.data.keyword || '')}` })
   },
 
-  onDraftInput(e) {
-    this.setData({ keywordDraft: e.detail.value })
-  },
-
-  cancelSearch() {
-    this.setData({
-      searchOpen: false,
-      keywordDraft: this.data.keyword
-    })
-  },
-
-  confirmSearch() {
-    const keyword = String(this.data.keywordDraft || '').trim()
-    this.setData({ searchOpen: false, keyword, keywordDraft: keyword }, () => {
-      track.search({
-        surface: 'forum',
-        keyword,
-        category: this.data.topic,
-        sort: this.data.sort
-      })
+  // 搜索页提交后回调
+  applySearch(keyword) {
+    const next = String(keyword || '').trim()
+    if (next === this.data.keyword) return
+    this.setData({ keyword: next }, () => {
+      if (next) {
+        track.search({
+          surface: 'forum',
+          keyword: next,
+          category: this.data.topic,
+          sort: this.data.sort
+        })
+      }
       this.loadPosts()
     })
+  },
+
+  clearSearch() {
+    this.applySearch('')
   },
 
   openPost(type, id) {
@@ -568,6 +559,20 @@ Page({
       wx.showToast({ title: '点赞失败', icon: 'none' })
     }
     this._likingId = ''
+  },
+
+  // 单图按原比例缩放到不超过 THUMB_MAX 的框里，完整显示不裁剪
+  onThumbLoad(e) {
+    const key = e.currentTarget.dataset.key
+    const width = Number(e.detail && e.detail.width) || 0
+    const height = Number(e.detail && e.detail.height) || 0
+    if (!key || !width || !height) return
+    const scale = Math.min(THUMB_MAX.width / width, THUMB_MAX.height / height)
+    const style = `width: ${Math.round(width * scale)}rpx; height: ${Math.round(height * scale)}rpx;`
+    this._thumbStyles = { ...(this._thumbStyles || {}), [key]: style }
+    const index = (this.data.posts || []).findIndex((item) => item.feedKey === key)
+    if (index < 0 || this.data.posts[index].thumbStyle === style) return
+    this.setData({ [`posts[${index}].thumbStyle`]: style })
   },
 
   previewImage(e) {

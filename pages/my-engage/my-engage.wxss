@@ -1,6 +1,6 @@
 .sub-page {
   min-height: 100vh;
-  background: #f3f6fb;
+  background: transparent;
   padding: 20rpx 0 calc(40rpx + env(safe-area-inset-bottom));
 }
 
@@ -8,8 +8,8 @@
   margin: 0 24rpx 18rpx;
   display: flex;
   gap: 8rpx;
-  background: rgba(255, 255, 255, 0.82);
-  border-radius: 18rpx;
+  background: rgba(18, 26, 44, 0.05);
+  border-radius: 999rpx;
   padding: 6rpx;
   box-sizing: border-box;
 }
@@ -19,9 +19,9 @@
   text-align: center;
   height: 64rpx;
   line-height: 64rpx;
-  border-radius: 14rpx;
-  font-size: 24rpx;
-  color: #9a8a90;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: var(--ink-3);
   padding: 0 8rpx;
   white-space: nowrap;
 }
@@ -29,15 +29,15 @@
 .engage-author {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #2f7dff;
+  color: var(--brand);
   font-weight: 650;
 }
 
 .seg.active {
-  background: linear-gradient(145deg, #6aadff 0%, #2f7dff 100%);
-  color: #fff;
+  background: #fff;
+  color: var(--ink);
   font-weight: 700;
-  box-shadow: 0 6rpx 16rpx rgba(47, 125, 255, 0.25);
+  box-shadow: 0 2rpx 8rpx rgba(18, 26, 44, 0.08);
 }
 
 .list {
@@ -59,7 +59,7 @@
   margin-top: 14rpx;
   font-size: 30rpx;
   font-weight: 720;
-  color: #1f2329;
+  color: var(--ink);
 }
 
 .mini-content {
@@ -76,13 +76,13 @@
   margin-top: 12rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #1f2329;
+  color: var(--ink);
 }
 
 .engage-reply {
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #2f7dff;
+  color: var(--brand);
 }
 
 .engage-del {

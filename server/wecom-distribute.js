@@ -276,7 +276,7 @@ async function distributeDigest(card, targets = []) {
 
 module.exports = {
   envStatus,
-  generateUrlLink,
+  generateGroupLink,
   sendDigestByRobot,
   sendDigestToExternalGroup,
   ownerUserids,

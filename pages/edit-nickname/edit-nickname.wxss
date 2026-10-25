@@ -2,7 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f3f6fb;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -28,7 +28,7 @@
 .label {
   font-size: 24rpx;
   font-weight: 600;
-  color: #8a9199;
+  color: var(--ink-3);
 }
 
 .count {
@@ -42,7 +42,7 @@
   padding: 0;
   font-size: 34rpx;
   font-weight: 700;
-  color: #1f2329;
+  color: var(--ink);
   box-sizing: border-box;
 }
 
@@ -55,12 +55,12 @@
   margin: 20rpx 12rpx 0;
   font-size: 24rpx;
   line-height: 1.6;
-  color: #9aa3af;
+  color: var(--ink-3);
 }
 
 .footer {
   padding: 24rpx 40rpx calc(24rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(243, 246, 251, 0) 0%, #f3f6fb 28%);
+  background: transparent;
 }
 
 .save-btn {
@@ -68,7 +68,7 @@
   line-height: 88rpx;
   text-align: center;
   border-radius: 999rpx;
-  background: linear-gradient(145deg, #6aadff 0%, #2f7dff 100%);
+  background: linear-gradient(145deg, #6aadff 0%, var(--brand) 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 650;

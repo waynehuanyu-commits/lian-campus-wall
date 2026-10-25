@@ -1,29 +1,47 @@
 const repo = require('../../utils/repo')
 const defaultProfile = require('../../utils/default-profile')
-const auth = require('../../utils/auth')
 const track = require('../../utils/track')
 const { formatTime } = require('../../utils/util')
+const { readNavMetrics } = require('../../utils/nav-bar')
+const coverStore = require('../../utils/cover')
 
 Page({
   data: {
+    nav: { top: 20, height: 44, capsule: 100 },
+    cover: coverStore.DEFAULT_COVER,
     userId: '',
     profile: null,
     stats: { postCount: 0, receivedLikes: 0, receivedComments: 0 },
     tabs: [
-      { id: 'wall', name: '互助广场' },
-      { id: 'forum', name: '学习分享' }
+      { id: 'forum', name: '学习分享' },
+      { id: 'wall', name: '互助广场' }
     ],
-    tab: 'wall',
+    tab: 'forum',
     list: [],
     loading: true,
     error: '',
-    messaging: false,
     moreOpen: false
   },
 
   onLoad(query) {
     this.userId = decodeURIComponent(query.id || '')
-    this.setData({ userId: this.userId })
+    this.setData({ userId: this.userId, nav: readNavMetrics(), cover: coverStore.cachedCover() })
+    coverStore.fetchCover().then((next) => {
+      if (!coverStore.sameCover(this.data.cover, next)) this.setData({ cover: next })
+    })
+  },
+
+  onCoverError() {
+    if (coverStore.sameCover(this.data.cover, coverStore.DEFAULT_COVER)) return
+    this.setData({ cover: coverStore.fallbackCover() })
+  },
+
+  goBack() {
+    wx.navigateBack({
+      fail() {
+        wx.switchTab({ url: '/pages/forum/forum' })
+      }
+    })
   },
 
   onShow() {
@@ -86,25 +104,12 @@ Page({
     this.setData({ list: this.decorateList(rows, tab) })
   },
 
-  async onMessageTap() {
-    if (this.data.messaging || !auth.ensureCanSpeak()) return
-    const peerId = this.data.profile && this.data.profile.id
-    if (!peerId) return
-    this.setData({ messaging: true })
-    const result = await repo.openOrCreateConversation(peerId)
-    this.setData({ messaging: false })
-    if (auth.showActionError(result)) return
-    const id = result.conversation && result.conversation.id
-    if (!id) {
-      wx.showToast({ title: '无法发起私信', icon: 'none' })
-      return
-    }
-    wx.navigateTo({ url: `/pages/dm-chat/dm-chat?id=${encodeURIComponent(id)}` })
-  },
 
   openMore() {
     this.setData({ moreOpen: true })
   },
+
+  noop() {},
 
   closeMore() {
     this.setData({ moreOpen: false })

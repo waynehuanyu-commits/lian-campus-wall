@@ -250,6 +250,15 @@ async function resolveCloudUrls(fileIDs = []) {
   return map
 }
 
+/** 上传到云存储，返回 cloud:// fileID */
+async function uploadFile(cloudPath, buffer) {
+  if (useLocal()) throw new Error('本地演示模式不能上传到云存储')
+  if (!app) getDb()
+  const res = await app.uploadFile({ cloudPath, fileContent: buffer })
+  if (!res || !res.fileID) throw new Error('上传失败：云存储未返回 fileID')
+  return res.fileID
+}
+
 function applyCloudUrls(urls, map) {
   return (Array.isArray(urls) ? urls : []).map((item) => map[item] || item)
 }
@@ -268,5 +277,6 @@ module.exports = {
   useLocal,
   resolveCloudUrls,
   applyCloudUrls,
+  uploadFile,
   resetLocal: localDb.resetLocal
 }

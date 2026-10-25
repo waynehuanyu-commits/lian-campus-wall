@@ -102,12 +102,6 @@ function contactTypeLabel() {
 function validateWallContact(type, value, tag) {
   return moderation.validateWallContact(type, value, tag)
 }
-const SCHOOL_SUGGESTIONS = [
-  '北京大学', '清华大学', '复旦大学', '上海交通大学', '浙江大学',
-  '南京大学', '武汉大学', '中山大学', '四川大学', '华中科技大学',
-  '西安交通大学', '哈尔滨工业大学', '中国人民大学', '同济大学', '厦门大学'
-]
-
 function nowMinus(hours) {
   return Date.now() - hours * 3600 * 1000
 }
@@ -2039,6 +2033,18 @@ function reportReasonLabel(id) {
 
 function escalateReportedTarget(targetType, targetId, reportCount) {
   const note = `用户举报满 ${reportCount} 次，自动进入人工审核`
+  if (targetType === 'comment') {
+    saveComments(getComments().map((item) => (item.id !== targetId ? item : {
+      ...item,
+      reportCount,
+      reviewStatus: 'manual_review',
+      reviewOutcome: 'manual_review',
+      reviewNote: note,
+      reviewPriority: 'high',
+      reportEscalatedAt: Date.now()
+    })))
+    return { escalated: true, kind: 'comment' }
+  }
   if (targetType === 'forum' || targetType === 'wall') {
     const key = targetType === 'wall' ? KEYS.WALL_POSTS : KEYS.FORUM_POSTS
     const list = wx.getStorageSync(key) || []
@@ -2080,7 +2086,7 @@ function escalateReportedTarget(targetType, targetId, reportCount) {
 function submitReport({ targetType, targetId, reason, note } = {}) {
   const type = String(targetType || '').trim()
   const id = String(targetId || '').trim()
-  if (!['forum', 'wall', 'user'].includes(type) || !id) {
+  if (!['forum', 'wall', 'comment', 'user'].includes(type) || !id) {
     return { ok: false, message: '举报对象无效' }
   }
   const reasonMeta = REPORT_REASONS.find((item) => item.id === reason) || REPORT_REASONS.find((item) => item.id === 'other')
@@ -2091,6 +2097,11 @@ function submitReport({ targetType, targetId, reason, note } = {}) {
     const post = getPost(type, id)
     if (!post) return { ok: false, message: '内容不存在' }
     if (post.authorId === user.id) return { ok: false, message: '不能举报自己的帖子' }
+  }
+  if (type === 'comment') {
+    const comment = getComments().find((item) => item.id === id)
+    if (!comment) return { ok: false, message: '评论不存在' }
+    if (comment.authorId === user.id) return { ok: false, message: '不能举报自己的评论' }
   }
   const list = getReports()
   if (list.some((item) => item.reporterId === user.id && item.targetType === type && item.targetId === id && item.status !== 'dismissed')) {
@@ -2258,8 +2269,26 @@ function toggleLike(type, id) {
   return !liked
 }
 
+function toggleCommentLike(commentId) {
+  const user = getUser()
+  if (!user || !user.id) return { ok: false, code: 'NEED_LOGIN', message: '请先登录' }
+  const comment = getComments().find((item) => item.id === commentId)
+  if (!comment) return { ok: false, message: '评论不存在' }
+  const likes = getLikes()
+  const userLikes = likes[user.id] || { forum: [], wall: [] }
+  const bucket = new Set(userLikes.comment || [])
+  const liked = bucket.has(commentId)
+  if (liked) bucket.delete(commentId)
+  else bucket.add(commentId)
+  saveLikes({ ...likes, [user.id]: { ...userLikes, comment: Array.from(bucket) } })
+  const likeCount = Math.max(0, (Number(comment.likeCount) || 0) + (liked ? -1 : 1))
+  saveComments(getComments().map((item) => (item.id === commentId ? { ...item, likeCount } : item)))
+  return { ok: true, liked: !liked, likeCount }
+}
+
 function listComments(type, id) {
   const user = getUser()
+  const likedIds = new Set(((getLikes()[user.id] || {}).comment) || [])
   return getComments()
     .filter((item) => item.targetType === type && item.targetId === id)
     .filter((item) => moderation.isPublicStatus(item.reviewStatus || 'approved') || item.authorId === user.id)
@@ -2270,9 +2299,12 @@ function listComments(type, id) {
       replyToName: item.replyToName || '',
       images: Array.isArray(item.images) ? item.images : [],
       depth: Number(item.depth) || 0,
+      likeCount: Math.max(0, Number(item.likeCount) || 0),
+      liked: likedIds.has(item.id),
       reviewStatusLabel: moderation.reviewStatusLabel(item.reviewStatus || 'approved'),
       mine: item.authorId === user.id,
-      canDelete: item.authorId === user.id || item.postAuthorId === user.id
+      canDelete: item.authorId === user.id || item.postAuthorId === user.id,
+      authorId: item.anonymous ? '' : item.authorId
     }))
     .sort((a, b) => a.createdAt - b.createdAt)
 }
@@ -2342,8 +2374,10 @@ function addComment(type, id, content, extra = {}) {
     replyToName,
     depth,
     authorId: user.id,
-    authorName: user.nickname,
-    authorAvatar: user.avatar,
+    authorName: extra.anonymous ? '匿名同学' : user.nickname,
+    authorAvatar: extra.anonymous ? defaultProfile.stableAvatar(`${id}:${user.id}`) : user.avatar,
+    anonymous: !!extra.anonymous,
+    likeCount: 0,
     ...reviewPatch(review),
     createdAt: Date.now()
   }
@@ -3319,7 +3353,7 @@ const WEEKLY_HOT_MAX = 20
 function defaultWeeklyHot() {
   return {
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '管理员精选热榜',
     enabled: true,
     items: [],
@@ -3362,7 +3396,7 @@ function buildSeedWeeklyHot(wallPosts, forumPosts) {
     .slice(0, 8)
   return {
     id: 'current',
-    title: '每周精选',
+    title: '园区热议',
     subtitle: '本周校园精选',
     enabled: true,
     schemaVersion: 2,
@@ -3600,7 +3634,6 @@ module.exports = {
   reviewStatusLabel: moderation.reviewStatusLabel,
   wallHeadline,
   wallSummary,
-  SCHOOL_SUGGESTIONS,
   ensureInit,
   getUser,
   updateUser,
@@ -3632,6 +3665,7 @@ module.exports = {
   resolveReport,
   deletePost,
   toggleLike,
+  toggleCommentLike,
   listComments,
   addComment,
   deleteComment,

@@ -1,7 +1,7 @@
 {
   "navigationBarTitleText": "学校认证",
-  "navigationBarBackgroundColor": "#FFFFFF",
-  "backgroundColor": "#F5F6F8",
+  "navigationBarBackgroundColor": "#E6EEFF",
+  "backgroundColor": "#F2F5FA",
   "usingComponents": {
     "privacy-popup": "/components/privacy-popup/privacy-popup"
   }

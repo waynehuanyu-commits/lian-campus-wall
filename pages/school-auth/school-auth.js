@@ -6,7 +6,6 @@ const { formatTime } = require('../../utils/util')
 
 Page({
   data: {
-    suggestions: store.SCHOOL_SUGGESTIONS,
     locked: false,
     schoolName: '',
     schoolCampus: '',
@@ -52,9 +51,6 @@ Page({
     this.setData({ schoolCampus: e.detail.value })
   },
 
-  onSuggestTap(e) {
-    this.setData({ schoolName: e.currentTarget.dataset.name })
-  },
 
   onStudentNoteInput(e) {
     this.setData({ studentNote: e.detail.value })

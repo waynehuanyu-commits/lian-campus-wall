@@ -1,11 +1,12 @@
 {
   "navigationBarTitleText": "帖子详情",
-  "navigationBarBackgroundColor": "#FFFFFF",
+  "navigationBarBackgroundColor": "#E6EEFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#FFFFFF",
+  "backgroundColor": "#F2F5FA",
   "usingComponents": {
     "post-gallery": "/components/post-gallery/post-gallery",
     "privacy-popup": "/components/privacy-popup/privacy-popup",
-    "report-sheet": "/components/report-sheet/report-sheet"
+    "report-sheet": "/components/report-sheet/report-sheet",
+    "campus-qr-card": "/components/campus-qr-card/campus-qr-card"
   }
 }
