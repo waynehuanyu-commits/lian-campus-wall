@@ -55,18 +55,6 @@
 
   <view class="pub-card pub-list">
     <view class="pub-row">
-      <text class="pub-row-title">微信号（选填）</text>
-      <input
-        class="pub-row-input"
-        maxlength="30"
-        type="text"
-        placeholder="例如：campus_helper"
-        placeholder-class="pub-ph"
-        value="{{contactValue}}"
-        bindinput="onContactInput"
-      />
-    </view>
-    <view class="pub-row">
       <view class="pub-row-copy">
         <text class="pub-row-title">匿名发布</text>
         <text class="pub-row-desc">其他人将看不到你的昵称</text>
@@ -74,7 +62,6 @@
       <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
     </view>
   </view>
-  <view class="pub-note">需要对接时再填，不填也能发。</view>
 
   <view class="pub-submit-bar">
     <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布'}}</button>

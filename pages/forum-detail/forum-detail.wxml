@@ -44,9 +44,6 @@
       <view class="engage-item" catchtap="onShareTap">
         <view class="engage-ic engage-ic-share"></view>
       </view>
-      <view wx:if="{{post.hasContact && !post.isOwner}}" class="engage-item engage-cta" bindtap="onContactTap">
-        <text class="engage-cta-text">微信</text>
-      </view>
     </view>
     </view>
   </view>

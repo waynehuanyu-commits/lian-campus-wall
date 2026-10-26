@@ -21,8 +21,6 @@
     "pages/inbox-comments/inbox-comments",
     "pages/inbox-likes/inbox-likes",
     "pages/share-poster/share-poster",
-    "pages/my-messages/my-messages",
-    "pages/dm-chat/dm-chat",
     "pages/user-profile/user-profile",
     "pages/about/about",
     "pages/agreement/agreement"

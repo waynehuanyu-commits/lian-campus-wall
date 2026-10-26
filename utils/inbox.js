@@ -16,10 +16,10 @@ function currentUserId() {
   }
 }
 
+// 私信已下线：红点只算收到的赞和评论，不再计入私信未读
 function totalOf(badges) {
   return (Number(badges.unreadLikes) || 0)
     + (Number(badges.unreadComments) || 0)
-    + (Number(badges.unreadMessages) || 0)
 }
 
 function applyTab(badges) {

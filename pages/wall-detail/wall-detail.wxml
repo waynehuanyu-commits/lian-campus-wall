@@ -67,14 +67,6 @@
         <view class="engage-ic engage-ic-comment"></view>
         <text class="engage-num">{{post.commentCount}}</text>
       </view>
-      <view wx:if="{{post.hasContact && !post.isOwner}}" class="engage-item engage-cta" bindtap="onContactTap">
-        <view class="engage-ic engage-ic-wechat"></view>
-        <text>{{contactRevealed ? '再看' : '微信'}}</text>
-      </view>
-      <view wx:if="{{post.hasContact && contactRevealed && !post.isOwner}}" class="engage-item engage-cta soft" bindtap="openFeedbackSheet">
-        <view class="engage-ic engage-ic-flag"></view>
-        <text>{{feedbackDone ? '已反馈' : '反馈'}}</text>
-      </view>
       <view class="engage-item" catchtap="onShareTap">
         <view class="engage-ic engage-ic-share"></view>
       </view>
