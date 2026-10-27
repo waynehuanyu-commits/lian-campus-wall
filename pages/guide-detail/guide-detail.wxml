@@ -17,8 +17,8 @@
 
     <view wx:if="{{guide.mine && guide.reviewStatus !== 'approved'}}" class="tag gd-review">{{guide.reviewLabel}}</view>
 
-    <view class="detail-title">{{guide.title}}</view>
-    <view wx:if="{{guide.content}}" class="detail-content">{{guide.content}}</view>
+    <view class="detail-title"><text user-select="true">{{guide.title}}</text></view>
+    <view wx:if="{{guide.content}}" class="detail-content"><text user-select="true">{{guide.content}}</text></view>
 
     <post-gallery wx:if="{{guide.images && guide.images.length}}" urls="{{guide.images}}" />
 

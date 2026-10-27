@@ -2,6 +2,7 @@ const crypto = require('crypto')
 const https = require('https')
 const cloud = require('wx-server-sdk')
 const security = require('./lib/security')
+const reportRules = require('./lib/report-rules')
 const wecom = require('./lib/wecom')
 const moderation = require('./lib/moderation')
 const wxSecurity = require('./lib/wx-security')
@@ -201,6 +202,15 @@ function isMissingDoc(err) {
   return /does not exist|不存在|DOCUMENT_NOT_FOUND|-502005/i.test(text)
 }
 
+async function newestWhere(name, where, limit) {
+  try {
+    return await db.collection(name).where(where).orderBy('createdAt', 'desc').limit(limit).get()
+  } catch (err) {
+    // 缺索引等情况退回不排序的查询，至少不让收件箱空掉
+    return db.collection(name).where(where).limit(limit).get().catch(() => ({ data: [] }))
+  }
+}
+
 async function readPost(ref) {
   try {
     const snap = await ref.get()
@@ -367,7 +377,7 @@ const REPORT_REASONS = [
   { id: 'other', label: '其他违规' }
 ]
 
-const REPORT_THRESHOLD = 3
+const REPORT_THRESHOLD = reportRules.REPORT_THRESHOLD
 
 function wallDealStatusLabel(status) {
   const hit = WALL_DEAL_STATUSES.find((item) => item.id === status)
@@ -3833,8 +3843,9 @@ const handlers = {
   async myReceivedComments(_payload, user) {
     const snapshotAt = Date.now()
     const [byPost, byReply] = await Promise.all([
-      db.collection('comments').where({ postAuthorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
-      db.collection('comments').where({ replyToUserId: user.id }).limit(20).get().catch(() => ({ data: [] }))
+      // 按时间倒序取最新的，否则超过条数上限时新评论可能不在列表里，已读位置也就推不过去
+      newestWhere('comments', { postAuthorId: user.id }, 30),
+      newestWhere('comments', { replyToUserId: user.id }, 20)
     ])
     const seen = new Set()
     const rows = []
@@ -3873,8 +3884,7 @@ const handlers = {
     const snapshotAt = Date.now()
     let likeRows = []
     try {
-      const res = await db.collection('likes').where({ postAuthorId: user.id }).limit(40).get()
-      likeRows = res.data || []
+      likeRows = (await newestWhere('likes', { postAuthorId: user.id }, 40)).data
     } catch (err) {
       likeRows = []
     }
@@ -3949,8 +3959,10 @@ const handlers = {
   },
 
   async getInboxBadges(_payload, user) {
-    const lastSeenLikesAt = Number(user.lastSeenLikesAt) || 0
-    const lastSeenCommentsAt = Number(user.lastSeenCommentsAt) || 0
+    // 已读位置直接读库：user 来自本实例 90 秒缓存，刚在别的实例标过已读时这里还是旧值，红点会冒回来
+    const fresh = await readPost(db.collection('users').doc(user.id)).catch(() => null)
+    const lastSeenLikesAt = Number((fresh || user).lastSeenLikesAt) || 0
+    const lastSeenCommentsAt = Number((fresh || user).lastSeenCommentsAt) || 0
     const userId = user.id
 
     async function safeWhere(name, where) {
@@ -3997,22 +4009,26 @@ const handlers = {
   },
 
   async markInboxSeen(payload, user) {
-    const next = { ...user }
     const likes = payload && payload.likes === true
     const comments = payload && payload.comments === true
     if (!likes && !comments) return { ok: false, message: '未指定已读类别' }
+    // 只改已读字段、以库里的值为基准取大，不用缓存里的整份 user 覆盖（会把别处刚写的字段冲掉）
+    const fresh = (await readPost(db.collection('users').doc(user.id)).catch(() => null)) || user
+    const patch = {}
+    const now = Date.now()
     if (likes) {
-      const at = Number(payload.likesAt) || 0
+      const at = Math.min(Number(payload.likesAt) || 0, now)
       if (!at) return { ok: false, message: '缺少已读位置' }
-      next.lastSeenLikesAt = Math.max(Number(user.lastSeenLikesAt) || 0, at)
+      patch.lastSeenLikesAt = Math.max(Number(fresh.lastSeenLikesAt) || 0, at)
     }
     if (comments) {
-      const at = Number(payload.commentsAt) || 0
+      const at = Math.min(Number(payload.commentsAt) || 0, now)
       if (!at) return { ok: false, message: '缺少已读位置' }
-      next.lastSeenCommentsAt = Math.max(Number(user.lastSeenCommentsAt) || 0, at)
+      patch.lastSeenCommentsAt = Math.max(Number(fresh.lastSeenCommentsAt) || 0, at)
     }
-    await saveUser(next)
-    return { ok: true, user: publicUser(next) }
+    await db.collection('users').doc(user.id).update({ data: patch })
+    if (user.openid) userByOpenidCache.delete(user.openid)
+    return { ok: true, user: publicUser({ ...fresh, ...patch }) }
   },
 
   async getShareCode(payload) {
@@ -4633,11 +4649,18 @@ const handlers = {
     if (!['forum', 'wall', 'comment', 'user'].includes(type) || !id) {
       return { ok: false, message: '举报对象无效' }
     }
+    // 资格按库里最新账号判断：后台刚限制举报或封号时，实例缓存里的 user 可能还是旧的
+    const freshUser = user && user.id !== 'guest_readonly'
+      ? ((await readPost(db.collection('users').doc(user.id)).catch(() => null)) || user)
+      : user
+    const eligible = reportRules.reportEligibility(user && user.officialLogin ? user : freshUser)
+    if (!eligible.ok) return { ok: false, code: eligible.code, message: eligible.message }
     const reasonMeta = REPORT_REASONS.find((item) => item.id === payload.reason)
       || REPORT_REASONS.find((item) => item.id === 'other')
     if (type === 'user' && user.id === id) return { ok: false, message: '不能举报自己' }
 
     let targetAuthorId = ''
+    let target = null
     // 评论举报额外记下所属帖子，后台据此跳转原帖
     let parentType = ''
     let parentId = ''
@@ -4650,6 +4673,7 @@ const handlers = {
       }
       if (!comment) return { ok: false, message: '评论不存在' }
       if (comment.authorId === user.id) return { ok: false, message: '不能举报自己的评论' }
+      target = comment
       targetAuthorId = comment.authorId || ''
       parentType = comment.targetType || ''
       parentId = comment.targetId || ''
@@ -4663,8 +4687,11 @@ const handlers = {
       }
       if (!post) return { ok: false, message: '内容不存在' }
       if (post.authorId === user.id) return { ok: false, message: '不能举报自己的帖子' }
+      target = post
       targetAuthorId = post.authorId || ''
     } else {
+      target = await readPost(db.collection('users').doc(id)).catch(() => null)
+      if (!target) return { ok: false, message: '用户不存在' }
       targetAuthorId = id
     }
 
@@ -4673,7 +4700,8 @@ const handlers = {
       targetType: type,
       targetId: id
     }).limit(20).get()
-    if ((exist.data || []).some((item) => item.status !== 'dismissed')) {
+    // 同一账号对同一对象只能举报一次（含已判无效的），不能靠反复举报刷计数
+    if ((exist.data || []).length) {
       return { ok: false, message: '你已经举报过了' }
     }
 
@@ -4689,6 +4717,12 @@ const handlers = {
       note: String((payload && payload.note) || '').trim().slice(0, 200),
       reporterId: user.id,
       reporterName: user.nickname || '黎安话事',
+      reporterSchool: user.schoolName || '',
+      reporterEligible: true,
+      // 记一份标题快照，原内容被删后后台仍能搜索和辨认
+      targetTitle: type === 'user'
+        ? String(target.nickname || '').slice(0, 40)
+        : String(target.title || target.content || '').replace(/\s+/g, ' ').slice(0, 40),
       status: 'pending',
       createdAt: Date.now(),
       resolvedAt: 0,
@@ -4699,16 +4733,15 @@ const handlers = {
 
     const all = await db.collection('reports').where({
       targetType: type,
-      targetId: id
+      targetId: id,
+      status: 'pending'
     }).limit(100).get()
-    const reporters = new Set(
-      (all.data || [])
-        .filter((item) => item.status !== 'dismissed')
-        .map((item) => item.reporterId)
-    )
-    const reportCount = reporters.size
+    const reportCount = reportRules.activeReporterIds(all.data || [], target).size
     let escalated = false
-    if (reportCount >= REPORT_THRESHOLD) {
+    const hideable = type === 'user'
+      ? target.reportStatus !== 'manual_review'
+      : reportRules.shouldAutoHide(reportCount, target, moderation.isPublicStatus)
+    if (reportCount >= REPORT_THRESHOLD && hideable) {
       escalated = true
       const note = `用户举报满 ${reportCount} 次，自动进入人工审核`
       if (type === 'forum' || type === 'wall') {
@@ -4720,6 +4753,7 @@ const handlers = {
             reviewOutcome: 'manual_review',
             reviewNote: note,
             reviewPriority: 'high',
+            reportHidden: true,
             reportEscalatedAt: Date.now()
           }
         })
@@ -4733,22 +4767,20 @@ const handlers = {
             reviewOutcome: 'manual_review',
             reviewNote: note,
             reviewPriority: 'high',
+            reportHidden: true,
             reportEscalatedAt: Date.now()
           }
         })
       } else if (type === 'user') {
         try {
-          const target = (await db.collection('users').doc(id).get()).data
-          if (target) {
-            await db.collection('users').doc(id).update({
-              data: {
-                reportCount,
-                reportStatus: 'manual_review',
-                reportEscalatedAt: Date.now(),
-                riskScore: (target.riskScore || 0) + 8
-              }
-            })
-          }
+          await db.collection('users').doc(id).update({
+            data: {
+              reportCount,
+              reportStatus: 'manual_review',
+              reportEscalatedAt: Date.now(),
+              riskScore: (target.riskScore || 0) + 8
+            }
+          })
         } catch (err) { /* ignore */ }
       }
       await pushSecurityLog({

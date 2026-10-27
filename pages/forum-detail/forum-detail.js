@@ -496,6 +496,7 @@ Page({
       wx.showToast({ title: '这篇帖子还不能举报', icon: 'none' })
       return
     }
+    if (!auth.ensureCanReport()) return
     const sheet = this.selectComponent('#report-sheet')
     if (!sheet) {
       wx.showToast({ title: '举报菜单没打开', icon: 'none' })
@@ -511,6 +512,7 @@ Page({
   onReportComment(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    if (!auth.ensureCanReport()) return
     const sheet = this.selectComponent('#report-sheet')
     if (!sheet) {
       wx.showToast({ title: '举报菜单没打开', icon: 'none' })
@@ -521,7 +523,7 @@ Page({
       targetId: id,
       onSubmit: async (payload) => {
         const result = await repo.submitReport(payload)
-        // 满 3 人举报后评论已转人工审核，刷新让它立即从列表消失
+        // 满 6 人举报后评论已转人工审核，刷新让它立即从列表消失
         if (result && result.ok && result.escalated) this.refresh({ soft: true })
         return result
       }

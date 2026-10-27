@@ -7,6 +7,8 @@ const service = require('./lib/service')
 const staff = require('./lib/staff')
 const cover = require('./lib/cover')
 const guides = require('./lib/guides')
+const reportCases = require('./lib/report-cases')
+const contentAdmin = require('./lib/content-admin')
 
 loadEnv()
 const localEnv = path.join(__dirname, '.env')
@@ -63,6 +65,11 @@ function requireAdmin(req, res) {
     return null
   }
   return session
+}
+
+// 处置留痕用的操作人：后台成员名 / 账号
+function operatorOf(session) {
+  return (session && (session.name || session.account)) || 'admin'
 }
 
 function requireRoot(req, res) {
@@ -231,9 +238,10 @@ const routes = {
   },
 
   'POST /api/reviews': async (req, res) => {
-    if (!requireAdmin(req, res)) return
+    const session = requireAdmin(req, res)
+    if (!session) return
     const body = await readBody(req)
-    json(res, 200, await service.reviewContent(body.type, body.id, body))
+    json(res, 200, await service.reviewContent(body.type, body.id, body, operatorOf(session)))
   },
 
   'POST /api/local/reset': async (req, res) => {
@@ -373,13 +381,62 @@ const routes = {
   'GET /api/reports': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const url = new URL(req.url, 'http://127.0.0.1')
-    json(res, 200, { ok: true, list: await service.listReports(url.searchParams.get('status') || 'pending') })
+    json(res, 200, await service.listReports({
+      status: url.searchParams.get('status') || 'pending',
+      keyword: url.searchParams.get('q') || '',
+      page: url.searchParams.get('page') || 0
+    }))
   },
 
   'POST /api/reports/resolve': async (req, res) => {
-    if (!requireAdmin(req, res)) return
+    const session = requireAdmin(req, res)
+    if (!session) return
     const body = await readBody(req)
-    json(res, 200, await service.resolveReport(body.id, body))
+    json(res, 200, await service.resolveReport(body.id, body, operatorOf(session)))
+  },
+
+  'GET /api/reporters': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const url = new URL(req.url, 'http://127.0.0.1')
+    json(res, 200, await reportCases.getReporter(url.searchParams.get('id'), { page: url.searchParams.get('page') || 0 }))
+  },
+
+  'POST /api/reporters/restrict': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await reportCases.restrictReporter(await readBody(req), operatorOf(session)))
+  },
+
+  'GET /api/content': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const url = new URL(req.url, 'http://127.0.0.1')
+    json(res, 200, await contentAdmin.listContent({
+      type: url.searchParams.get('type') || 'forum',
+      status: url.searchParams.get('status') || 'public',
+      keyword: url.searchParams.get('q') || '',
+      page: url.searchParams.get('page') || 0
+    }))
+  },
+
+  'GET /api/content/detail': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const url = new URL(req.url, 'http://127.0.0.1')
+    json(res, 200, await contentAdmin.getContentDetail(url.searchParams.get('type'), url.searchParams.get('id')))
+  },
+
+  'POST /api/content/visibility': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await contentAdmin.setContentVisibility(await readBody(req), operatorOf(session)))
+  },
+
+  'GET /api/moderation-logs': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const url = new URL(req.url, 'http://127.0.0.1')
+    json(res, 200, await contentAdmin.listActionLogs({
+      keyword: url.searchParams.get('q') || '',
+      page: url.searchParams.get('page') || 0
+    }))
   },
 
   'POST /api/school/set': async (req, res) => {

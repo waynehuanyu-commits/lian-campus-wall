@@ -97,13 +97,14 @@ async function refresh(force = false) {
   return inflight
 }
 
+// 已读推到「列表拉取时刻」：列表里看不到的（帖子已下架、评论待审、超出条数）也算看过，否则红点永远消不掉
 function seenCursor(rows, snapshotAt) {
   const times = (Array.isArray(rows) ? rows : [])
     .map((item) => Number(item && item.createdAt) || 0)
     .filter((item) => item > 0)
-  if (times.length) return Math.max.apply(null, times)
   const at = Number(snapshotAt) || 0
-  return at > 0 ? at : 0
+  const newest = times.length ? Math.max.apply(null, times) : 0
+  return Math.max(newest, at > 0 ? at : 0)
 }
 
 function current() {

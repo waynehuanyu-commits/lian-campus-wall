@@ -1244,3 +1244,93 @@ aside nav button {
 .hot-stats {
   font-variant-numeric: tabular-nums;
 }
+
+/* 举报工单 / 内容管理 / 处置记录 */
+.mod-search { margin-top: 12px; }
+.mod-search input { flex: 1; min-width: 0; }
+
+.mod-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 6px 0 18px;
+}
+
+.mod-pager button[disabled] { opacity: 0.4; cursor: default; }
+
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--brand-deep);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-btn:hover { color: var(--brand); }
+.link-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+
+.mod-text {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.mod-text.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mod-case-actions {
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-wash);
+}
+
+.mod-reports summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.mod-reporter {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--line);
+}
+
+.mod-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.mod-stats div {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-wash);
+  text-align: center;
+}
+
+.mod-stats strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.mod-stats span { font-size: 12px; color: var(--muted); }
+
+.mod-focus {
+  background: #fffbeb;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.mod-drawer-panel { width: min(620px, 100%); display: grid; gap: 10px; align-content: start; }
