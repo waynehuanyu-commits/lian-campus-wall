@@ -888,6 +888,7 @@ async function render() {
             <div class="hot-copy">
               <strong>${esc(item.title)}</strong>
               <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+              <span class="meta hot-stats">${weeklyStats(item)}</span>
             </div>
             <button class="quiet" data-weekly-add="${esc(item.id)}" data-type="${esc(item.contentType || 'wall')}" type="button">加入热榜</button>
           </div>`)}
@@ -1446,6 +1447,12 @@ async function refreshReviews() {
 
 function stat(num, label) {
   return `<div class="card stat-card"><div class="stat-num">${num || 0}</div><div class="stat-label">${label}</div></div>`
+}
+
+// 热榜候选的真实统计；null 表示读取到的字段异常，显示「—」而不是 0
+function weeklyStats(item) {
+  const show = (value) => (value == null ? '<span title="读取失败">—</span>' : value)
+  return `浏览 ${show(item.viewCount)} · 点赞 ${show(item.likeCount)} · 评论 ${show(item.commentCount)}`
 }
 
 function listOrEmpty(list, renderItem) {

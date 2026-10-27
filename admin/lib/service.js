@@ -1246,10 +1246,18 @@ function weeklyCandidateFromPost(post, contentType) {
     title: contentType === 'forum' ? post.title : wallHeadline(post),
     summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
     tag: contentType === 'forum' ? (post.category || '') : (post.tag || ''),
-    likeCount: post.likeCount || 0,
-    commentCount: post.commentCount || 0,
+    // 计数直接取原帖字段：缺字段说明从未累加过，按真实 0 处理；字段损坏返回 null，页面显示「—」不冒充 0
+    viewCount: postStat(post.viewCount),
+    likeCount: postStat(post.likeCount),
+    commentCount: postStat(post.commentCount),
     createdAt: post.createdAt
   }
+}
+
+function postStat(value) {
+  if (value == null) return 0
+  const num = Number(value)
+  return Number.isFinite(num) && num >= 0 ? Math.floor(num) : null
 }
 
 function matchesWeeklyKeyword(post, contentType, q) {

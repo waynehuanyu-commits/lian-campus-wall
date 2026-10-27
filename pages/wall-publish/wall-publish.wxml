@@ -79,7 +79,7 @@
     <view class="pub-note">线下交易请注意安全，平台不介入纠纷。</view>
 
     <view class="pub-submit-bar">
-      <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布到互助广场'}}</button>
+      <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting || published}}" loading="{{submitting}}">{{published ? '已发布' : (submitting ? '发布中' : '发布到互助广场')}}</button>
     </view>
   </block>
   <privacy-popup />

@@ -154,7 +154,17 @@ Page({
     }
   },
 
+  // 只认最后一次刷新、且发起时的会话仍有效；切换/退出账号后，旧刷新晚到也不再改昵称、头像和学校
+  isCurrentRefresh(token, userId) {
+    if (token.gen !== this._refreshGen || token.session !== repo.currentSession()) return false
+    const app = getApp()
+    const current = app && app.globalData && app.globalData.user
+    return !userId || !current || current.id === userId
+  },
+
   async refresh() {
+    this._refreshGen = (this._refreshGen || 0) + 1
+    const token = { gen: this._refreshGen, session: repo.currentSession() }
     let user = {}
     let gate = { ok: false, message: '登录后可发帖、评论和收消息' }
     try {
@@ -162,15 +172,16 @@ Page({
       gate = await repo.getSpeakGate({ force: true })
     } catch (err) {
       console.error('[mine.refresh.user]', err)
-      this.paintGuestFirst()
+      if (this.isCurrentRefresh(token)) this.paintGuestFirst()
       return
     }
+    if (!this.isCurrentRefresh(token, user.id)) return
     this.paint(user, gate)
     try {
       const savedAvatar = defaultProfile.resolveAvatar(user.avatar, user.id)
       const preview = this._avatarPreview && this._avatarPreview.id === savedAvatar ? this._avatarPreview.src : ''
       const avatarSrc = await this.avatarForView(user.id, savedAvatar, preview)
-      if (avatarSrc) this.setData({ avatarSrc })
+      if (avatarSrc && this.isCurrentRefresh(token, user.id)) this.setData({ avatarSrc })
     } catch (err) {
       console.error('[mine.refresh.avatar]', err)
     }
@@ -365,6 +376,11 @@ Page({
     inbox.reset((result.user && result.user.id) || '')
     await this.refresh()
     inbox.refresh(true).catch(() => {})
+    const now = getApp().globalData.user
+    if (!now || !now.officialLogin) {
+      wx.showModal({ title: '切换没有生效', content: '请重新进入「我的」页再试一次。', showCancel: false, confirmColor: '#2F7DFF' })
+      return
+    }
     wx.showModal({ title: '已登录', content: '现在发帖和评论会显示为黎安校园墙。', showCancel: false, confirmColor: '#2F7DFF' })
   },
 

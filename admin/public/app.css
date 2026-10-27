@@ -1240,3 +1240,7 @@ aside nav button {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+
+.hot-stats {
+  font-variant-numeric: tabular-nums;
+}

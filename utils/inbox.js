@@ -75,9 +75,15 @@ async function refresh(force = false) {
     await (getApp().globalData.ready || Promise.resolve())
     const uid = currentUserId()
     if (cache.userId && uid && cache.userId !== uid) reset(uid)
+    const session = repo.currentSession()
     const result = await repo.getInboxBadges()
     const badges = pickBadges(result)
     inflight = null
+    // 请求期间切换或退出了账号：这是上一个账号的未读数，丢掉
+    if (session !== repo.currentSession() || uid !== currentUserId() || (result && result.staleSession)) {
+      applyTab(cache)
+      return cache
+    }
     if (!badges) {
       applyTab(cache)
       return cache

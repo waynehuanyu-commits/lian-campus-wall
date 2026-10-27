@@ -1024,7 +1024,7 @@ function getSpeakGate(user = getUser()) {
       ok: false,
       code: 'NEED_AUTH',
       title: '需要先认证学校',
-      message: '已登录。发布、评论和查看联系方式前，请再填写学校信息完成基础身份认证。'
+      message: '发帖和评论前，请先填写所在学校完成基础认证，提交后立即生效，无需等待审核。'
     }
   }
   return { ok: true, code: 'OK', title: '', message: '' }
@@ -1717,6 +1717,12 @@ function listContactViews() {
   return getContactViews()
 }
 
+// 与云函数一致：同一次提交（submitId 相同）只落一条
+function localPostId(prefix, submitId) {
+  const text = String(submitId || '').trim()
+  return /^[A-Za-z0-9_-]{8,64}$/.test(text) ? `${prefix}${text}` : ''
+}
+
 function createForumPost(payload) {
   const gate = getSpeakGate()
   if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
@@ -1729,7 +1735,12 @@ function createForumPost(payload) {
   const images = payload.images || []
   if (!title && !content && !images.length) return { ok: false, message: '请填写标题或正文' }
   const fingerprint = security.contentFingerprint(tag, title, content)
-  if (!user.postWhitelist && security.hasDuplicateContent(getForumPosts(), user.id, fingerprint)) {
+  const forumId = localPostId('f_', payload.submitId)
+  const replayed = forumId && getForumPosts().find((item) => item.id === forumId && item.authorId === user.id)
+  if (replayed) return { ok: true, post: replayed, replayed: true }
+  if (!user.postWhitelist && security.hasDuplicateContent(getForumPosts(), user.id, fingerprint, (item) => (
+    security.contentFingerprint(item.tag || item.category, item.title, item.content)
+  ))) {
     return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复发布相同内容' }
   }
   if (!user.postWhitelist) {
@@ -1744,7 +1755,7 @@ function createForumPost(payload) {
     channel: tag
   })
   const post = {
-    id: uid('f_'),
+    id: forumId || uid('f_'),
     tag,
     category: tag,
     title,
@@ -1799,6 +1810,9 @@ function createWallPost(payload) {
     return { ok: false, message: contact.message }
   }
   const fingerprint = security.contentFingerprint(payload.tag, title, content, extra, payload.routeFrom, payload.routeTo)
+  const wallId = localPostId('w_', payload.submitId)
+  const replayedWall = wallId && getWallPosts().find((item) => item.id === wallId && item.authorId === user.id)
+  if (replayedWall) return { ok: true, post: replayedWall, replayed: true }
   if (!user.postWhitelist && security.hasDuplicateContent(getWallPosts(), user.id, fingerprint, (item) => (
     security.contentFingerprint(item.tag, item.title, item.content, item.extra, item.routeFrom, item.routeTo)
   ))) {
@@ -1820,7 +1834,7 @@ function createWallPost(payload) {
     channel: payload.tag
   })
   const post = {
-    id: uid('w_'),
+    id: wallId || uid('w_'),
     tag: payload.tag,
     title,
     price: (payload.price || '').trim(),

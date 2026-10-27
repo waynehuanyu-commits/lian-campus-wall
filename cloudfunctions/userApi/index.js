@@ -143,6 +143,59 @@ function samePostId(userId, fingerprint) {
   return hash
 }
 
+/** 发帖各阶段耗时写进云函数日志，用来判断「发布慢」到底慢在哪一步（先拿证据再优化） */
+function logPublishTiming(action, timing, imageCount) {
+  const now = Date.now()
+  console.log(`[publish-timing] ${action}`, JSON.stringify({
+    images: timing.images - timing.start,
+    review: timing.review - timing.images,
+    save: now - timing.review,
+    total: now - timing.start,
+    imageCount
+  }))
+}
+
+function cleanSubmitId(value) {
+  const text = String(value || '').trim()
+  return /^[A-Za-z0-9_-]{8,64}$/.test(text) ? text : ''
+}
+
+/** 新版前端每次发布带稳定的 submitId（超时重试沿用），按它生成帖子 ID；老版本前端没有时退回按分钟分桶 */
+function postIdFor(prefix, userId, fingerprint, submitId) {
+  if (!submitId) return `${prefix}${samePostId(userId, fingerprint)}`
+  const hash = crypto.createHash('sha1').update(`${userId}|submit|${submitId}`).digest('hex').slice(0, 20)
+  return `${prefix}${hash}`
+}
+
+/** 同一次提交已经落库（例如上次请求超时但服务端已保存）：直接返回那条，不再扣发帖频率、不再判重 */
+async function replaySubmittedPost(collection, postId, user) {
+  const existing = await readPost(db.collection(collection).doc(postId))
+  if (!existing || !existing.id || existing.authorId !== user.id) return null
+  const result = publishReviewResult({
+    outcome: existing.reviewOutcome,
+    reviewStatus: existing.reviewStatus,
+    message: existing.reviewNote || ''
+  }, existing)
+  return { ...result, replayed: true, speakGate: speakGate(user) }
+}
+
+function forumFingerprintOf(item) {
+  return security.contentFingerprint(item.tag || item.category, item.title, item.content)
+}
+
+function wallFingerprintOf(item) {
+  return security.contentFingerprint(item.tag, item.title, item.content, item.extra, item.routeFrom, item.routeTo)
+}
+
+function recentPostsByAuthor(collection, userId) {
+  return db.collection(collection)
+    .where({ authorId: userId })
+    .orderBy('createdAt', 'desc')
+    .limit(30)
+    .get()
+    .catch(() => ({ data: [] }))
+}
+
 function isMissingDoc(err) {
   const text = String((err && (err.errMsg || err.message)) || err || '')
   return /does not exist|不存在|DOCUMENT_NOT_FOUND|-502005/i.test(text)
@@ -414,7 +467,7 @@ function speakGate(user) {
       ok: false,
       code: 'NEED_AUTH',
       title: '需要先认证学校',
-      message: '已登录。发布、评论和查看联系方式前，请再填写学校信息完成基础身份认证。'
+      message: '发帖和评论前，请先填写所在学校完成基础认证，提交后立即生效，无需等待审核。'
     }
   }
   return { ok: true, code: 'OK', title: '', message: '' }
@@ -3043,15 +3096,20 @@ const handlers = {
     const contact = validateWallContact(payload.contactType, payload.contactValue, tag)
     if (!contact.ok) return contact
     if (!title && !content && !(payload.images || []).length) return { ok: false, message: '请填写标题或正文' }
-    const [forumRes, limit] = await Promise.all([
-      db.collection('forum_posts').where({ authorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
-      consumeRateLimit(user.id, 'post', user)
-    ])
-    const forum = forumRes.data || []
     const fingerprint = security.contentFingerprint(tag, title, content)
-    if (!user.postWhitelist && !user.appAdmin && security.hasDuplicateContent(forum, user.id, fingerprint)) {
+    const submitId = cleanSubmitId(payload.submitId)
+    const postId = postIdFor('f_', user.id, fingerprint, submitId)
+    if (submitId) {
+      const replay = await replaySubmittedPost('forum_posts', postId, user)
+      if (replay) return replay
+    }
+    const forumRes = await recentPostsByAuthor('forum_posts', user.id)
+    // 新老记录统一按「话题+标题+正文」比对；只拦 1 小时内的相同内容，过后可以再发
+    if (!user.postWhitelist && !user.appAdmin && security.hasDuplicateContent(forumRes.data || [], user.id, fingerprint, forumFingerprintOf)) {
       return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复发布相同内容' }
     }
+    const timing = { start: Date.now() }
+    const limit = await consumeRateLimit(user.id, 'post', user)
     if (!limit.ok) return limit
     let images = []
     try {
@@ -3059,6 +3117,7 @@ const handlers = {
     } catch (err) {
       return { ok: false, message: err.message || '图片上传失败' }
     }
+    timing.images = Date.now()
     const review = await runContentReview({
       title,
       content,
@@ -3067,7 +3126,6 @@ const handlers = {
       channel: tag,
       images
     }, user)
-    const postId = `f_${samePostId(user.id, fingerprint)}`
     const post = {
       id: postId,
       tag,
@@ -3089,7 +3147,9 @@ const handlers = {
       commentCount: 0,
       viewCount: 0
     }
+    timing.review = Date.now()
     const savedForum = await savePostOnce('forum_posts', post)
+    logPublishTiming('createForumPost', timing, images.length)
     if (savedForum.duplicated) {
       return { ok: true, post: savedForum.post, message: '发布成功', speakGate: speakGate(user) }
     }
@@ -3110,17 +3170,19 @@ const handlers = {
     const content = String(payload.content || '').trim()
     const extra = String(payload.extra || '').trim()
     if (!title) return { ok: false, message: '请填写标题' }
-    const [wallRes, limit] = await Promise.all([
-      db.collection('wall_posts').where({ authorId: user.id }).limit(30).get().catch(() => ({ data: [] })),
-      consumeRateLimit(user.id, 'post', user)
-    ])
-    const wall = wallRes.data || []
     const fingerprint = security.contentFingerprint(payload.tag, title, content, extra, payload.routeFrom, payload.routeTo)
-    if (!user.postWhitelist && !user.appAdmin && security.hasDuplicateContent(wall, user.id, fingerprint, (item) => (
-      security.contentFingerprint(item.tag, item.title, item.content, item.extra, item.routeFrom, item.routeTo)
-    ))) {
+    const submitId = cleanSubmitId(payload.submitId)
+    const postId = postIdFor('w_', user.id, fingerprint, submitId)
+    if (submitId) {
+      const replay = await replaySubmittedPost('wall_posts', postId, user)
+      if (replay) return replay
+    }
+    const wallRes = await recentPostsByAuthor('wall_posts', user.id)
+    if (!user.postWhitelist && !user.appAdmin && security.hasDuplicateContent(wallRes.data || [], user.id, fingerprint, wallFingerprintOf)) {
       return { ok: false, code: 'DUPLICATE', message: '请勿短时间重复发布相同内容' }
     }
+    const timing = { start: Date.now() }
+    const limit = await consumeRateLimit(user.id, 'post', user)
     if (!limit.ok) return limit
     let images = []
     try {
@@ -3128,6 +3190,7 @@ const handlers = {
     } catch (err) {
       return { ok: false, message: err.message || '图片上传失败' }
     }
+    timing.images = Date.now()
     const review = await runContentReview({
       title,
       content,
@@ -3141,7 +3204,6 @@ const handlers = {
       contactValue: contact.contactValue,
       images
     }, user)
-    const postId = `w_${samePostId(user.id, fingerprint)}`
     const post = {
       id: postId,
       tag: payload.tag,
@@ -3168,7 +3230,9 @@ const handlers = {
       commentCount: 0,
       viewCount: 0
     }
+    timing.review = Date.now()
     const savedWall = await savePostOnce('wall_posts', post)
+    logPublishTiming('createWallPost', timing, images.length)
     if (savedWall.duplicated) {
       return { ok: true, post: savedWall.post, message: '发布成功', speakGate: speakGate(user) }
     }
@@ -4845,6 +4909,13 @@ exports.main = async (event) => {
     if (OPENID) {
       const unionid = wxContext.UNIONID || ''
       user = await getUserByOpenid(OPENID)
+      // 客户端声明的当前身份和本实例缓存对不上（刚在另一个实例切换过官方身份）：丢缓存重读库，
+      // 否则最多 90 秒内会按旧身份发帖/评论
+      const acting = event && event.acting
+      if (user && (acting === 'official' || acting === 'self') && !!user.actingOfficial !== (acting === 'official')) {
+        userByOpenidCache.delete(OPENID)
+        user = await getUserByOpenid(OPENID)
+      }
       if (!user && unionid) user = await getUserByField('unionid', unionid)
       if (!user) {
         user = await saveUser(createBlankUser(OPENID, unionid ? { unionid } : {}))

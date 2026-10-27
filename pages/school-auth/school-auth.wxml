@@ -1,7 +1,7 @@
 <view class="page padded auth-page">
   <view wx:if="{{!locked}}" class="panel notice">
     <view class="section-title">学校认证</view>
-    <view class="notice-text">发言、评论和查看联系方式前需认证学校。请填写真实学校全称。提交后不可修改。</view>
+    <view class="notice-text">发帖和评论前需填写所在学校，提交后立即生效，无需等待审核。请填写真实学校全称，提交后不可修改。</view>
   </view>
 
   <block wx:if="{{locked}}">
