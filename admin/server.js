@@ -512,6 +512,12 @@ const routes = {
     json(res, 200, await guides.pickPost(await readBody(req), session.name || session.account || ''))
   },
 
+  'POST /api/guides/reorder': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.reorder(await readBody(req), session.name || session.account || ''))
+  },
+
   'POST /api/guides/categories': async (req, res) => {
     const session = requireAdmin(req, res)
     if (!session) return

@@ -3715,7 +3715,7 @@ function listGuides(payload = {}) {
   const rows = getGuides()
     .filter((row) => row.reviewStatus === 'approved' && (!category || row.category === category))
     .filter((row) => guideKind(row) !== 'pick' || pickSource(row))
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+    .sort((a, b) => (b.sortAt || b.publishedAt || 0) - (a.sortAt || a.publishedAt || 0))
   const slice = rows.slice(page * GUIDE_PAGE_SIZE, (page + 1) * GUIDE_PAGE_SIZE)
   return {
     ok: true,

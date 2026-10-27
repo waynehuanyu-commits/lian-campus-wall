@@ -4197,7 +4197,8 @@ const handlers = {
     try {
       const res = await db.collection('guides')
         .where(where)
-        .orderBy('publishedAt', 'desc')
+        // 运营在后台可调顺序：按 sortAt 倒序（上线时取当时时间，调序时改写；老数据由后台打开列表时补齐）
+        .orderBy('sortAt', 'desc')
         .skip(page * GUIDE_PAGE_SIZE)
         .limit(GUIDE_PAGE_SIZE)
         .get()
