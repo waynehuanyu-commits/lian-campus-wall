@@ -3,6 +3,7 @@ const repo = require('../../utils/repo')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
 const media = require('../../utils/media')
+const publishGuard = require('../../utils/publish-guard')
 
 Page({
   data: {
@@ -21,7 +22,8 @@ Page({
     blockTitle: '',
     blockDesc: '',
     blockAction: '',
-    submitting: false
+    submitting: false,
+    published: false
   },
 
   async onShow() {
@@ -123,7 +125,7 @@ Page({
   },
 
   async onSubmit() {
-    if (this._submitLock || this.data.submitting || !auth.ensureCanSpeak()) return
+    if (this._submitLock || this.data.submitting || this.data.published || !auth.ensureCanSpeak()) return
     const title = this.data.title.trim()
     const content = this.data.content.trim()
     if (!title && !content && !(this.data.images || []).length) {
@@ -151,9 +153,7 @@ Page({
     }
     this._submitLock = true
     this.setData({ submitting: true })
-    let result
-    try {
-      result = await repo.createForumPost({
+    const draft = {
       tag,
       category: tag,
       title,
@@ -162,10 +162,16 @@ Page({
       anonymous: this.data.anonymous,
       contactType: (contact && contact.contactType) || '',
       contactValue: (contact && contact.contactValue) || ''
-    })
-    } finally {
+    }
+    const submitId = publishGuard.submitIdFor(this, draft)
+    const result = await publishGuard.runPublish(() => repo.createForumPost({ ...draft, submitId }))
+    if (!result.ok) {
+      // 失败：解锁、保留草稿；内容不改直接重试会沿用同一个 submitId
       this._submitLock = false
       this.setData({ submitting: false })
+    } else {
+      // 成功：保持锁定直到离开页面，避免返回前再点一次
+      this.setData({ submitting: false, published: true })
     }
     if (auth.showActionError(result)) {
       track.publishFail({

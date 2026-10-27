@@ -3,6 +3,7 @@ const repo = require('../../utils/repo')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
 const media = require('../../utils/media')
+const publishGuard = require('../../utils/publish-guard')
 
 const BOARD_META = {
   '二手闲置流转': {
@@ -63,6 +64,7 @@ Page({
     contactValue: '',
     anonymous: false,
     submitting: false,
+    published: false,
     blocked: false,
     blockTitle: '',
     blockDesc: '',
@@ -187,7 +189,7 @@ Page({
   },
 
   async onSubmit() {
-    if (this._submitLock || this.data.submitting || !auth.ensureCanSpeak()) return
+    if (this._submitLock || this.data.submitting || this.data.published || !auth.ensureCanSpeak()) return
     const { tag, isRide, title, extraField, extra, routeFrom, routeTo, departTime, content, images, contactValue, anonymous } = this.data
     const text = (content || '').trim()
     const titleText = (title || '').trim()
@@ -205,9 +207,7 @@ Page({
 
     this._submitLock = true
     this.setData({ submitting: true })
-    let result
-    try {
-      result = await repo.createWallPost({
+    const draft = {
       tag,
       title: titleText,
       price: tag === '二手闲置流转' ? extraField : '',
@@ -220,10 +220,14 @@ Page({
       contactType: contact.contactType,
       contactValue: contact.contactValue,
       anonymous
-    })
-    } finally {
+    }
+    const submitId = publishGuard.submitIdFor(this, draft)
+    const result = await publishGuard.runPublish(() => repo.createWallPost({ ...draft, submitId }))
+    if (!result.ok) {
       this._submitLock = false
       this.setData({ submitting: false })
+    } else {
+      this.setData({ submitting: false, published: true })
     }
     if (auth.showActionError(result)) {
       track.publishFail({
@@ -250,7 +254,7 @@ Page({
       return
     }
     const flushed = result.distribution && result.distribution.flushed
-    const progress = result.distribution && (result.distribution.progress || result.distribution)
+    const progress = (result.distribution && (result.distribution.progress || result.distribution)) || {}
     wx.showToast({
       title: flushed ? '已发布，满10条将自动群发' : `已发布，汇总 ${progress.count || 0}/${progress.size || 10}`,
       icon: 'none'

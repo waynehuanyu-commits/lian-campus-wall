@@ -4,7 +4,7 @@
       <image class="qr-avatar" src="{{avatar}}" mode="aspectFill" />
       <text class="qr-name">黎安校园墙</text>
     </view>
-    <view class="qr-title">扫码添加墙墙好友</view>
+    <view class="qr-title">扫码添加墙墙微信</view>
     <view class="qr-desc">获取黎安园区新动态</view>
   </view>
   <image class="qr-code" src="{{src}}" mode="aspectFit" show-menu-by-longpress bindtap="onPreview" />

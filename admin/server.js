@@ -440,6 +440,11 @@ const routes = {
     json(res, 200, await service.sendDigestWecom(body.id))
   },
 
+  'POST /api/digest/mock-full': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await service.mockDigestFullAndPush())
+  },
+
   'GET /api/wecom/status': async (req, res) => {
     if (!requireAdmin(req, res)) return
     json(res, 200, { ok: true, wecom: service.wecomStatus() })
@@ -516,6 +521,12 @@ const routes = {
     const session = requireAdmin(req, res)
     if (!session) return
     json(res, 200, await guides.pickPost(await readBody(req), session.name || session.account || ''))
+  },
+
+  'POST /api/guides/reorder': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    json(res, 200, await guides.reorder(await readBody(req), session.name || session.account || ''))
   },
 
   'POST /api/guides/categories': async (req, res) => {

@@ -951,6 +951,37 @@ async function resolveWecomChatIds(token) {
   return { chatIds, sender, targets }
 }
 
+/** 联调：清空队列，写入满额 mock 帖，再走与「攒满 10 条」相同的 flush + 企微群发 */
+async function mockDigestFullAndPush() {
+  await db.ensureCollection('digest_queue')
+  const queue = await db.allDocs('digest_queue')
+  await Promise.all(queue
+    .filter((item) => item.id || item._id)
+    .map((item) => db.removeDoc('digest_queue', item.id || item._id).catch(() => {})))
+  const now = Date.now()
+  for (let i = 0; i < DIGEST_SIZE; i += 1) {
+    const id = uid('dq_')
+    await db.setDoc('digest_queue', id, {
+      id,
+      contentType: 'wall',
+      contentId: `mock_wall_${now}_${i}`,
+      title: `【Mock ${i + 1}/${DIGEST_SIZE}】自动推送联调`,
+      summary: 'mock 满 10 条后应自动生成汇总并创建企微群发',
+      channel: '互助广场 · Mock',
+      pagepath: `pages/wall-detail/wall-detail?id=mock_wall_${now}_${i}`,
+      queuedAt: now - (DIGEST_SIZE - i) * 1000,
+      mock: true
+    })
+  }
+  bustReadCache()
+  const flushed = await flushDigest(false)
+  return {
+    ok: !!(flushed && flushed.ok),
+    message: (flushed && flushed.message) || 'mock 满队列后 flush 未成功',
+    flushed
+  }
+}
+
 async function sendDigestWecom(id) {
   const digest = await db.getDoc('digests', id)
   if (!digest) return { ok: false, message: '这份推文不存在' }
@@ -1352,10 +1383,18 @@ function weeklyCandidateFromPost(post, contentType) {
     title: contentType === 'forum' ? post.title : wallHeadline(post),
     summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
     tag: contentType === 'forum' ? (post.category || '') : (post.tag || ''),
-    likeCount: post.likeCount || 0,
-    commentCount: post.commentCount || 0,
+    // 计数直接取原帖字段：缺字段说明从未累加过，按真实 0 处理；字段损坏返回 null，页面显示「—」不冒充 0
+    viewCount: postStat(post.viewCount),
+    likeCount: postStat(post.likeCount),
+    commentCount: postStat(post.commentCount),
     createdAt: post.createdAt
   }
+}
+
+function postStat(value) {
+  if (value == null) return 0
+  const num = Number(value)
+  return Number.isFinite(num) && num >= 0 ? Math.floor(num) : null
 }
 
 function matchesWeeklyKeyword(post, contentType, q) {
@@ -1678,6 +1717,7 @@ module.exports = {
   listContentReviews,
   getReviewDetail,
   reviewContent,
+  enqueueApprovedWall,
   listLexicons,
   addLexiconTerm,
   toggleLexiconTerm,
@@ -1690,6 +1730,7 @@ module.exports = {
   digestState,
   flushDigest,
   sendDigestWecom,
+  mockDigestFullAndPush,
   buildDigestByTime,
   buildDigestFromSelection,
   refillDigestPaste,

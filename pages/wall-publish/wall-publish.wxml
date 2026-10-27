@@ -69,10 +69,6 @@
         <input class="pub-row-input" maxlength="30" placeholder="{{extraPlaceholder}}" placeholder-class="pub-ph" value="{{extraField}}" bindinput="onExtraFieldInput" />
       </view>
       <view class="pub-row">
-        <text class="pub-row-title">微信号（选填）</text>
-        <input class="pub-row-input" maxlength="30" type="text" placeholder="例如：campus_ride" placeholder-class="pub-ph" value="{{contactValue}}" bindinput="onContactInput" />
-      </view>
-      <view class="pub-row">
         <view class="pub-row-copy">
           <text class="pub-row-title">匿名发布</text>
           <text class="pub-row-desc">拼车和二手建议实名，方便对接</text>
@@ -80,10 +76,10 @@
         <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
       </view>
     </view>
-    <view class="pub-note">需要对接时再填微信号，不填也可以发。线下交易请注意安全，平台不介入纠纷。</view>
+    <view class="pub-note">线下交易请注意安全，平台不介入纠纷。</view>
 
     <view class="pub-submit-bar">
-      <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting}}" loading="{{submitting}}">{{submitting ? '发布中' : '发布到互助广场'}}</button>
+      <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting || published}}" loading="{{submitting}}">{{published ? '已发布' : (submitting ? '发布中' : '发布到互助广场')}}</button>
     </view>
   </block>
   <privacy-popup />

@@ -888,6 +888,7 @@ async function render() {
             <div class="hot-copy">
               <strong>${esc(item.title)}</strong>
               <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+              <span class="meta hot-stats">${weeklyStats(item)}</span>
             </div>
             <button class="quiet" data-weekly-add="${esc(item.id)}" data-type="${esc(item.contentType || 'wall')}" type="button">加入热榜</button>
           </div>`)}
@@ -1004,7 +1005,10 @@ async function render() {
             <h3>审核队列 ${progress.count || 0}</h3>
             <p class="muted">互助广场通过审核后按时间入队；攒满 10 条会自动生成汇总并创建企微群发（需群主确认）。也可点右侧手动生成。</p>
           </div>
-          <button id="flush-btn" type="button">用队列生成并企微发送</button>
+          <div class="actions">
+            <button id="mock-full-btn" type="button">Mock 满10条并推送</button>
+            <button id="flush-btn" type="button">用队列生成并企微发送</button>
+          </div>
         </div>
       </div>
       ${listOrEmpty(progress.queued, (item, index) => `
@@ -1093,6 +1097,22 @@ async function render() {
           alert((err && err.message) || '生成推文失败')
         } finally {
           customBtn.disabled = false
+        }
+      }
+    }
+    const mockFullBtn = panel.querySelector('#mock-full-btn')
+    if (mockFullBtn) {
+      mockFullBtn.onclick = async () => {
+        if (!confirm('写入 10 条 mock 队列并自动推企微？群主需确认发送。')) return
+        mockFullBtn.disabled = true
+        try {
+          const result = await api('/api/digest/mock-full', { method: 'POST', body: '{}' })
+          alert(result.ok ? (result.message || '已推送') : (result.message || '失败'))
+          await refreshDigest()
+        } catch (err) {
+          alert((err && err.message) || 'Mock 推送失败')
+        } finally {
+          mockFullBtn.disabled = false
         }
       }
     }
@@ -1466,6 +1486,12 @@ function stat(num, label) {
   return `<div class="card stat-card"><div class="stat-num">${num || 0}</div><div class="stat-label">${label}</div></div>`
 }
 
+// 热榜候选的真实统计；null 表示读取到的字段异常，显示「—」而不是 0
+function weeklyStats(item) {
+  const show = (value) => (value == null ? '<span title="读取失败">—</span>' : value)
+  return `浏览 ${show(item.viewCount)} · 点赞 ${show(item.likeCount)} · 评论 ${show(item.commentCount)}`
+}
+
 function listOrEmpty(list, renderItem) {
   if (!list || !list.length) return '<div class="empty">暂无数据</div>'
   return list.map(renderItem).join('')
@@ -1650,7 +1676,7 @@ function guideCategorySelect(attr, categories, current) {
   )).join('')}</select>`
 }
 
-function guideRow(item, categories) {
+function guideRow(item, categories, index, total) {
   const status = item.reviewStatus || 'pending'
   const kind = item.kind === 'article' || item.kind === 'pick' ? item.kind : 'post'
   const author = kind === 'article'
@@ -1663,7 +1689,13 @@ function guideRow(item, categories) {
       <button type="button" data-guide-act="approve" data-id="${esc(item.id)}">通过</button>
       <button type="button" class="quiet warn" data-guide-act="reject" data-id="${esc(item.id)}">不通过</button>`
   } else if (status === 'approved') {
-    ops = `${kind === 'article' ? `<button type="button" class="quiet" data-guide-edit="${esc(item.id)}">编辑</button>` : ''}
+    const order = `<span class="gd-order">
+        <button type="button" class="quiet" data-guide-move="top" data-id="${esc(item.id)}" ${index === 0 ? 'disabled' : ''}>移到最前</button>
+        <button type="button" class="quiet" data-guide-move="up" data-id="${esc(item.id)}" ${index === 0 ? 'disabled' : ''}>上移</button>
+        <button type="button" class="quiet" data-guide-move="down" data-id="${esc(item.id)}" ${index === total - 1 ? 'disabled' : ''}>下移</button>
+      </span>`
+    ops = `${order}
+      ${kind === 'article' ? `<button type="button" class="quiet" data-guide-edit="${esc(item.id)}">编辑</button>` : ''}
       <button type="button" class="quiet warn" data-guide-act="offline" data-id="${esc(item.id)}">下线</button>`
   } else {
     ops = `${catSelect}
@@ -1677,7 +1709,7 @@ function guideRow(item, categories) {
     <div class="gd-row">
       ${guideThumb(item, categories)}
       <div class="gd-copy">
-        <strong>${esc(item.title)}</strong>
+        <strong>${status === 'approved' ? `<span class="gd-rank">${index + 1}</span>` : ''}${esc(item.title)}</strong>
         <span class="meta"><span class="gd-kind ${kind}">${GUIDE_KIND_LABEL[kind]}</span> ${esc(item.category || '')}${author} · ${formatTime(item.publishedAt || item.createdAt)}${status === 'rejected' ? ` · 未通过：${esc(item.reviewNote || '')}` : ''}</span>
         ${body}
         ${kind === 'article' ? `<a class="meta gd-link" href="${esc(item.articleUrl)}" target="_blank" rel="noopener">${esc(item.articleUrl)}</a>` : ''}
@@ -1696,31 +1728,40 @@ function guideListView(guides, categories) {
           return `<button type="button" class="${state.guideStatus === tab.status ? 'active' : ''}" data-guide-tab="${tab.status}">${tab.label} ${n}</button>`
         }).join('')}
       </div>
-      <p class="muted">${state.guideStatus === 'pending' ? '用户在小程序「黎安攻略」里的投稿，机审通过后全部在这里等人工审核，通过才会在小程序里显示。' : ''}</p>
+      <p class="muted">${state.guideStatus === 'pending' ? '用户在小程序「黎安攻略」里的投稿，机审通过后全部在这里等人工审核，通过才会在小程序里显示。' : ''}${state.guideStatus === 'approved' ? '序号就是小程序「黎安攻略」里的显示顺序（「全部」分类下）；新上线的默认排在最前。' : ''}</p>
       ${(guides.items || []).length
-        ? guides.items.map((item) => guideRow(item, categories)).join('')
+        ? guides.items.map((item, index, all) => guideRow(item, categories, index, all.length)).join('')
         : '<p class="muted">这里还没有内容。</p>'}
     </div>`
 }
 
 function guideArticleView(categories) {
-  const draft = state.guideDraft || { id: '', title: '', category: categories[0] || '', cover: '', coverUrl: '', articleUrl: '' }
+  const draft = state.guideDraft || { id: '', title: '', summary: '', category: categories[0] || '', coverMode: 'image', cover: '', coverUrl: '', articleUrl: '' }
+  const textCover = draft.coverMode === 'text'
+  const tone = Math.max(0, categories.indexOf(draft.category)) % GUIDE_TONES
   state.guideDraft = draft
   const local = (state.data && state.data.overview && state.data.overview.mode) !== 'cloud'
   return `
     <div class="card">
       <h3>${draft.id ? '编辑公众号推文' : '添加公众号推文'}</h3>
-      <p class="muted">上传横版封面（公众号封面比例 2.35:1，如 900×383），填推文链接，保存后直接出现在小程序「黎安攻略」，用户点开直接进推文。</p>
+      <p class="muted">填推文链接，保存后直接出现在小程序「黎安攻略」，用户点开直接进推文。封面可以上传横版图（2.35:1，如 900×383），也可以用文字封面：按标题和副标题自动排版，样式和用户投稿一致。</p>
       <div class="gd-form">
-        <div class="gd-cover-pick">
-          ${draft.coverUrl ? `<img src="${esc(draft.coverUrl)}" alt="" />` : '<span class="muted">还没上传封面</span>'}
+        <div>
+          ${textCover
+            ? `<div class="gd-cover-pick gd-tthumb tone-${tone} gd-text-preview"><strong>${esc(draft.title || '标题')}</strong>${draft.summary ? `<span>${esc(draft.summary)}</span>` : ''}</div>`
+            : `<div class="gd-cover-pick">${draft.coverUrl ? `<img src="${esc(draft.coverUrl)}" alt="" />` : '<span class="muted">还没上传封面</span>'}</div>`}
+          <div class="gd-cover-mode">
+            <label class="check-row"><input type="radio" name="gd-cover-mode" value="image" ${textCover ? '' : 'checked'} /><span>上传封面图</span></label>
+            <label class="check-row"><input type="radio" name="gd-cover-mode" value="text" ${textCover ? 'checked' : ''} /><span>用文字封面</span></label>
+          </div>
         </div>
         <div class="gd-fields">
-          <div class="row gap">
+          ${textCover ? '' : `<div class="row gap">
             <label class="upload-btn">上传封面<input id="gd-file" type="file" accept="image/jpeg,image/png,image/webp" hidden /></label>
             <span id="gd-upload-status" class="muted"></span>
-          </div>
+          </div>`}
           <input id="gd-title" maxlength="40" placeholder="标题" value="${esc(draft.title)}" />
+          <input id="gd-summary" maxlength="40" placeholder="副标题（选填，显示在文字封面上）" value="${esc(draft.summary || '')}" />
           <input id="gd-url" placeholder="推文链接 https://mp.weixin.qq.com/..." value="${esc(draft.articleUrl)}" />
           ${guideCategorySelect('id="gd-category"', categories, draft.category)}
           <div class="row gap">
@@ -1804,11 +1845,31 @@ function bindGuideArticle(panel) {
   const readDraft = () => ({
     ...state.guideDraft,
     title: panel.querySelector('#gd-title').value.trim(),
+    summary: panel.querySelector('#gd-summary').value.trim(),
     articleUrl: panel.querySelector('#gd-url').value.trim(),
     category: panel.querySelector('#gd-category').value
   })
+  panel.querySelectorAll('[name="gd-cover-mode"]').forEach((radio) => {
+    radio.onchange = () => {
+      state.guideDraft = { ...readDraft(), coverMode: radio.value }
+      render()
+    }
+  })
+  // 文字封面：改标题、副标题、分类时预览跟着变
+  const preview = panel.querySelector('.gd-text-preview')
+  if (preview) {
+    const refresh = () => {
+      const d = readDraft()
+      const cats = (state.data.guides && state.data.guides.categories) || []
+      preview.className = `gd-cover-pick gd-tthumb tone-${Math.max(0, cats.indexOf(d.category)) % GUIDE_TONES} gd-text-preview`
+      preview.innerHTML = `<strong>${esc(d.title || '标题')}</strong>${d.summary ? `<span>${esc(d.summary)}</span>` : ''}`
+    }
+    ;['#gd-title', '#gd-summary'].forEach((sel) => { panel.querySelector(sel).oninput = refresh })
+    panel.querySelector('#gd-category').onchange = refresh
+  }
   const status = panel.querySelector('#gd-upload-status')
-  panel.querySelector('#gd-file').onchange = async (e) => {
+  const fileInput = panel.querySelector('#gd-file')
+  if (fileInput) fileInput.onchange = async (e) => {
     const file = e.target.files && e.target.files[0]
     if (!file) return
     status.textContent = '上传中…'
@@ -1892,7 +1953,9 @@ function bindGuideList(panel, guides) {
       state.guideDraft = {
         id: item.id,
         title: item.title,
+        summary: item.summary || '',
         category: item.category,
+        coverMode: item.cover ? 'image' : 'text',
         cover: item.cover,
         coverUrl: item.coverUrl,
         articleUrl: item.articleUrl
@@ -1900,6 +1963,20 @@ function bindGuideList(panel, guides) {
       state.guideView = 'article'
       render()
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+  panel.querySelectorAll('[data-guide-move]').forEach((btn) => {
+    btn.onclick = async () => {
+      btn.disabled = true
+      const result = await api('/api/guides/reorder', {
+        method: 'POST',
+        body: JSON.stringify({ id: btn.dataset.id, action: btn.dataset.guideMove })
+      })
+      if (!result.ok) {
+        btn.disabled = false
+        return alert(result.message || '调整失败')
+      }
+      await reloadGuides()
     }
   })
   panel.querySelectorAll('[data-guide-tab]').forEach((btn) => {

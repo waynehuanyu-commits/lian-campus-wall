@@ -132,7 +132,8 @@ function showActionError(result) {
     REJECTED: '未通过审核',
     EMERGENCY_BLOCK: '内容已拦截',
     BANNED: '账号已封禁',
-    MUTED: '账号禁言中'
+    MUTED: '账号禁言中',
+    NETWORK: '网络异常'
   }
   wx.showModal({
     title: titles[result.code] || '未通过校验',

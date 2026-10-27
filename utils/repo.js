@@ -15,6 +15,26 @@ const feedLocal = {
   weekly: { at: 0, data: null, inflight: null }
 }
 
+// 会话代次：登录、退出、切换官方身份时 +1。发出请求时记下代次，响应回来代次变了就不再回写用户资料，
+// 防止 A 的慢请求在 B 登录后才返回、把全局用户又改回 A
+let sessionEpoch = 0
+
+function currentSession() {
+  return sessionEpoch
+}
+
+function bumpSession() {
+  sessionEpoch += 1
+  return sessionEpoch
+}
+
+function currentActing() {
+  const app = getApp()
+  const user = app && app.globalData && app.globalData.user
+  if (!user || !user.id || user.id === 'guest_readonly') return ''
+  return user.officialLogin ? 'official' : 'self'
+}
+
 function isLoggedOut() {
   try {
     return !!wx.getStorageSync(LOGOUT_KEY)
@@ -179,12 +199,19 @@ function cacheUser(user, speakGate) {
 }
 
 async function callCloud(action, payload = {}) {
+  const epoch = sessionEpoch
   try {
     const res = await wx.cloud.callFunction({
       name: 'userApi',
-      data: { action, payload }
+      // acting 告诉服务端客户端当前以哪个身份操作；与服务端缓存不一致时服务端会重读账号
+      data: { action, payload, acting: currentActing() }
     })
     const result = (res && res.result) || { ok: false, message: '云函数无响应' }
+    if (epoch !== sessionEpoch) {
+      // 旧会话的响应：业务数据照常返回，账号资料一律丢掉
+      const { user, speakGate, ...rest } = result
+      return { ...rest, staleSession: true }
+    }
     if (!isLoggedOut()) {
       cacheUser(result.user, result.speakGate)
     }
@@ -192,7 +219,7 @@ async function callCloud(action, payload = {}) {
   } catch (err) {
     const message = (err && (err.errMsg || err.message)) || '云函数调用失败'
     console.error('[userApi]', action, message)
-    return { ok: false, message }
+    return { ok: false, code: 'NETWORK', message }
   }
 }
 
@@ -305,6 +332,9 @@ function compressTemp(raw, finish) {
  * 上传到云存储，存 cloud://；小程序 <image> 直接绑 fileID（半个月前的做法）。
  * chooseAvatar 的临时图要先换成本地路径再上传，否则微信会拒绝。
  */
+// 发布失败重试时，已传成功的本地图直接复用 fileID，不重复上传
+const uploadedFiles = new Map()
+
 async function uploadImages(paths = [], folder = 'posts') {
   if (!config.useCloud) return paths
   const dir = String(folder || 'posts').replace(/\/+/g, '') || 'posts'
@@ -312,6 +342,8 @@ async function uploadImages(paths = [], folder = 'posts') {
     const raw = String(filePath || '').trim()
     if (!raw) return ''
     if (raw.startsWith('cloud://') || raw.startsWith('/images/')) return raw
+    const cachedKey = `${dir}|${raw}`
+    if (uploadedFiles.has(cachedKey)) return uploadedFiles.get(cachedKey)
 
     let localPath = raw
     const localTemp = raw.startsWith('wxfile://') || raw.startsWith('http://tmp') || raw.startsWith('https://tmp')
@@ -328,6 +360,7 @@ async function uploadImages(paths = [], folder = 'posts') {
     if (!upload || !upload.fileID) {
       throw new Error((upload && upload.errMsg) || '上传失败')
     }
+    uploadedFiles.set(cachedKey, upload.fileID)
     return upload.fileID
   }))
 }
@@ -417,6 +450,7 @@ async function getSpeakGate(options = {}) {
     if (globalData.speakGate) return globalData.speakGate
   }
   const result = await callCloud('getSpeakGate')
+  if (result.staleSession) return globalData.speakGate || guestSpeakGate()
   return result.speakGate || { ok: false, code: 'NEED_AUTH', title: '需要先认证学校', message: result.message || '' }
 }
 
@@ -431,6 +465,7 @@ async function getUser(options = {}) {
   const app = getApp()
   if (!force && app && app.globalData && app.globalData.user) return app.globalData.user
   const result = await callCloud('me')
+  if (result.staleSession) return (app && app.globalData && app.globalData.user) || null
   return result.user || null
 }
 
@@ -444,6 +479,7 @@ async function logout() {
       // 本地仍可退出
     }
   }
+  bumpSession()
   setLoggedOut(true)
   invalidateLocalFeeds()
   try {
@@ -456,6 +492,7 @@ async function logout() {
 }
 
 async function login() {
+  bumpSession()
   setLoggedOut(false)
   if (!config.useCloud) {
     store.ensureInit()
@@ -470,10 +507,15 @@ async function login() {
     forceLogin: true
   })
   if (!result || !result.ok) {
+    bumpSession()
     setLoggedOut(true)
     applyGuestSession()
     return result || { ok: false, message: '登录失败' }
   }
+  // 登录请求本身发出后到返回前，其它请求也可能带着旧资料回来；再翻一次代次，以登录结果为准
+  bumpSession()
+  cacheUser(result.user, result.speakGate)
+  invalidateLocalFeeds()
   try {
     const inbox = require('./inbox')
     inbox.reset((result.user && result.user.id) || '')
@@ -500,14 +542,26 @@ async function updateUser(patch) {
   return callCloud('updateUser', patch)
 }
 
+// 切换身份前后各翻一次代次：切换前发出的请求、切换途中返回的请求都不能覆盖切换结果
+async function switchIdentity(action) {
+  bumpSession()
+  const result = await callCloud(action, {})
+  bumpSession()
+  if (result && result.ok && result.user) {
+    cacheUser(result.user, result.speakGate)
+    invalidateLocalFeeds()
+  }
+  return result
+}
+
 async function enterOfficial() {
   if (!config.useCloud) return { ok: false, message: '当前不能登录公共账号' }
-  return callCloud('enterOfficial', {})
+  return switchIdentity('enterOfficial')
 }
 
 async function leaveOfficial() {
   if (!config.useCloud) return { ok: false, message: '当前不能退出公共账号' }
-  return callCloud('leaveOfficial', {})
+  return switchIdentity('leaveOfficial')
 }
 
 async function submitSchoolInfo(payload) {
@@ -1106,6 +1160,7 @@ module.exports = {
   logout,
   login,
   isLoggedOut,
+  currentSession,
   enterOfficial,
   leaveOfficial,
   submitSchoolInfo,
