@@ -476,7 +476,7 @@ async function reviewContent(type, id, { outcome, note } = {}) {
 
 async function enqueueApprovedWall(post) {
   if (!moderation.isPublicStatus(post.reviewStatus)) return null
-  const queue = await db.recentDocs('digest_queue', 50)
+  const queue = (await db.allDocs('digest_queue')).sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0))
   if (queue.some((item) => item.contentId === post.id)) {
     return { queued: true, count: queue.length }
   }
@@ -492,7 +492,13 @@ async function enqueueApprovedWall(post) {
   }
   await db.setDoc('digest_queue', item.id, item)
   bustReadCache()
-  return { queued: true, count: queue.length + 1 }
+  const count = queue.length + 1
+  // 按入队时间攒满 10 条：自动生成汇总并创建企微群发任务
+  if (count >= DIGEST_SIZE) {
+    const flushed = await flushDigest(false)
+    return { queued: true, count: 0, flushed }
+  }
+  return { queued: true, count }
 }
 
 async function getLexiconMeta() {
@@ -890,11 +896,110 @@ async function attachDigestPaste(digest) {
 }
 
 async function flushDigest(force = true) {
-  const queued = (await db.allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
+  const queued = (await db.allDocs('digest_queue')).sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0))
   if (!queued.length) return { ok: false, message: '队列是空的' }
   if (!force && queued.length < DIGEST_SIZE) return { ok: false, message: '未满 10 条' }
   const items = queued.slice(0, DIGEST_SIZE).map(({ _id, ...rest }) => rest)
-  return publishDigest(items)
+  const published = await publishDigest(items)
+  if (!published.ok || !published.digest) return published
+  const wecom = await sendDigestWecom(published.digest.id)
+  const wecomHint = wecom.ok
+    ? '已创建企微群发，请群主在企业微信点「确认发送」。'
+    : `企微未发出：${wecom.message || '失败'}（推文已生成，可稍后手动发）`
+  return {
+    ...published,
+    wecom,
+    message: `${published.message} ${wecomHint}`
+  }
+}
+
+function digestWecomCard(digest) {
+  const items = digest.items || []
+  const lines = items.map((item, index) => (
+    `${index + 1}. ${item.title}\n摘要：${item.summary || ''}\n入口：${item.pagepath || ''}`
+  ))
+  return {
+    title: digest.title || `黎安话事精选 · ${items.length}条汇总`,
+    summary: digest.summary || items.map((item) => item.title).join(' ').slice(0, 120),
+    text: [
+      digest.title || '黎安话事精选',
+      digest.summary || '',
+      '',
+      lines.join('\n\n'),
+      '',
+      '点开小程序进入汇总页，再点对应条目查看详情。'
+    ].join('\n'),
+    appid: process.env.MINI_APPID || process.env.WECOM_MINI_APPID || '',
+    wecomPage: digest.wecomPage || `pages/digest/digest.html?id=${digest.id}`
+  }
+}
+
+async function resolveWecomChatIds(token) {
+  let targets = (await listGroups()).filter((item) => item.enabled !== false && item.receiveDigest)
+  targets = await resolveTargets(targets)
+  let chatIds = targets.map((item) => item.chatId).filter(Boolean)
+  if (!chatIds.length && process.env.WECOM_CHAT_ID) {
+    chatIds = [String(process.env.WECOM_CHAT_ID).trim()]
+  }
+  if (!chatIds.length) {
+    const found = await getWecom().findChatIdByName(token, process.env.WECOM_GROUP_NAME || '黎安话事推送测试群')
+    if (found) chatIds = [found]
+  }
+  const sender = (targets.find((item) => item.sender) || {}).sender
+    || process.env.WECOM_SENDER
+    || ''
+  return { chatIds, sender, targets }
+}
+
+async function sendDigestWecom(id) {
+  const digest = await db.getDoc('digests', id)
+  if (!digest) return { ok: false, message: '这份推文不存在' }
+  const status = wecomStatus()
+  if (!status.ready) {
+    return { ok: false, message: `还没配齐企微参数：${status.missing.join('、')}` }
+  }
+  try {
+    const wecom = getWecom()
+    const token = await wecom.getWecomToken()
+    const { chatIds, sender } = await resolveWecomChatIds(token)
+    if (!chatIds.length) {
+      return { ok: false, message: '没有可发送的客户群。先到「企微群发」绑定，或配置 WECOM_CHAT_ID。' }
+    }
+    if (!sender) {
+      return { ok: false, message: '缺少群主账号 WECOM_SENDER' }
+    }
+    const card = digestWecomCard(digest)
+    const result = await wecom.sendDigestToExternalGroup(token, card, chatIds, sender)
+    const logId = uid('dl_')
+    const ok = result && !result.errcode
+    await db.setDoc('distribute_logs', logId, {
+      id: logId,
+      groupId: 'g_customer',
+      groupName: process.env.WECOM_GROUP_NAME || '',
+      groupType: 'external',
+      contentType: 'digest',
+      contentId: digest.id,
+      title: digest.title,
+      summary: digest.summary,
+      pagepath: digest.pagepath,
+      wecomPage: card.wecomPage,
+      itemCount: (digest.items || []).length,
+      status: ok ? 'confirm' : 'failed',
+      wecom: { chatIds, sender, result },
+      createdAt: Date.now()
+    }).catch(() => {})
+    if (!ok) {
+      return { ok: false, message: (result && result.errmsg) || '企微返回失败', result }
+    }
+    return {
+      ok: true,
+      message: '已创建企微群发。请群主打开企业微信点「确认发送」。',
+      chatIds,
+      result
+    }
+  } catch (err) {
+    return { ok: false, message: err.message || '企微发送失败' }
+  }
 }
 
 async function refillDigestPaste(id) {
@@ -1013,6 +1118,7 @@ async function publishDigest(items) {
   }
   digest.pagepath = `pages/digest/digest?id=${digest.id}`
   digest.sharePath = `/pages/digest/digest?id=${digest.id}`
+  digest.wecomPage = `pages/digest/digest.html?id=${digest.id}`
   try {
     await db.setDoc('digests', digest.id, digest)
   } catch (err) {
@@ -1583,6 +1689,7 @@ module.exports = {
   reviewStudentAuth,
   digestState,
   flushDigest,
+  sendDigestWecom,
   buildDigestByTime,
   buildDigestFromSelection,
   refillDigestPaste,

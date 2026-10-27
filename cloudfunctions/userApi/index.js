@@ -1628,26 +1628,13 @@ async function digestProgress() {
   }
 }
 
-async function sortDigestItemsByHeat(items) {
-  const walls = await allDocs('wall_posts')
-  const byId = {}
-  walls.forEach((post) => { byId[post.id || post._id] = post })
-  const now = Date.now()
-  return items.slice().sort((a, b) => {
-    const pa = byId[a.contentId] || { createdAt: a.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const pb = byId[b.contentId] || { createdAt: b.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const diff = postHeatScore(pb, now) - postHeatScore(pa, now)
-    if (diff !== 0) return diff
-    return (pb.createdAt || 0) - (pa.createdAt || 0)
-  })
-}
-
 async function flushDigest(force) {
-  const queued = (await allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
+  // 按入队时间 FIFO：够 10 条就取最早的一批发起，不再按热度重排
+  const queued = (await allDocs('digest_queue')).sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0))
   if (!queued.length) return null
   if (!force && queued.length < DIGEST_SIZE) return null
   const picked = queued.slice(0, DIGEST_SIZE)
-  const items = (await sortDigestItemsByHeat(picked)).map(({ _id, ...rest }) => rest)
+  const items = picked.map(({ _id, ...rest }) => rest)
   await Promise.all(picked.map((item) => db.collection('digest_queue').doc(item.id || item._id).remove()))
   const digest = {
     id: uid('dg_'),

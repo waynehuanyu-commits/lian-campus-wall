@@ -3241,25 +3241,12 @@ function enqueueApproved(type, post) {
   return { progress: digestProgress(), flushed: null }
 }
 
-function sortDigestItemsByHeat(items) {
-  const walls = getWallPosts()
-  const byId = {}
-  walls.forEach((post) => { byId[post.id] = post })
-  const now = Date.now()
-  return [...items].sort((a, b) => {
-    const pa = byId[a.contentId] || { createdAt: a.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const pb = byId[b.contentId] || { createdAt: b.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const diff = postHeatScore(pb, now) - postHeatScore(pa, now)
-    if (diff !== 0) return diff
-    return (pb.createdAt || 0) - (pa.createdAt || 0)
-  })
-}
-
 function flushDigest(force = false) {
-  const queue = getDigestQueue()
+  // 按入队时间 FIFO：够 10 条就取最早的一批发起，不再按热度重排
+  const queue = getDigestQueue().slice().sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0))
   if (!queue.length) return null
   if (!force && queue.length < DIGEST_SIZE) return null
-  const items = sortDigestItemsByHeat(queue.slice(0, DIGEST_SIZE))
+  const items = queue.slice(0, DIGEST_SIZE)
   saveDigestQueue(queue.slice(DIGEST_SIZE))
   const digest = {
     id: uid('dg_'),

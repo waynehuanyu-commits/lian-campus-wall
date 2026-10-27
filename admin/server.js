@@ -434,6 +434,12 @@ const routes = {
     json(res, 200, await service.refillDigestPaste(body.id))
   },
 
+  'POST /api/digest/wecom': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const body = await readBody(req)
+    json(res, 200, await service.sendDigestWecom(body.id))
+  },
+
   'GET /api/wecom/status': async (req, res) => {
     if (!requireAdmin(req, res)) return
     json(res, 200, { ok: true, wecom: service.wecomStatus() })

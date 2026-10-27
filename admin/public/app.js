@@ -1002,9 +1002,9 @@ async function render() {
         <div class="row">
           <div>
             <h3>审核队列 ${progress.count || 0}</h3>
-            <p class="muted">互助广场通过审核后会进这个队列，仅供查看。不会再满 10 条就自动出文。</p>
+            <p class="muted">互助广场通过审核后按时间入队；攒满 10 条会自动生成汇总并创建企微群发（需群主确认）。也可点右侧手动生成。</p>
           </div>
-          <button id="flush-btn" type="button">用队列生成</button>
+          <button id="flush-btn" type="button">用队列生成并企微发送</button>
         </div>
       </div>
       ${listOrEmpty(progress.queued, (item, index) => `
@@ -1023,6 +1023,7 @@ async function render() {
           <div class="actions">
             <button type="button" data-copy="${esc(item.id)}">复制推文</button>
             <button type="button" data-repaste="${esc(item.id)}">重新生成文字链</button>
+            <button type="button" data-wecom="${esc(item.id)}">企业微信发送</button>
           </div>
         </div>`)}`
     panel.querySelectorAll('[data-by-time]').forEach((btn) => {
@@ -1142,6 +1143,23 @@ async function render() {
           return alert(result.message || '生成失败')
         }
         await refreshDigest()
+      }
+    })
+    panel.querySelectorAll('[data-wecom]').forEach((btn) => {
+      btn.onclick = async () => {
+        if (!confirm('创建企业微信客户群群发任务？群主需在企微里点「确认发送」。')) return
+        btn.disabled = true
+        try {
+          const result = await api('/api/digest/wecom', {
+            method: 'POST',
+            body: JSON.stringify({ id: btn.dataset.wecom })
+          })
+          alert(result.ok ? (result.message || '已创建群发') : (result.message || '发送失败'))
+        } catch (err) {
+          alert((err && err.message) || '企业微信发送失败')
+        } finally {
+          btn.disabled = false
+        }
       }
     })
     return
