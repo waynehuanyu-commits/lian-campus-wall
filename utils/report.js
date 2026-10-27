@@ -11,7 +11,7 @@ const REPORT_REASONS = [
   { id: 'other', label: '其他违规' }
 ]
 
-const REPORT_THRESHOLD = 3
+const { REPORT_THRESHOLD } = require('./report-rules')
 
 function reasonLabel(id) {
   const row = REPORT_REASONS.find((item) => item.id === id)
@@ -31,6 +31,10 @@ function submitReason(reason, onSubmit, targetType, targetId) {
   })).then((result) => {
     wx.hideLoading()
     if (!result || !result.ok) {
+      if (result && ['NEED_LOGIN', 'NEED_AUTH'].indexOf(result.code) >= 0) {
+        require('./auth').promptReportBlocked(result)
+        return
+      }
       wx.showToast({ title: (result && result.message) || '举报失败', icon: 'none' })
       return
     }

@@ -440,7 +440,7 @@ async function getReviewDetail(type, id) {
   }
 }
 
-async function reviewContent(type, id, { outcome, note } = {}) {
+async function reviewContent(type, id, { outcome, note } = {}, operator = '') {
   const collection = type === 'comment' ? 'comments' : (type === 'forum' ? 'forum_posts' : 'wall_posts')
   const post = await db.getDoc(collection, id)
   if (!post) return { ok: false, message: '内容不存在' }
@@ -462,6 +462,11 @@ async function reviewContent(type, id, { outcome, note } = {}) {
     type: 'manual_review',
     userId: post.authorId || '',
     userNickname: post.authorName || '',
+    operator,
+    action: nextStatus,
+    targetType: type,
+    targetId: id,
+    reason: String(note || '').trim(),
     detail: `人工审${type === 'comment' ? '评论' : '帖'} ${type}:${id} → ${nextStatus}`,
     ruleIds: post.reviewRuleIds || [],
     createdAt: Date.now()
@@ -1396,151 +1401,24 @@ async function weeklyHotState(keyword = '') {
   })
 }
 
-async function resolveReport(reportId, { action, note, muteHours } = {}) {
-  const row = await db.getDoc('reports', reportId)
-  if (!row) return { ok: false, message: '举报不存在' }
-  const act = String(action || 'dismiss')
-  const resolveNote = String(note || '').trim()
-  let accountResult = null
+// 举报工单的逻辑在 report-cases.js；这里保留旧接口：按单条举报 id 找到工单再整单处理
+const LEGACY_REPORT_ACTIONS = { dismiss: 'dismiss', delete: 'takedown', hide: 'takedown', mute: 'mute_author', ban: 'ban_author' }
 
-  if (act === 'mute' || act === 'ban') {
-    const targetUserId = row.targetType === 'user'
-      ? row.targetId
-      : (row.targetAuthorId || '')
-    if (targetUserId) {
-      accountResult = await setAccountStatus(targetUserId, {
-        status: act === 'ban' ? 'banned' : 'muted',
-        reason: resolveNote || (act === 'ban' ? '举报核实后封号' : '举报核实后禁言'),
-        muteHours: muteHours || 24
-      })
-    }
+async function resolveReport(reportId, { action, note, muteHours, targetType, targetId } = {}, operator = '') {
+  let type = targetType
+  let id = targetId
+  if (reportId && (!type || !id)) {
+    const row = await db.getDoc('reports', reportId)
+    if (!row) return { ok: false, message: '举报不存在' }
+    type = row.targetType
+    id = row.targetId
   }
-  if ((act === 'delete' || act === 'hide') && ['forum', 'wall', 'comment'].includes(row.targetType)) {
-    await reviewContent(row.targetType, row.targetId, {
-      outcome: act === 'delete' ? 'rejected' : 'manual_review',
-      note: resolveNote || (act === 'delete' ? '因举报核实后下架' : '因举报转入人工审核')
-    })
-  }
-
-  const stamp = {
-    status: 'resolved',
-    resolvedAt: Date.now(),
-    resolveAction: act,
-    resolveNote: resolveNote
-  }
-  await db.setDoc('reports', reportId, { ...row, ...stamp })
-
-  if (act !== 'dismiss') {
-    const siblings = (await db.allDocs('reports')).filter((item) => (
-      item.targetType === row.targetType
-      && item.targetId === row.targetId
-      && item.status === 'pending'
-      && item.id !== reportId
-    ))
-    await Promise.all(siblings.map((item) => db.setDoc('reports', item.id || item._id, {
-      ...item,
-      status: 'resolved',
-      resolvedAt: Date.now(),
-      resolveAction: act,
-      resolveNote: resolveNote || '同类举报一并处理'
-    })))
-  }
-
-  const logId = uid('sl_')
-  await db.setDoc('security_logs', logId, {
-    id: logId,
-    level: act === 'dismiss' ? 'info' : 'warn',
-    type: 'report_resolve',
-    userId: row.targetType === 'user' ? row.targetId : (row.targetAuthorId || ''),
-    userNickname: '',
-    detail: `处理举报 ${reportId} → ${act}`,
-    createdAt: Date.now()
-  })
-  bustReadCache()
-  return { ok: true, report: { ...row, ...stamp }, accountResult }
+  const act = LEGACY_REPORT_ACTIONS[action] || action
+  return require('./report-cases').resolveCase({ targetType: type, targetId: id, action: act, note, muteHours }, operator)
 }
 
-// 匿名内容在后台显示真实账号，便于追溯处置；实名内容同样返回，统一展示
-async function realAuthorOf(target, targetType) {
-  if (!target || targetType === 'user') return null
-  const authorId = target.authorId || ''
-  if (!authorId) return null
-  const user = await db.getDoc('users', authorId)
-  return { id: authorId, nickname: (user && user.nickname) || '' }
-}
-
-async function listReportCases(status = '全部') {
-  const rows = (await db.recentDocs('reports', 100)).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-  const groups = new Map()
-  rows.forEach((item) => {
-    const key = `${item.targetType || ''}:${item.targetId || ''}`
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(item)
-  })
-  const cases = []
-  for (const [key, reports] of groups) {
-    const sample = reports[0]
-    let target = null
-    let parentPost = null
-    if (sample.targetType === 'forum' || sample.targetType === 'wall') {
-      const collection = sample.targetType === 'wall' ? 'wall_posts' : 'forum_posts'
-      target = await db.getDoc(collection, sample.targetId)
-    } else if (sample.targetType === 'comment') {
-      target = await db.getDoc('comments', sample.targetId)
-      const parentType = sample.parentType || (target && target.targetType) || ''
-      const parentId = sample.parentId || (target && target.targetId) || ''
-      if (parentId) parentPost = await db.getDoc(parentType === 'wall' ? 'wall_posts' : 'forum_posts', parentId)
-    } else if (sample.targetType === 'user') {
-      target = await db.getDoc('users', sample.targetId)
-    }
-    const realAuthor = await realAuthorOf(target, sample.targetType)
-    const images = target && Array.isArray(target.images) ? target.images.filter(Boolean) : []
-    const urlMap = images.length ? await db.resolveCloudUrls(images) : {}
-    const pending = reports.filter((item) => item.status === 'pending')
-    const reporters = Array.from(new Set(reports.map((item) => item.reporterId).filter(Boolean)))
-    const caseStatus = pending.length ? 'pending' : 'resolved'
-    if (status && status !== '全部' && caseStatus !== status) continue
-    cases.push({
-      key,
-      targetType: sample.targetType,
-      targetId: sample.targetId,
-      targetAuthorId: sample.targetAuthorId || (target && (target.authorId || target.id)) || '',
-      status: caseStatus,
-      pendingCount: pending.length,
-      reportCount: reporters.length,
-      latestAt: reports[0].createdAt || 0,
-      title: target
-        ? (sample.targetType === 'comment'
-          ? `评论 · ${parentPost ? (parentPost.title || wallHeadline(parentPost) || '原帖') : '原帖已删除'}`
-          : (target.title || target.nickname || target.tag || '未命名'))
-        : '原内容已删除',
-      anonymous: !!(target && target.anonymous),
-      realAuthor,
-      content: target ? String(target.content || '').slice(0, 400) : '',
-      images: db.applyCloudUrls(images, urlMap),
-      authorName: target ? (target.authorName || target.nickname || '') : '',
-      reviewStatus: (target && target.reviewStatus) || '',
-      accountStatus: target && sample.targetType === 'user' ? (target.status || 'active') : '',
-      reports: reports.map((item) => ({
-        id: item.id,
-        reason: item.reason,
-        reasonLabel: item.reasonLabel || item.reason,
-        note: item.note || '',
-        reporterId: item.reporterId,
-        reporterName: item.reporterName || item.reporterId,
-        status: item.status || 'pending',
-        createdAt: item.createdAt,
-        resolveAction: item.resolveAction || '',
-        resolveNote: item.resolveNote || '',
-        resolvedAt: item.resolvedAt || 0
-      }))
-    })
-  }
-  return cases.sort((a, b) => (b.latestAt || 0) - (a.latestAt || 0))
-}
-
-async function listReports(status = 'pending') {
-  return cache.wrap(`reports:${status}`, 20000, () => listReportCases(status))
+async function listReports(options = {}) {
+  return require('./report-cases').listReportCases(options)
 }
 
 async function dashboard() {

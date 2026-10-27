@@ -52,7 +52,7 @@ const REPORT_REASONS = [
   { id: 'other', label: '其他违规' }
 ]
 
-const REPORT_THRESHOLD = 3
+const { REPORT_THRESHOLD } = require('./report-rules')
 
 const DIGEST_SIZE = 10
 
@@ -2106,7 +2106,8 @@ function submitReport({ targetType, targetId, reason, note } = {}) {
   }
   const reasonMeta = REPORT_REASONS.find((item) => item.id === reason) || REPORT_REASONS.find((item) => item.id === 'other')
   const user = getUser()
-  if (!user || !user.id) return { ok: false, message: '请先登录' }
+  const eligible = require('./report-rules').reportEligibility(user)
+  if (!eligible.ok) return { ok: false, code: eligible.code, message: eligible.message }
   if (type === 'user' && user.id === id) return { ok: false, message: '不能举报自己' }
   if (type === 'forum' || type === 'wall') {
     const post = getPost(type, id)
@@ -2119,7 +2120,7 @@ function submitReport({ targetType, targetId, reason, note } = {}) {
     if (comment.authorId === user.id) return { ok: false, message: '不能举报自己的评论' }
   }
   const list = getReports()
-  if (list.some((item) => item.reporterId === user.id && item.targetType === type && item.targetId === id && item.status !== 'dismissed')) {
+  if (list.some((item) => item.reporterId === user.id && item.targetType === type && item.targetId === id)) {
     return { ok: false, message: '你已经举报过了' }
   }
   const row = {

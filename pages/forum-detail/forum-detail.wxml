@@ -19,8 +19,8 @@
 
     <view wx:if="{{post.isOwner && post.reviewStatus && post.reviewStatus !== 'approved'}}" class="tag" style="margin-top: 16rpx;">{{post.reviewStatusLabel || ''}} · {{post.reviewNote || '审核处理中'}}</view>
 
-    <view wx:if="{{post.title}}" class="detail-title"><text wx:if="{{post.pinned}}" class="pin-tag">置顶</text><text wx:if="{{post.official}}" class="pin-tag official">官方</text>{{post.title}}</view>
-    <view wx:if="{{post.content}}" class="detail-content">{{post.content}}</view>
+    <view wx:if="{{post.title}}" class="detail-title"><text wx:if="{{post.pinned}}" class="pin-tag">置顶</text><text wx:if="{{post.official}}" class="pin-tag official">官方</text><text user-select="true">{{post.title}}</text></view>
+    <view wx:if="{{post.content}}" class="detail-content"><text user-select="true">{{post.content}}</text></view>
 
     <post-gallery wx:if="{{post.images && post.images.length}}" urls="{{post.images}}" bind:preview="onGalleryPreview" />
 
@@ -82,7 +82,7 @@
           />
           <view class="comment-body">
             <view class="comment-name" data-userid="{{item.root.authorId}}" data-anonymous="{{item.root.anonymous}}" catchtap="onCommentAuthorTap">{{item.root.authorName}}</view>
-            <view wx:if="{{item.root.content}}" class="comment-text">{{item.root.content}}</view>
+            <view wx:if="{{item.root.content}}" class="comment-text"><text user-select="true">{{item.root.content}}</text></view>
             <view wx:if="{{item.root.images && item.root.images.length}}" class="comment-images">
               <image
                 wx:for="{{item.root.images}}"
@@ -124,7 +124,7 @@
           <view class="comment-body">
             <view class="comment-name" data-userid="{{reply.authorId}}" data-anonymous="{{reply.anonymous}}" catchtap="onCommentAuthorTap">{{reply.authorName}}</view>
             <view wx:if="{{reply.replyToName}}" class="comment-reply-to">回复 @{{reply.replyToName}}</view>
-            <view wx:if="{{reply.content}}" class="comment-text">{{reply.content}}</view>
+            <view wx:if="{{reply.content}}" class="comment-text"><text user-select="true">{{reply.content}}</text></view>
             <view wx:if="{{reply.images && reply.images.length}}" class="comment-images">
               <image
                 wx:for="{{reply.images}}"

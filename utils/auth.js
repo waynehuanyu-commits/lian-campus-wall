@@ -1,5 +1,6 @@
 const store = require('./store')
 const repo = require('./repo')
+const reportRules = require('./report-rules')
 
 function cachedGate() {
   const app = getApp()
@@ -115,6 +116,46 @@ function ensureCanSpeak() {
   return false
 }
 
+function promptReportBlocked(check) {
+  if (check.code === 'NEED_LOGIN') {
+    wx.showModal({
+      title: '登录后才能举报',
+      content: '浏览开放。举报需要先登录并完成学校认证。',
+      confirmText: '去开通',
+      cancelText: '先看看',
+      confirmColor: '#2F7DFF',
+      success(res) {
+        if (res.confirm) goLogin()
+      }
+    })
+    return
+  }
+  if (check.code === 'NEED_AUTH') {
+    wx.showModal({
+      title: '需要先认证学校',
+      content: '完成学校认证后才能举报。填写所在学校即可，提交后立即生效。',
+      confirmText: '去认证',
+      cancelText: '先看看',
+      confirmColor: '#2F7DFF',
+      success(res) {
+        if (res.confirm) goSchoolAuth()
+      }
+    })
+    return
+  }
+  wx.showToast({ title: check.message || '当前账号不能举报', icon: 'none' })
+}
+
+// 举报资格：登录 + 学校认证 + 未封禁 + 未被限制举报；服务端用同一套规则再校验一次
+function ensureCanReport() {
+  const app = getApp()
+  const user = (app && app.globalData && app.globalData.user) || null
+  const check = reportRules.reportEligibility(repo.isLoggedOut() ? null : user)
+  if (check.ok) return true
+  promptReportBlocked(check)
+  return false
+}
+
 function showActionError(result) {
   if (!result || result.ok) return false
   if (result.code === 'NEED_LOGIN') {
@@ -149,6 +190,8 @@ module.exports = {
   goSchoolAuth,
   goLogin,
   ensureCanSpeak,
+  ensureCanReport,
+  promptReportBlocked,
   showActionError,
   safeBack,
   cachedGate

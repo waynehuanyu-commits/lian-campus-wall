@@ -25,6 +25,8 @@ const titles = {
   overview: ['', '今日概览'],
   review: ['', '内容审核'],
   reports: ['', '内容审核'],
+  content: ['', '内容审核'],
+  modlogs: ['', '内容审核'],
   keywords: ['', '风控词库'],
   accounts: ['', '用户管理'],
   whitelist: ['', '用户管理'],
@@ -43,8 +45,10 @@ const titles = {
 // 合并后的菜单：侧栏只显示第一项，页内用子标签切换；各子页面的数据和接口保持原样
 const NAV_GROUPS = {
   review: [
-    { nav: 'review', label: '帖子与评论' },
-    { nav: 'reports', label: '用户举报' }
+    { nav: 'review', label: '待审队列' },
+    { nav: 'reports', label: '用户举报' },
+    { nav: 'content', label: '内容管理' },
+    { nav: 'modlogs', label: '处置记录' }
   ],
   accounts: [
     { nav: 'accounts', label: '账号处置' },
@@ -777,64 +781,17 @@ async function render() {
   }
 
   if (state.nav === 'reports') {
-    const allCases = data.reports || []
-    const filter = state.reportStatus || 'pending'
-    const cases = allCases.filter((item) => filter === '全部' || item.status === filter)
-    const typeLabel = { forum: '学习分享', wall: '互助广场', comment: '评论', user: '用户' }
-    const actLabel = { hide: '已隐藏', delete: '已下架', mute: '已禁言', ban: '已封号', dismiss: '已忽略' }
-    panel.innerHTML = `
-      <div class="card">
-        <h3>举报工单</h3>
-        <p class="muted">按被举报对象合并。同一帖或同一用户被 3 个不同的人举报后，帖子会自动隐藏并进入审帖。这里可以看原文、处理，并留下记录。</p>
-        <div class="row gap">
-          <button type="button" data-report-filter="pending">待处理 ${allCases.filter((item) => item.status === 'pending').length}</button>
-          <button type="button" data-report-filter="resolved">已处理 ${allCases.filter((item) => item.status === 'resolved').length}</button>
-          <button type="button" data-report-filter="全部">全部 ${allCases.length}</button>
-        </div>
-      </div>
-      ${listOrEmpty(cases, (item) => `
-        <div class="card list-item">
-          <div class="row">
-            <strong>${esc(item.title || '未命名')}</strong>
-            <span>${esc(typeLabel[item.targetType] || item.targetType)} · ${item.reportCount || 0} 人举报</span>
-          </div>
-          <div class="meta">作者 ${authorHtml(item.authorName || item.targetAuthorId, item.anonymous, item.realAuthor)} · 最近 ${formatTime(item.latestAt)}${item.reviewStatus ? ` · 内容状态 ${esc(item.reviewStatus)}` : ''}</div>
-          ${item.content ? `<p>${esc(item.content)}</p>` : ''}
-          ${item.images && item.images.length ? `<div class="image-row">${item.images.map((src) => `<a href="${esc(src)}" target="_blank" rel="noreferrer"><img class="thumb" src="${esc(src)}" alt=""></a>`).join('')}</div>` : ''}
-          ${(item.reports || []).map((report) => `
-            <div class="list-item">
-              <div class="row"><strong>${esc(report.reasonLabel || report.reason)}</strong><span>${esc(report.status === 'pending' ? '待处理' : (actLabel[report.resolveAction] || '已处理'))}</span></div>
-              <div class="meta">${esc(report.reporterName || report.reporterId)} · ${formatTime(report.createdAt)}</div>
-              ${report.note ? `<div class="meta">补充：${esc(report.note)}</div>` : ''}
-              ${report.resolveNote || report.resolvedAt ? `<div class="meta">处理：${esc(report.resolveNote || actLabel[report.resolveAction] || '')} · ${formatTime(report.resolvedAt)}</div>` : ''}
-              ${report.status === 'pending' ? `
-                <div class="actions">
-                  <button data-rid="${esc(report.id)}" data-act="hide">隐藏进审</button>
-                  <button data-rid="${esc(report.id)}" data-act="delete">下架删除</button>
-                  <button data-rid="${esc(report.id)}" data-act="mute">禁言作者</button>
-                  <button data-rid="${esc(report.id)}" data-act="ban">封号作者</button>
-                  <button data-rid="${esc(report.id)}" data-act="dismiss">忽略</button>
-                </div>` : ''}
-            </div>`).join('')}
-        </div>`)}
-    `
-    panel.querySelectorAll('[data-report-filter]').forEach((btn) => {
-      btn.onclick = () => {
-        state.reportStatus = btn.dataset.reportFilter
-        render()
-      }
-    })
-    panel.querySelectorAll('[data-rid]').forEach((btn) => {
-      btn.onclick = async () => {
-        const note = window.prompt('处理备注（可选）', '') || ''
-        const result = await api('/api/reports/resolve', {
-          method: 'POST',
-          body: JSON.stringify({ id: btn.dataset.rid, action: btn.dataset.act, note, muteHours: 24 })
-        })
-        if (!result.ok) return alert(result.message || '处理失败')
-        await reload()
-      }
-    })
+    renderReports(panel, data.reports)
+    return
+  }
+
+  if (state.nav === 'content') {
+    renderContent(panel, data.content)
+    return
+  }
+
+  if (state.nav === 'modlogs') {
+    renderModLogs(panel, data.modlogs)
     return
   }
 
@@ -1996,13 +1953,9 @@ async function loadNav(nav) {
   if (nav === 'cover') return reloadCover()
   if (nav === 'guides') return reloadGuides()
   if (nav === 'digest') return refreshDigest()
-  if (nav === 'reports') {
-    const result = await api('/api/reports?status=' + encodeURIComponent('全部'))
-    if (!result.ok) return
-    state.data.reports = result.list || []
-    if (state.nav === 'reports') render()
-    return
-  }
+  if (nav === 'reports') return reloadReports()
+  if (nav === 'content') return reloadContent()
+  if (nav === 'modlogs') return reloadModLogs()
   if (nav === 'review') return refreshReviews()
   if (nav === 'keywords') {
     const [lex, words] = await Promise.all([api('/api/lexicons'), api('/api/keywords')])
