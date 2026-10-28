@@ -95,6 +95,7 @@
   <view class="empty-title">{{error || '用户不存在'}}</view>
 </view>
 <report-sheet id="report-sheet" />
+<phone-sheet id="phone-sheet" />
 
 <view wx:if="{{moreOpen}}" class="share-sheet-mask" catchtouchmove="noop" bindtap="closeMore">
   <view class="share-sheet" catchtap="noop">

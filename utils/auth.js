@@ -78,13 +78,27 @@ function safeBack(delay = 0) {
   else go()
 }
 
-// 绑定手机号的入口放在学校认证页
-function promptPhone(message) {
+// 需要手机号时在当前页弹出底部验证弹窗；页面没挂弹窗时退回到学校认证页（那里有兜底入口）
+function promptPhone() {
+  const pages = getCurrentPages()
+  const page = pages[pages.length - 1]
+  const sheet = page && typeof page.selectComponent === 'function' ? page.selectComponent('#phone-sheet') : null
+  if (sheet) {
+    sheet.open({
+      onBound: () => {
+        // 绑定接口已回写最新发言权限，让页面按新状态重画
+        if (typeof page.applyGate === 'function') page.applyGate()
+        else if (typeof page.refreshGate === 'function') page.refreshGate()
+        else if (typeof page.onShow === 'function') page.onShow()
+      }
+    })
+    return
+  }
   wx.showModal({
-    title: '需要绑定手机号',
-    content: message || '发帖、评论和举报前请绑定手机号，用于身份核验和违规追溯，仅管理员可见，不会公开展示。',
-    confirmText: '去绑定',
-    cancelText: '先看看',
+    title: '验证手机号',
+    content: '为了社区安全，发言前需要验证一次手机号。号码只用于账号安全核验，不会展示给任何其他用户。',
+    confirmText: '去验证',
+    cancelText: '暂不验证',
     confirmColor: '#2F7DFF',
     success(res) {
       if (res.confirm) goSchoolAuth()
@@ -122,7 +136,7 @@ function ensureCanSpeak() {
     return false
   }
   if (gate.code === 'NEED_PHONE') {
-    promptPhone(gate.message)
+    promptPhone()
     return false
   }
   wx.showModal({
@@ -162,7 +176,7 @@ function promptReportBlocked(check) {
     return
   }
   if (check.code === 'NEED_PHONE') {
-    promptPhone('绑定手机号后才能举报。手机号仅管理员可见，不会公开展示。')
+    promptPhone()
     return
   }
   wx.showToast({ title: check.message || '当前账号不能举报', icon: 'none' })
@@ -189,7 +203,7 @@ function showActionError(result) {
     return true
   }
   if (result.code === 'NEED_PHONE') {
-    promptPhone(result.message)
+    promptPhone()
     return true
   }
   const titles = {

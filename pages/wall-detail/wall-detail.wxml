@@ -248,9 +248,9 @@
   <text>认证学校后即可评论</text>
   <text class="accent">去认证</text>
 </view>
-<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_PHONE'}}" class="composer guest-bar" bindtap="goAuth">
-  <text>绑定手机号后即可评论</text>
-  <text class="accent">去绑定</text>
+<view wx:elif="{{post && post.reviewStatus === 'approved' && speakCode === 'NEED_PHONE'}}" class="composer guest-bar" bindtap="goBindPhone">
+  <text>验证手机号后即可评论</text>
+  <text class="accent">去验证</text>
 </view>
 <view wx:elif="{{post && post.reviewStatus === 'approved'}}" class="composer guest-bar">
   <text>{{speakMessage || '当前账号暂不能评论'}}</text>
@@ -323,3 +323,4 @@
 </view>
 <privacy-popup />
 <report-sheet id="report-sheet" />
+<phone-sheet id="phone-sheet" />
