@@ -2,7 +2,6 @@ const store = require('../../utils/store')
 const repo = require('../../utils/repo')
 const track = require('../../utils/track')
 const media = require('../../utils/media')
-const phoneBind = require('../../utils/phone-bind')
 const { formatTime } = require('../../utils/util')
 
 Page({
@@ -20,8 +19,7 @@ Page({
     studentNote: '',
     phoneBound: false,
     phoneMasked: '',
-    phoneRequired: false,
-    phoneBinding: false
+    phoneRequired: false
   },
 
   async onShow() {
@@ -51,12 +49,8 @@ Page({
     })
   },
 
-  async onGetPhoneNumber(e) {
-    if (this.data.phoneBinding) return
-    this.setData({ phoneBinding: true })
-    const ok = await phoneBind.bindFromEvent(e)
-    this.setData({ phoneBinding: false })
-    if (ok) this.refresh()
+  onPhoneBound() {
+    this.refresh()
   },
 
   onSchoolInput(e) {

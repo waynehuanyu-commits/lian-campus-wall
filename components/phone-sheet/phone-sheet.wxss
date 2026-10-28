@@ -1,58 +1,183 @@
+/* 手机号验证卡片：底部弹窗和发帖页内嵌共用；配色跟随主题的电光蓝 + 荧光黄绿 */
 .mask {
   position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 10000;
-  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: flex-end;
+  background: rgba(10, 20, 45, 0.42);
+  animation: fade-in 180ms ease-out both;
 }
 
 .panel {
   width: 100%;
-  background: #fff;
-  border-radius: 24rpx 24rpx 0 0;
-  padding: 36rpx 40rpx calc(24rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 48rpx calc(20rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  border-radius: 40rpx 40rpx 0 0;
+  background: linear-gradient(180deg, #f3f7ff 0%, #ffffff 220rpx);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: slide-up 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.handle {
+  width: 72rpx;
+  height: 8rpx;
+  border-radius: 8rpx;
+  background: rgba(18, 26, 44, 0.12);
+  margin-bottom: 36rpx;
+}
+
+.inline-card {
+  margin: 48rpx 32rpx 0;
+  padding: 56rpx 40rpx 44rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(180deg, #f3f7ff 0%, #ffffff 260rpx);
+  box-shadow: 0 16rpx 40rpx rgba(10, 42, 122, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.icon {
+  position: relative;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 36rpx;
+  background: #e9efff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-phone {
+  position: relative;
+  width: 40rpx;
+  height: 62rpx;
+  border: 6rpx solid #0a5cff;
+  border-radius: 12rpx;
   box-sizing: border-box;
 }
 
-.title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1f2937;
+.icon-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 6rpx;
+  width: 8rpx;
+  height: 8rpx;
+  margin-left: -4rpx;
+  border-radius: 50%;
+  background: #0a5cff;
+}
+
+.icon-badge {
+  position: absolute;
+  right: -6rpx;
+  bottom: -6rpx;
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
+  border-radius: 50%;
+  border: 4rpx solid #ffffff;
+  background: #d4f01e;
+  color: #0a2a7a;
+  font-size: 22rpx;
+  font-weight: 800;
   text-align: center;
 }
 
-.desc {
-  margin: 16rpx 0 32rpx;
+.title {
+  margin-top: 28rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #121a2c;
+  letter-spacing: 1rpx;
+}
+
+.subtitle {
+  margin-top: 10rpx;
   font-size: 26rpx;
-  line-height: 1.6;
-  color: #6b7280;
+  color: #858d9c;
+}
+
+.promises {
+  align-self: stretch;
+  margin: 36rpx 0 40rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 24rpx;
+  background: #f6f8fc;
+}
+
+.promise {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  font-size: 27rpx;
+  line-height: 1.4;
+  color: #3b4458;
+}
+
+.promise + .promise {
+  margin-top: 18rpx;
+}
+
+.tick {
+  flex-shrink: 0;
+  width: 34rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  border-radius: 50%;
+  background: #f3fbc4;
+  color: #0a2a7a;
+  font-size: 20rpx;
+  font-weight: 800;
   text-align: center;
 }
 
 .bind-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  border-radius: 999rpx;
-  background: #2f7dff;
-  color: #fff;
-  font-size: 30rpx;
-  font-weight: 600;
+  width: 100% !important;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 24rpx;
+  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  color: #ffffff;
+  font-size: 31rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  box-shadow: 0 12rpx 28rpx rgba(10, 82, 230, 0.28);
+  transition: transform 120ms ease;
 }
 
 .bind-btn::after {
   border: none;
 }
 
-.cancel {
-  height: 88rpx;
-  line-height: 88rpx;
-  margin-top: 8rpx;
-  text-align: center;
-  font-size: 28rpx;
-  color: #6b7280;
+.bind-btn-hover {
+  transform: scale(0.98);
+  opacity: 0.92;
+}
+
+.later {
+  margin-top: 12rpx;
+  padding: 20rpx 40rpx;
+  font-size: 27rpx;
+  color: #858d9c;
+  border-radius: 999rpx;
+}
+
+.later-hover {
+  background: rgba(18, 26, 44, 0.05);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }

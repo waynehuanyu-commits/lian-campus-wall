@@ -4,17 +4,7 @@
     <view class="notice-text">发帖和评论前需填写所在学校，提交后立即生效，无需等待审核。请填写真实学校全称，提交后不可修改。</view>
   </view>
 
-  <view wx:if="{{phoneRequired && !phoneBound}}" class="panel phone-card">
-    <view class="section-title">验证手机号</view>
-    <view class="notice-text">为了社区安全，发言前需要验证一次手机号。号码只用于账号安全核验，不会展示给任何其他用户。</view>
-    <button
-      class="btn-primary submit-btn"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="onGetPhoneNumber"
-      disabled="{{phoneBinding}}"
-      loading="{{phoneBinding}}"
-    >使用微信手机号验证</button>
-  </view>
+  <phone-sheet wx:if="{{phoneRequired && !phoneBound}}" inline bind:bound="onPhoneBound" />
 
   <block wx:if="{{locked}}">
     <view class="panel locked-card">

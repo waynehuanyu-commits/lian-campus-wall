@@ -1,10 +1,10 @@
 <view class="page publish-page">
-  <view wx:if="{{blocked}}" class="empty">
+  <phone-sheet wx:if="{{blocked && blockAction === 'phone'}}" inline bind:bound="onPhoneBound" />
+  <view wx:elif="{{blocked}}" class="empty">
     <view class="empty-title">{{blockTitle}}</view>
     <view>{{blockDesc}}</view>
     <button wx:if="{{blockAction === 'login'}}" class="btn-primary submit-btn" bindtap="goLogin">去开通发言</button>
     <button wx:elif="{{blockAction === 'auth'}}" class="btn-primary submit-btn" bindtap="goAuth">去认证学校</button>
-    <button wx:elif="{{blockAction === 'phone'}}" class="btn-primary submit-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">使用微信手机号验证</button>
   </view>
 
   <block wx:else>
