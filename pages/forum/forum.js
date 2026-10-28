@@ -173,7 +173,6 @@ Page({
       let tip = (gate && gate.message) || ''
       if (code === 'NEED_LOGIN') tip = '随便逛。发帖和评论需要先完成登录与学校认证'
       else if (code === 'NEED_AUTH') tip = '随便逛。发帖和评论需要先认证学校'
-      else if (code === 'NEED_PHONE') tip = '随便逛。发帖和评论前请先绑定手机号'
       this.setData({
         canSpeak: !!(gate && gate.ok),
         speakCode: code,

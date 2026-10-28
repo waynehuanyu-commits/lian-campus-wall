@@ -1334,18 +1334,3 @@ aside nav button {
 }
 
 .mod-drawer-panel { width: min(620px, 100%); display: grid; gap: 10px; align-content: start; }
-
-.mod-policy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 12px 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px dashed var(--line);
-  background: var(--bg-wash);
-}
-
-.mod-policy.on { border-style: solid; border-color: var(--brand); }
-.mod-policy button { flex-shrink: 0; }

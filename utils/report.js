@@ -31,7 +31,7 @@ function submitReason(reason, onSubmit, targetType, targetId) {
   })).then((result) => {
     wx.hideLoading()
     if (!result || !result.ok) {
-      if (result && ['NEED_LOGIN', 'NEED_AUTH', 'NEED_PHONE'].indexOf(result.code) >= 0) {
+      if (result && ['NEED_LOGIN', 'NEED_AUTH'].indexOf(result.code) >= 0) {
         require('./auth').promptReportBlocked(result)
         return
       }

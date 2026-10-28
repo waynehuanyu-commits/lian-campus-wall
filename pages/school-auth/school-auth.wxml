@@ -4,23 +4,6 @@
     <view class="notice-text">发帖和评论前需填写所在学校，提交后立即生效，无需等待审核。请填写真实学校全称，提交后不可修改。</view>
   </view>
 
-  <view class="panel phone-card">
-    <view class="row between">
-      <view class="section-title">手机号</view>
-      <view class="lock-tag {{phoneBound ? 'ok' : ''}}">{{phoneBound ? '已绑定' : (phoneRequired ? '发言前需绑定' : '未绑定')}}</view>
-    </view>
-    <view wx:if="{{phoneBound}}" class="locked-school">{{phoneMasked}}</view>
-    <view class="notice-text">用于身份核验和违规追溯，仅管理员可见，不会出现在帖子、评论或公开主页。一个手机号只能绑定一个账号。</view>
-    <button
-      wx:if="{{!phoneBound}}"
-      class="btn-primary submit-btn"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="onGetPhoneNumber"
-      disabled="{{phoneBinding}}"
-      loading="{{phoneBinding}}"
-    >微信手机号快速绑定</button>
-  </view>
-
   <block wx:if="{{locked}}">
     <view class="panel locked-card">
       <view class="row between">

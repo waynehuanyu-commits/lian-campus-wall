@@ -7,9 +7,8 @@ const REPORT_THRESHOLD = 6
 /**
  * 能否举报：必须登录、完成学校认证、账号未封禁、举报权限未被后台限制。
  * 后台账号（appAdmin）和官方身份不受学校认证限制。
- * options.requirePhone：后台打开手机号强制绑定时传 true。
  */
-function reportEligibility(user, options = {}) {
+function reportEligibility(user) {
   if (!user || !user.id || user.id === 'guest_readonly') {
     return { ok: false, code: 'NEED_LOGIN', message: '登录后才能举报' }
   }
@@ -22,10 +21,6 @@ function reportEligibility(user, options = {}) {
   const official = !!(user.appAdmin || user.officialLogin || user.id === 'official_lian_wall')
   if (!official && !(user.schoolName && user.schoolLocked)) {
     return { ok: false, code: 'NEED_AUTH', message: '完成学校认证后才能举报' }
-  }
-  // 后台打开「发言前必须绑定手机号」后，举报同样要求已绑定（前端拿不到号码，只看 phoneBound）
-  if (!official && options.requirePhone && !(user.phone || user.phoneBound)) {
-    return { ok: false, code: 'NEED_PHONE', message: '绑定手机号后才能举报' }
   }
   return { ok: true, code: 'OK', message: '' }
 }
