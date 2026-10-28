@@ -1,33 +1,14 @@
-<template name="phone-card">
-  <view class="icon">
-    <view class="icon-phone"><view class="icon-dot"></view></view>
-    <view class="icon-badge">✓</view>
-  </view>
-  <view class="title">验证一下手机号</view>
-  <view class="subtitle">为了社区安全，发言前需要验证一次</view>
-  <view class="promises">
-    <view class="promise"><text class="tick">✓</text><text>只用于账号安全核验</text></view>
-    <view class="promise"><text class="tick">✓</text><text>其他用户看不到你的号码</text></view>
-    <view class="promise"><text class="tick">✓</text><text>验证一次，之后不用再验</text></view>
-  </view>
-  <button
-    class="bind-btn"
-    hover-class="bind-btn-hover"
-    open-type="getPhoneNumber"
-    bindgetphonenumber="onGetPhoneNumber"
-    disabled="{{binding}}"
-    loading="{{binding}}"
-  >微信手机号一键验证</button>
-</template>
-
-<view wx:if="{{inline}}" class="inline-card">
-  <template is="phone-card" data="{{binding}}" />
-</view>
-
-<view wx:elif="{{show}}" class="mask" catchtouchmove="noop" bindtap="close">
+<view wx:if="{{show}}" class="mask" catchtouchmove="noop" bindtap="close">
   <view class="panel" catchtap="noop">
-    <view class="handle"></view>
-    <template is="phone-card" data="{{binding}}" />
-    <view class="later" hover-class="later-hover" bindtap="close">暂不验证</view>
+    <view class="title">验证手机号</view>
+    <view class="desc">为了社区安全，发言前需要验证一次手机号。号码只用于账号安全核验，不会展示给任何其他用户。</view>
+    <button
+      class="bind-btn"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{binding}}"
+      loading="{{binding}}"
+    >使用微信手机号验证</button>
+    <view class="cancel" bindtap="close">暂不验证</view>
   </view>
 </view>

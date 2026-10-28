@@ -2,11 +2,6 @@ const phoneBind = require('../../utils/phone-bind')
 
 // 需要手机号时从底部弹出；绑定入口只在这里出现，「我的」里不常驻
 Component({
-  properties: {
-    // 内嵌模式：直接在页面里显示卡片（发帖页被拦时用），验证成功后触发 bound 事件
-    inline: { type: Boolean, value: false }
-  },
-
   data: {
     show: false,
     binding: false,
@@ -34,10 +29,6 @@ Component({
       const ok = await phoneBind.bindFromEvent(e)
       this.setData({ binding: false })
       if (!ok) return
-      if (this.data.inline) {
-        this.triggerEvent('bound')
-        return
-      }
       this.close()
       if (this._onBound) this._onBound()
     }
