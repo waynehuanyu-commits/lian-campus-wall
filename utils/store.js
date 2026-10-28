@@ -1723,7 +1723,8 @@ function localPostId(prefix, submitId) {
   return /^[A-Za-z0-9_-]{8,64}$/.test(text) ? `${prefix}${text}` : ''
 }
 
-function createForumPost(payload) {
+function createForumPost(rawPayload) {
+  const payload = { ...(rawPayload || {}), anonymous: false }
   const gate = getSpeakGate()
   if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
   const user = getUser()
@@ -1797,7 +1798,8 @@ function createForumPost(payload) {
   return { ok: true, post }
 }
 
-function createWallPost(payload) {
+function createWallPost(rawPayload) {
+  const payload = { ...(rawPayload || {}), anonymous: false }
   const gate = getSpeakGate()
   if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
   const user = getUser()

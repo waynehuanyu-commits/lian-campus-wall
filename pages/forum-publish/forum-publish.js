@@ -17,7 +17,6 @@ Page({
     content: '',
     images: [],
     contactValue: '',
-    anonymous: false,
     blocked: false,
     blockTitle: '',
     blockDesc: '',
@@ -93,10 +92,6 @@ Page({
     this.setData({ content: e.detail.value })
   },
 
-  onAnonymousChange(e) {
-    this.setData({ anonymous: e.detail.value })
-  },
-
   onContactInput(e) {
     this.setData({ contactValue: e.detail.value })
   },
@@ -159,7 +154,6 @@ Page({
       title,
       content,
       images: this.data.images,
-      anonymous: this.data.anonymous,
       contactType: (contact && contact.contactType) || '',
       contactValue: (contact && contact.contactValue) || ''
     }
@@ -188,7 +182,7 @@ Page({
       contentType: 'forum',
       contentId: (result && result.post && result.post.id) || '',
       category: tag,
-      anonymous: !!this.data.anonymous,
+      anonymous: false,
       imageCount: (this.data.images || []).length
     })
     const status = result.post && result.post.reviewStatus

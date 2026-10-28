@@ -3097,7 +3097,9 @@ const handlers = {
     return { ok: true }
   },
 
-  async createForumPost(payload, user) {
+  async createForumPost(rawPayload, user) {
+    // 2026-10 审核整改：发帖不再支持匿名（平台不开放匿名社交），老版本前端传 anonymous 也一律实名
+    const payload = { ...(rawPayload || {}), anonymous: false }
     const gate = speakGate(user)
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const title = String(payload.title || '').trim()
@@ -3171,7 +3173,9 @@ const handlers = {
     return { ...result, speakGate: speakGate(user) }
   },
 
-  async createWallPost(payload, user) {
+  async createWallPost(rawPayload, user) {
+    // 2026-10 审核整改：发帖不再支持匿名（平台不开放匿名社交），老版本前端传 anonymous 也一律实名
+    const payload = { ...(rawPayload || {}), anonymous: false }
     const gate = speakGate(user)
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const contact = validateWallContact(payload.contactType, payload.contactValue, payload.tag)

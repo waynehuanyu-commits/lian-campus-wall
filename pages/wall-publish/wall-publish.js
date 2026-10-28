@@ -62,7 +62,6 @@ Page({
     allowContact: true,
     contactType: 'wechat',
     contactValue: '',
-    anonymous: false,
     submitting: false,
     published: false,
     blocked: false,
@@ -160,10 +159,6 @@ Page({
     this.setData({ contactValue: e.detail.value })
   },
 
-  onAnonymousChange(e) {
-    this.setData({ anonymous: e.detail.value })
-  },
-
   chooseImages() {
     const remain = this.data.maxImages - this.data.images.length
     media.chooseImages({
@@ -190,7 +185,7 @@ Page({
 
   async onSubmit() {
     if (this._submitLock || this.data.submitting || this.data.published || !auth.ensureCanSpeak()) return
-    const { tag, isRide, title, extraField, extra, routeFrom, routeTo, departTime, content, images, contactValue, anonymous } = this.data
+    const { tag, isRide, title, extraField, extra, routeFrom, routeTo, departTime, content, images, contactValue } = this.data
     const text = (content || '').trim()
     const titleText = (title || '').trim()
 
@@ -218,8 +213,7 @@ Page({
       content: text,
       images,
       contactType: contact.contactType,
-      contactValue: contact.contactValue,
-      anonymous
+      contactValue: contact.contactValue
     }
     const submitId = publishGuard.submitIdFor(this, draft)
     const result = await publishGuard.runPublish(() => repo.createWallPost({ ...draft, submitId }))
@@ -244,7 +238,7 @@ Page({
       contentType: 'wall',
       contentId: (result && result.post && result.post.id) || '',
       tag,
-      anonymous: !!anonymous,
+      anonymous: false,
       imageCount: (images || []).length
     })
     const status = result.post && result.post.reviewStatus
