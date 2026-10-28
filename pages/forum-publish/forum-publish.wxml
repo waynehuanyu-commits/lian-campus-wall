@@ -53,16 +53,6 @@
     </view>
   </view>
 
-  <view class="pub-card pub-list">
-    <view class="pub-row">
-      <view class="pub-row-copy">
-        <text class="pub-row-title">匿名发布</text>
-        <text class="pub-row-desc">其他人将看不到你的昵称</text>
-      </view>
-      <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
-    </view>
-  </view>
-
   <view class="pub-submit-bar">
     <button class="pub-submit" bindtap="onSubmit" disabled="{{submitting || published}}" loading="{{submitting}}">{{published ? '已发布' : (submitting ? '发布中' : '发布')}}</button>
   </view>
