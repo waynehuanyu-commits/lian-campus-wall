@@ -124,7 +124,7 @@ function reporterLine(report) {
       </div>
       <div class="meta">
         举报者 <button type="button" class="link-btn" data-reporter="${esc(report.reporterId)}">${esc(who.nickname || report.reporterName || '未设昵称')}（${esc(report.reporterId)}）</button>
-        · ${esc(who.schoolName || '未认证')} · 手机号 ${esc(who.phone || '未绑定')} · ${formatTime(report.createdAt)} ${accountTag(who)}
+        · ${esc(who.schoolName || '未认证')} · ${formatTime(report.createdAt)} ${accountTag(who)}
       </div>
       <div class="meta">历史举报 ${stats.total || 0} 次：成立 ${stats.upheld || 0} · 不成立 ${stats.dismissed || 0} · 待处理 ${stats.pending || 0}</div>
       ${report.note ? `<div class="meta">补充：${esc(report.note)}</div>` : ''}
@@ -142,7 +142,7 @@ function reportCaseHtml(item) {
         <span>${esc(MOD_TYPE_LABEL[item.targetType] || item.targetType)} · 本轮有效举报 ${item.activeReporterCount} / ${item.threshold} 人</span>
       </div>
       <div class="meta">
-        内容作者 ${author ? `${esc(author.nickname || item.authorName || '未设昵称')}（${esc(author.id)}${author.phone ? ` · ${esc(author.phone)}` : ''}）` : '—'}${item.anonymous ? ' <span class="anon-tag">匿名发布</span>' : ''}
+        内容作者 ${author ? `${esc(author.nickname || item.authorName || '未设昵称')}（${esc(author.id)}）` : '—'}${item.anonymous ? ' <span class="anon-tag">匿名发布</span>' : ''}
         ${author ? accountTag(author) : ''}
         ${item.reviewStatusLabel ? ` · <span class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel)}</span>` : ''}
         ${item.reportHidden ? ' <span class="status-pill warn">因举报自动隐藏</span>' : ''}
@@ -236,7 +236,7 @@ async function openReporter(reporterId, page = 0) {
   const stats = result.stats || {}
   const panel = openDrawer(`
     <div class="row"><h3>举报者档案</h3><button type="button" class="quiet" data-drawer-close>关闭</button></div>
-    <div class="meta">${esc(account.nickname || '未设昵称')}（${esc(account.id)}）· ${esc(account.schoolName || '未认证')} · 手机号 ${esc(account.phone || '未绑定')}</div>
+    <div class="meta">${esc(account.nickname || '未设昵称')}（${esc(account.id)}）· ${esc(account.schoolName || '未认证')}</div>
     <div class="meta">账号状态 ${esc(ACCOUNT_STATUS_LABEL[account.status] || account.status)} ${accountTag(account)}</div>
     ${account.reportBlocked ? `<div class="meta">限制举报原因：${esc(account.reportBlockedReason || '—')} · ${esc(account.reportBlockedBy || '')} ${formatTime(account.reportBlockedAt)}</div>` : ''}
     <div class="mod-stats">
@@ -397,7 +397,7 @@ async function openContentDetail(type, id) {
     <div class="row"><h3>${esc(MOD_TYPE_LABEL[type])}详情</h3><button type="button" class="quiet" data-drawer-close>关闭</button></div>
     <div class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel)}</div>
     ${type !== 'comment' ? `<h3 style="margin-top:12px">${esc(item.headline)}</h3>` : ''}
-    <div class="meta">作者 ${authorHtml(item.authorName, item.anonymous, real)}${real ? `（${esc(real.id)}${real.phone ? ` · ${esc(real.phone)}` : ''}）` : ''} · ${formatTime(item.createdAt)}</div>
+    <div class="meta">作者 ${authorHtml(item.authorName, item.anonymous, real)}${real ? `（${esc(real.id)}）` : ''} · ${formatTime(item.createdAt)}</div>
     <div class="meta">${type === 'comment' ? `点赞 ${item.likeCount}` : `浏览 ${item.viewCount} · 点赞 ${item.likeCount} · 评论 ${item.commentCount}`}</div>
     <div class="detail-block"><div class="field-label">完整内容</div><div class="detail-text">${esc(item.content || '（无文字）')}</div>${item.extra ? `<div class="detail-text">${esc(item.extra)}</div>` : ''}</div>
     ${imagesHtml(item.images)}
@@ -490,36 +490,4 @@ function bindModCommon(panel) {
   panel.querySelectorAll('[data-content-act]').forEach((btn) => {
     btn.onclick = () => changeVisibility(btn.dataset.type, btn.dataset.id, btn.dataset.contentAct, reloadContent)
   })
-}
-
-// ---------- 手机号绑定开关（账号处置页） ----------
-
-function phonePolicyHtml(policy) {
-  const on = !!(policy && policy.required)
-  return `
-    <div class="mod-policy ${on ? 'on' : ''}">
-      <div>
-        <strong>发言前必须绑定手机号：${on ? '已开启' : '未开启'}</strong>
-        <div class="meta">${on
-          ? '发帖、评论、举报前要先在小程序「学校认证」页绑定手机号。'
-          : '先在公众平台「用户隐私保护指引」里补上手机号，带绑定入口的小程序版本上线后再开启。'}${policy && policy.updatedAt ? ` · ${esc(policy.updatedBy || '')} ${formatTime(policy.updatedAt)}` : ''}</div>
-      </div>
-      <button type="button" class="${on ? 'quiet' : ''}" data-phone-policy="${on ? 'off' : 'on'}">${on ? '关闭' : '开启'}</button>
-    </div>`
-}
-
-function bindPhonePolicy(panel) {
-  const btn = panel.querySelector('[data-phone-policy]')
-  if (!btn) return
-  btn.onclick = async () => {
-    const turnOn = btn.dataset.phonePolicy === 'on'
-    const tip = turnOn
-      ? '开启后，没绑手机号的用户不能发帖、评论、举报（约 1 分钟内生效）。确认隐私指引已更新、新版本已上线？'
-      : '关闭后，不绑手机号也能发言。确认关闭？'
-    if (!window.confirm(tip)) return
-    const result = await api('/api/phone-policy', { method: 'POST', body: JSON.stringify({ required: turnOn }) })
-    if (!result.ok) return alert(result.message || '保存失败')
-    state.data.phonePolicy = result
-    render()
-  }
 }

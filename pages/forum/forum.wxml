@@ -66,10 +66,6 @@
     <text>{{guestTip}}</text>
     <text class="action">去认证</text>
   </view>
-  <view wx:elif="{{!canSpeak && speakCode === 'NEED_PHONE'}}" class="guest-tip" bindtap="goAuth">
-    <text>{{guestTip}}</text>
-    <text class="action">去绑定</text>
-  </view>
   <view wx:elif="{{!canSpeak && guestTip}}" class="guest-tip">
     <text>{{guestTip}}</text>
   </view>

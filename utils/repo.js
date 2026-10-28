@@ -564,12 +564,6 @@ async function leaveOfficial() {
   return switchIdentity('leaveOfficial')
 }
 
-// 微信「手机号快速验证」拿到的一次性 code，交给云函数换真实号码并绑定到当前账号
-async function bindPhone(code) {
-  if (!config.useCloud) return store.bindPhone(code)
-  return callCloud('bindPhone', { code })
-}
-
 async function submitSchoolInfo(payload) {
   if (!config.useCloud) return store.submitSchoolInfo(payload)
   return callCloud('submitSchoolInfo', payload)
@@ -1170,7 +1164,6 @@ module.exports = {
   enterOfficial,
   leaveOfficial,
   submitSchoolInfo,
-  bindPhone,
   submitStudentAuth,
   requestSchoolChange,
   listForum,

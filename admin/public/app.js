@@ -400,10 +400,9 @@ async function render() {
     panel.innerHTML = `
       <div class="card">
         <h3>账号处置</h3>
-        <p class="muted">加白名单、设管理员、禁言和封禁，都用小程序「我的」里的账号编号。编号每人一条，不会因为昵称重复或没改昵称而对错人。把编号或 11 位手机号贴到下面搜索。</p>
-        ${phonePolicyHtml(data.phonePolicy)}
+        <p class="muted">加白名单、设管理员、禁言和封禁，都用小程序「我的」里的账号编号。编号每人一条，不会因为昵称重复或没改昵称而对错人。把编号贴到下面搜索。</p>
         <div class="row gap">
-          <input id="account-query" placeholder="贴账号编号（u_ 开头）或手机号" value="${esc(query)}" />
+          <input id="account-query" placeholder="贴账号编号，例如 u_ 开头" value="${esc(query)}" />
           <button id="account-search" type="button">搜索</button>
         </div>
         <div class="chips">
@@ -413,7 +412,7 @@ async function render() {
       ${listOrEmpty(accounts, (item) => `
         <div class="card list-item">
           <div class="row"><strong>${esc(item.nickname)}</strong><span>${item.appAdmin ? '小程序管理员' : (item.postWhitelist ? '发帖白名单' : statusText(item))}</span></div>
-          <div class="meta">账号编号 ${esc(item.id || '')} · 手机号 ${item.phone ? esc(item.phone) : '未绑定'}</div>
+          <div class="meta">账号编号 ${esc(item.id || '')}</div>
           <div class="meta">${esc([item.schoolName, item.schoolCampus].filter(Boolean).join(' · ') || '未认证')}</div>
           <div class="meta">风险 ${item.riskScore || 0} · 违规 ${item.violateCount || 0}${item.banReason ? ` · ${esc(item.banReason)}` : ''}</div>
           <div class="actions">
@@ -436,7 +435,6 @@ async function render() {
             <div class="meta">${esc(item.reviewNote || '')} · 规则 ${esc(ruleText(item.reviewRuleIds))}</div>${retiredHint(item.reviewRuleIds)}
           </div>`)}
       </div>`
-    bindPhonePolicy(panel)
     const search = panel.querySelector('#account-search')
     const input = panel.querySelector('#account-query')
     const runAccountSearch = async () => {
@@ -2035,9 +2033,8 @@ async function loadNav(nav) {
     return
   }
   if (nav === 'accounts') {
-    const [accounts, policy] = await Promise.all([api('/api/accounts'), api('/api/phone-policy')])
+    const accounts = await api('/api/accounts')
     if (accounts.ok) state.data.accounts = accounts.list || []
-    if (policy.ok) state.data.phonePolicy = policy
     if (state.nav === 'accounts') render()
     // 拦截列表后置，避免和账号列表抢跨海连接
     const intercepts = await api('/api/reviews?status=' + encodeURIComponent('rejected'))
