@@ -16,7 +16,11 @@ Page({
     studentStatusClass: '',
     studentReviewNote: '',
     studentImages: [],
-    studentNote: ''
+    studentNote: '',
+    phoneBound: false,
+    phoneMasked: '',
+    phoneRequired: false,
+    phoneBinding: false
   },
 
   async onShow() {
@@ -39,8 +43,42 @@ Page({
       studentStatusClass: status === 'approved' ? 'ok' : (status === 'rejected' ? 'danger' : ''),
       studentReviewNote: user.studentAuthReviewNote || '',
       studentImages: status === 'pending' || status === 'approved' ? (user.studentAuthImages || []) : this.data.studentImages,
-      studentNote: user.studentAuthNote || this.data.studentNote
+      studentNote: user.studentAuthNote || this.data.studentNote,
+      phoneBound: !!user.phoneBound,
+      phoneMasked: user.phoneMasked || '',
+      phoneRequired: !!user.phoneRequired
     })
+  },
+
+  // 微信手机号快速验证：拿到一次性 code 交给云函数换号码；用户拒绝或额度不足时 detail 里没有 code
+  async onGetPhoneNumber(e) {
+    const detail = (e && e.detail) || {}
+    if (!detail.code) {
+      const denied = /deny|cancel/i.test(detail.errMsg || '')
+      wx.showToast({ title: denied ? '需要授权手机号才能完成绑定' : '暂时无法获取手机号，请稍后再试', icon: 'none' })
+      return
+    }
+    if (this.data.phoneBinding) return
+    this.setData({ phoneBinding: true })
+    let result
+    try {
+      result = await repo.bindPhone(detail.code)
+    } catch (err) {
+      result = { ok: false, message: (err && err.message) || '绑定失败，请重试' }
+    }
+    this.setData({ phoneBinding: false })
+    if (!result || !result.ok) {
+      wx.showModal({
+        title: '手机号没绑上',
+        content: (result && result.message) || '绑定失败，请重试',
+        showCancel: false,
+        confirmColor: '#2F7DFF'
+      })
+      return
+    }
+    if (result.user) getApp().globalData.user = result.user
+    wx.showToast({ title: '手机号已绑定', icon: 'success' })
+    this.refresh()
   },
 
   onSchoolInput(e) {

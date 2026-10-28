@@ -47,6 +47,7 @@ Page({
     let blockAction = ''
     if (gate.code === 'NEED_LOGIN') blockAction = 'login'
     else if (gate.code === 'NEED_AUTH') blockAction = 'auth'
+    else if (gate.code === 'NEED_PHONE') blockAction = 'phone'
     this.setData({
       blocked: !gate.ok,
       blockTitle: gate.title || (blockAction === 'login' ? '开通发言' : '投稿前请先认证学校'),

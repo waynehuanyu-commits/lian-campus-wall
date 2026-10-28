@@ -262,6 +262,26 @@ function publicAccount(item) {
   return rest
 }
 
+// 「发言前必须绑定手机号」开关：云函数读 meta/phone_policy，约 1 分钟内生效
+async function getPhonePolicy() {
+  const doc = await db.getDoc('meta', 'phone_policy')
+  return { ok: true, required: !!(doc && doc.required), updatedAt: (doc && doc.updatedAt) || 0, updatedBy: (doc && doc.updatedBy) || '' }
+}
+
+async function setPhonePolicy(required, operator = '') {
+  await db.setDoc('meta', 'phone_policy', { id: 'phone_policy', required: !!required, updatedAt: Date.now(), updatedBy: operator })
+  const logId = uid('sl_')
+  await db.setDoc('security_logs', logId, {
+    id: logId,
+    level: 'warn',
+    type: 'phone_policy',
+    operator,
+    detail: required ? '打开「发言前必须绑定手机号」' : '关闭「发言前必须绑定手机号」',
+    createdAt: Date.now()
+  })
+  return getPhonePolicy()
+}
+
 async function listPostWhitelist() {
   const users = db.useLocal()
     ? (await db.allDocs('users')).filter((item) => item.postWhitelist)
@@ -287,7 +307,7 @@ async function searchAccounts(query) {
   if (db.useLocal()) {
     const users = await db.allDocs('users')
     return users
-      .filter((item) => [item.nickname, item.schoolName, item.schoolCampus, item.id].join(' ').includes(q))
+      .filter((item) => [item.nickname, item.schoolName, item.schoolCampus, item.id, item.phone].join(' ').includes(q))
       .slice(0, 20)
       .map(publicAccount)
   }
@@ -296,7 +316,10 @@ async function searchAccounts(query) {
   const regexp = database.RegExp({ regexp: safe, options: 'i' })
   const byId = /^u_[A-Za-z0-9_]+$/.test(q)
     ? await db.getDoc('users', q).then((row) => (row ? [row] : [])).catch(() => [])
-    : []
+    : (/^\d{11}$/.test(q)
+      // 11 位数字按手机号精确查
+      ? ((await database.collection('users').where({ phone: q }).limit(5).get().catch(() => ({ data: [] }))).data || [])
+      : [])
   const [byName, bySchool, exact] = await Promise.all([
     database.collection('users').where({ nickname: regexp }).limit(20).get().catch(() => ({ data: [] })),
     database.collection('users').where({ schoolName: regexp }).limit(20).get().catch(() => ({ data: [] })),
@@ -1579,6 +1602,8 @@ module.exports = {
   removeKeyword,
   listAccounts,
   setAccountStatus,
+  getPhonePolicy,
+  setPhonePolicy,
   setAppAdmin,
   setPostWhitelist,
   listPostWhitelist,

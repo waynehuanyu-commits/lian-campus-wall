@@ -28,7 +28,7 @@ async function goLogin() {
     return
   }
   // 云端会按 OPENID 自动建号，本地也会默认建用户；真正卡点往往是学校认证
-  if (existing && existing.code === 'NEED_AUTH') {
+  if (existing && (existing.code === 'NEED_AUTH' || existing.code === 'NEED_PHONE')) {
     goSchoolAuth()
     return
   }
@@ -46,7 +46,7 @@ async function goLogin() {
       wx.showToast({ title: '已可发言', icon: 'success' })
       return
     }
-    if (gate && gate.code === 'NEED_AUTH') {
+    if (gate && (gate.code === 'NEED_AUTH' || gate.code === 'NEED_PHONE')) {
       goSchoolAuth()
       return
     }
@@ -78,6 +78,20 @@ function safeBack(delay = 0) {
   else go()
 }
 
+// 绑定手机号的入口放在学校认证页
+function promptPhone(message) {
+  wx.showModal({
+    title: '需要绑定手机号',
+    content: message || '发帖、评论和举报前请绑定手机号，用于身份核验和违规追溯，仅管理员可见，不会公开展示。',
+    confirmText: '去绑定',
+    cancelText: '先看看',
+    confirmColor: '#2F7DFF',
+    success(res) {
+      if (res.confirm) goSchoolAuth()
+    }
+  })
+}
+
 function ensureCanSpeak() {
   const gate = cachedGate()
   if (gate.ok) return true
@@ -105,6 +119,10 @@ function ensureCanSpeak() {
         if (res.confirm) goSchoolAuth()
       }
     })
+    return false
+  }
+  if (gate.code === 'NEED_PHONE') {
+    promptPhone(gate.message)
     return false
   }
   wx.showModal({
@@ -143,6 +161,10 @@ function promptReportBlocked(check) {
     })
     return
   }
+  if (check.code === 'NEED_PHONE') {
+    promptPhone('绑定手机号后才能举报。手机号仅管理员可见，不会公开展示。')
+    return
+  }
   wx.showToast({ title: check.message || '当前账号不能举报', icon: 'none' })
 }
 
@@ -150,7 +172,7 @@ function promptReportBlocked(check) {
 function ensureCanReport() {
   const app = getApp()
   const user = (app && app.globalData && app.globalData.user) || null
-  const check = reportRules.reportEligibility(repo.isLoggedOut() ? null : user)
+  const check = reportRules.reportEligibility(repo.isLoggedOut() ? null : user, { requirePhone: !!(user && user.phoneRequired) })
   if (check.ok) return true
   promptReportBlocked(check)
   return false
@@ -164,6 +186,10 @@ function showActionError(result) {
   }
   if (result.code === 'NEED_AUTH') {
     ensureCanSpeak()
+    return true
+  }
+  if (result.code === 'NEED_PHONE') {
+    promptPhone(result.message)
     return true
   }
   const titles = {
@@ -192,6 +218,7 @@ module.exports = {
   ensureCanSpeak,
   ensureCanReport,
   promptReportBlocked,
+  promptPhone,
   showActionError,
   safeBack,
   cachedGate

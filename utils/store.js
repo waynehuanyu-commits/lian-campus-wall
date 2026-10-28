@@ -1050,6 +1050,15 @@ function saveSchoolRequests(list) {
   wx.setStorageSync(KEYS.SCHOOL_REQUESTS, list)
 }
 
+// 本地演示：没有真实手机号接口，只模拟绑定成功，号码用占位值
+function bindPhone(code) {
+  if (!code) return { ok: false, message: '没有拿到手机号授权，请重试' }
+  const user = getUser()
+  applyUserPatch(user.id, { phone: '13800000000', phoneBoundAt: Date.now() })
+  const next = { ...getUser(), phoneBound: true, phoneMasked: '138****0000' }
+  return { ok: true, user: next }
+}
+
 function submitSchoolInfo({ schoolName, schoolCampus }) {
   const user = getUser()
   if (user.status === 'banned') {
@@ -3828,6 +3837,7 @@ module.exports = {
   canSpeak,
   getSpeakGate,
   submitSchoolInfo,
+  bindPhone,
   requestSchoolChange,
   listSchoolRequests,
   reviewSchoolChange,

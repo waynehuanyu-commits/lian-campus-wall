@@ -395,6 +395,18 @@ const routes = {
     json(res, 200, await service.resolveReport(body.id, body, operatorOf(session)))
   },
 
+  'GET /api/phone-policy': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, await service.getPhonePolicy())
+  },
+
+  'POST /api/phone-policy': async (req, res) => {
+    const session = requireRoot(req, res)
+    if (!session) return
+    const body = await readBody(req)
+    json(res, 200, await service.setPhonePolicy(!!body.required, operatorOf(session)))
+  },
+
   'GET /api/reporters': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const url = new URL(req.url, 'http://127.0.0.1')
