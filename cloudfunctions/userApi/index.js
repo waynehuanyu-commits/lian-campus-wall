@@ -468,8 +468,8 @@ async function loadPhonePolicy() {
 const NEED_PHONE_GATE = {
   ok: false,
   code: 'NEED_PHONE',
-  title: '验证手机号',
-  message: '为了社区安全，发言前需要验证一次手机号。号码只用于账号安全核验，不会展示给任何其他用户。'
+  title: '需要绑定手机号',
+  message: '发帖、评论和举报前请绑定手机号，用于身份核验和违规追溯，仅管理员可见，不会公开展示。'
 }
 
 function needsPhone(user) {

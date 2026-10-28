@@ -1,5 +1,4 @@
 const store = require('../../utils/store')
-const phoneBind = require('../../utils/phone-bind')
 const repo = require('../../utils/repo')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
@@ -51,12 +50,6 @@ Page({
   currentTag() {
     if (this.data.tagMode === 'other') return this.cleanTag(this.data.customTag)
     return this.data.tag || store.DEFAULT_HOME_TAG
-  },
-
-  // 发帖页被手机号拦住时，直接在这里验证，成功后按新权限重画
-  async onGetPhoneNumber(e) {
-    const ok = await phoneBind.bindFromEvent(e)
-    if (ok) this.onShow()
   },
 
   goAuth() {

@@ -399,10 +399,6 @@ Page({
     auth.goSchoolAuth()
   },
 
-  goBindPhone() {
-    auth.promptPhone()
-  },
-
   goLogin() {
     auth.goLogin()
   },
