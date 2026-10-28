@@ -4,7 +4,8 @@
       "security.msgSecCheck",
       "security.imgSecCheck",
       "wxacode.getUnlimited",
-      "urlscheme.generate"
+      "urlscheme.generate",
+      "phonenumber.getPhoneNumber"
     ]
   },
   "timeout": 20

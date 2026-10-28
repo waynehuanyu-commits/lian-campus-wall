@@ -429,6 +429,12 @@ function publicUser(user) {
   next.appAdmin = !!user.appAdmin
   next.officialLogin = next.id === OFFICIAL_AUTHOR_ID
   next.officialLoginAllowed = !!user.officialLoginAllowed && !next.officialLogin
+  // 手机号只留在服务端，前端只拿到是否已绑定和打码后的号码
+  next.phoneBound = !!user.phone
+  next.phoneMasked = maskPhone(user.phone)
+  next.phoneRequired = phonePolicy.required
+  delete next.phone
+  delete next.phoneCountryCode
   return next
 }
 
@@ -441,6 +447,41 @@ function normalizeUser(user) {
     if (!next.bannedAt) next.banReason = ''
   }
   return next
+}
+
+// 手机号绑定策略（meta/phone_policy.required）：打开后，发帖、评论、举报前必须绑定手机号。
+// 默认关闭——要等公众平台隐私指引补上「手机号」、带绑定入口的新版本上线后，再在运营后台打开。
+let phonePolicy = { required: false, at: 0 }
+
+async function loadPhonePolicy() {
+  if (Date.now() - phonePolicy.at < 60000) return phonePolicy
+  try {
+    const doc = (await db.collection('meta').doc('phone_policy').get()).data
+    phonePolicy = { required: !!(doc && doc.required), at: Date.now() }
+  } catch (err) {
+    // 文档不存在或读失败：沿用上次的值，不因为读不到就把所有人挡在外面
+    phonePolicy = { required: phonePolicy.required, at: Date.now() }
+  }
+  return phonePolicy
+}
+
+const NEED_PHONE_GATE = {
+  ok: false,
+  code: 'NEED_PHONE',
+  title: '需要绑定手机号',
+  message: '发帖、评论和举报前请绑定手机号，用于身份核验和违规追溯，仅管理员可见，不会公开展示。'
+}
+
+function needsPhone(user) {
+  if (!phonePolicy.required || !user) return false
+  if (user.appAdmin || user.officialLogin || user.id === OFFICIAL_AUTHOR_ID) return false
+  return !user.phone
+}
+
+function maskPhone(phone) {
+  const text = String(phone || '')
+  if (text.length < 7) return text ? '***' : ''
+  return `${text.slice(0, 3)}****${text.slice(-4)}`
 }
 
 function speakGate(user) {
@@ -480,6 +521,7 @@ function speakGate(user) {
       message: '发帖和评论前，请先填写所在学校完成基础认证，提交后立即生效，无需等待审核。'
     }
   }
+  if (needsPhone(current)) return { ...NEED_PHONE_GATE }
   return { ok: true, code: 'OK', title: '', message: '' }
 }
 
@@ -2576,6 +2618,34 @@ const handlers = {
     return { ok: true, user: publicUser(saved), speakGate: speakGate(saved) }
   },
 
+  async bindPhone(payload, user) {
+    if (!user || user.id === 'guest_readonly') return { ok: false, code: 'NEED_LOGIN', message: '请先登录' }
+    if (user.officialLogin || user.id === OFFICIAL_AUTHOR_ID) return { ok: false, message: '请先切回个人身份再绑定手机号' }
+    const code = String((payload && payload.code) || '').trim()
+    if (!code) return { ok: false, message: '没有拿到手机号授权，请重试' }
+    let info = null
+    try {
+      const res = await cloud.openapi.phonenumber.getPhoneNumber({ code })
+      info = res && (res.phoneInfo || res.phone_info)
+    } catch (err) {
+      const errCode = err && (err.errCode || err.errcode)
+      console.error('[bindPhone]', errCode, err && (err.errMsg || err.message))
+      return { ok: false, message: `手机号验证失败，请稍后重试${errCode ? `（${errCode}）` : ''}` }
+    }
+    const phone = String((info && (info.purePhoneNumber || info.phoneNumber)) || '').replace(/\s+/g, '')
+    if (!/^\d{5,15}$/.test(phone)) return { ok: false, message: '没有拿到有效的手机号，请重试' }
+    // 一个手机号只绑一个账号，出了问题能对应到唯一的人
+    const taken = await db.collection('users').where({ phone }).limit(3).get().catch(() => ({ data: [] }))
+    if ((taken.data || []).some((item) => (item.id || item._id) !== user.id)) {
+      return { ok: false, code: 'PHONE_TAKEN', message: '这个手机号已绑定其他账号，如需更换请联系运营' }
+    }
+    const patch = { phone, phoneCountryCode: String((info && info.countryCode) || '86'), phoneBoundAt: Date.now() }
+    await db.collection('users').doc(user.id).update({ data: patch })
+    if (user.openid) userByOpenidCache.delete(user.openid)
+    const next = { ...user, ...patch }
+    return { ok: true, user: publicUser(next), speakGate: speakGate(next) }
+  },
+
   async me(_payload, user) {
     return { ok: true, user: publicUser(user), speakGate: speakGate(user) }
   },
@@ -4670,7 +4740,7 @@ const handlers = {
     const freshUser = user && user.id !== 'guest_readonly'
       ? ((await readPost(db.collection('users').doc(user.id)).catch(() => null)) || user)
       : user
-    const eligible = reportRules.reportEligibility(user && user.officialLogin ? user : freshUser)
+    const eligible = reportRules.reportEligibility(user && user.officialLogin ? user : freshUser, { requirePhone: phonePolicy.required })
     if (!eligible.ok) return { ok: false, code: eligible.code, message: eligible.message }
     const reasonMeta = REPORT_REASONS.find((item) => item.id === payload.reason)
       || REPORT_REASONS.find((item) => item.id === 'other')
@@ -4979,6 +5049,7 @@ exports.main = async (event) => {
       return { ok: false, message: '未登录' }
     }
 
+    await loadPhonePolicy()
     const result = await handler(payload, user)
     if (!result || result.ok === false) return result
     return result

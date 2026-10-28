@@ -95,6 +95,7 @@ Page({
       let tip = gate.message || ''
       if (code === 'NEED_LOGIN') tip = '浏览开放。发布和留言前请先完成登录与学校认证'
       else if (code === 'NEED_AUTH') tip = '浏览开放。发布和留言前请先认证学校'
+      else if (code === 'NEED_PHONE') tip = '浏览开放。发布和留言前请先绑定手机号'
       this.setData({
         canSpeak: !!gate.ok,
         speakCode: code,

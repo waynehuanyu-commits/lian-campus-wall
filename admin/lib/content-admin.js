@@ -89,7 +89,7 @@ async function authorsOf(rows) {
   const map = {}
   ids.forEach((id, index) => {
     const user = users[index]
-    map[id] = { id, nickname: (user && user.nickname) || '', status: (user && user.status) || 'active' }
+    map[id] = { id, nickname: (user && user.nickname) || '', phone: (user && user.phone) || '', status: (user && user.status) || 'active' }
   })
   return map
 }
