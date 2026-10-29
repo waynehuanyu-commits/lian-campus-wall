@@ -426,6 +426,18 @@ function nextSlotAt(now = Date.now()) {
   return all.filter((at) => at > now).sort((a, b) => a - b)[0]
 }
 
+// 失败原因转成人话；兼容旧版记录（wecom.result / wecom.error）和新版（wecom.sends[]）
+const ERR_TEXT = { 60020: '服务器 IP 不在企微白名单', 41048: '发送人不是该群群主', 40058: '消息内容格式不对', 90208: '小程序未关联企微', 81017: '客户群范围过大' }
+function failReason(wecom) {
+  if (!wecom) return '未调用企微'
+  if (wecom.error) return String(wecom.error).slice(0, 60)
+  const results = (wecom.sends || []).map((s) => s.result).concat(wecom.result ? [wecom.result] : []).filter(Boolean)
+  const bad = results.find((r) => r.errcode)
+  if (bad) return ERR_TEXT[bad.errcode] || `企微错误 ${bad.errcode}`
+  if (wecom.skipped) return wecom.message || '企微参数没配齐'
+  return '原因未记录'
+}
+
 /** 后台「企微群发」页用的状态汇总 */
 async function getStatus(now = Date.now()) {
   const [state, queue, logs, enabled, beat] = await Promise.all([
@@ -463,9 +475,7 @@ async function getStatus(now = Date.now()) {
         title: item.title,
         count: item.itemCount || 0,
         reasons: item.reasons || [],
-        error: item.status === 'failed'
-          ? JSON.stringify((item.wecom && (item.wecom.sends || []).map((s) => s.result && s.result.errmsg)) || item.wecom && item.wecom.error || '').slice(0, 120)
-          : ''
+        error: item.status === 'failed' ? failReason(item.wecom) : ''
       }))
   }
 }

@@ -193,7 +193,7 @@ async function render() {
         ${stat(ov.emergencyCount, '紧急拦截')}
         ${stat(ov.interceptCount, '已拒绝')}
         ${stat(ov.pendingSchool, '待审学校')}
-        ${stat(`${ov.digestCount || 0}/${ov.digestSize || 10}`, '汇总队列')}
+        ${stat(`${ov.digestCount || 0}`, '企微待推')}
         ${stat(ov.bannedCount, '已封禁')}
         ${stat(ov.mutedCount, '禁言中')}
         ${stat(ov.riskLogCount, '风控日志')}
