@@ -1143,7 +1143,19 @@ async function render() {
         ${ps.logs.length ? `<div class="push-logs">${ps.logs.map((log) => `
           <div class="row"><span>${esc(fmt(log.at))} · ${esc(LOG_LABEL[log.status] || log.status)}${log.count ? ` · ${log.count} 帖` : ''}</span><span class="muted">${esc(log.status === 'skipped_risk' ? (log.reasons || []).join('、') : (log.error || ''))}</span></div>`).join('')}</div>` : '<p class="muted">还没有推送记录。</p>'}
       </div>`
-    panel.innerHTML = statusCard + `
+    const picks = data.pickList
+    const pickCard = `
+      <div class="card">
+        <div class="row"><h3>人工圈选推送</h3><button id="pick-load" type="button">${picks ? '刷新列表' : '加载最近帖子'}</button></div>
+        <p class="muted">紧急时用：勾选帖子后「立即推送」不看时段和自动风险判断，由你把关；「加入下一轮」会插到队列最前面，下次推送优先发出。</p>
+        ${picks ? (picks.length ? `<div class="pick-list">${picks.map((p) => `
+          <label class="pick-row">
+            <input type="checkbox" data-pick="${esc(p.contentType)}:${esc(p.contentId)}" />
+            <span class="pick-main"><strong>${esc(p.title || '（无标题）')}</strong><span class="muted">${esc(p.topic || '')} · ${esc(formatTime(p.createdAt))} · ${esc(p.authorName || '')}</span><span class="pick-excerpt">${esc(p.excerpt || '')}</span></span>
+          </label>`).join('')}</div>
+        <div class="actions"><button id="pick-now" type="button">立即推送选中</button><button id="pick-queue" type="button">加入下一轮（优先）</button></div>` : '<p class="muted">最近没有已通过的帖子。</p>') : ''}
+      </div>`
+    panel.innerHTML = statusCard + pickCard + `
       <div class="card">
         <h3>企微自动推送</h3>
         <p class="muted">${wecom.ready ? '企微已接通。' : `企微还没配齐：${esc((wecom.missing || []).join('、'))}。`}每天 08:00–00:30 推送：固定时段 08:00 / 12:10 / 13:50 / 17:20 / 20:00 / 22:30 / 00:30；攒满 8 条提前推；急事 10 分钟内插队。每次推送都要群主在自己的企业微信里点「发送」。</p>
@@ -1169,6 +1181,32 @@ async function render() {
             ${inTargets.has(g.chatId) ? '<span class="muted">已在名单</span>' : `<button data-add="${esc(g.chatId)}" data-name="${esc(g.name)}" data-owner="${esc(g.owner)}" data-owner-name="${esc(g.ownerName || '')}">加入推送</button>`}
           </div>`).join('') : '<p class="muted">企微里没有找到客户群。</p>') : ''}
       </div>`
+    panel.querySelector('#pick-load').onclick = async (event) => {
+      event.target.disabled = true
+      event.target.textContent = '加载中…'
+      const result = await api('/api/wecom/candidates')
+      if (!result.ok) { event.target.disabled = false; return alert(result.message || '加载失败') }
+      state.data.pickList = result.list || []
+      render()
+    }
+    const pickedValues = () => [...panel.querySelectorAll('[data-pick]:checked')].map((box) => {
+      const [contentType, ...rest] = box.dataset.pick.split(':')
+      return { contentType, contentId: rest.join(':') }
+    })
+    const sendPicks = async (now) => {
+      const chosen = pickedValues()
+      if (!chosen.length) return alert('先勾选要推送的帖子')
+      const tip = now ? `立即把这 ${chosen.length} 条推到企微群？群主需要在企业微信里点「发送」。` : `把这 ${chosen.length} 条插到队列最前面，下一轮优先推送？`
+      if (!confirm(tip)) return
+      const result = await api('/api/wecom/push-picked', { method: 'POST', body: JSON.stringify({ picks: chosen, now }) })
+      if (!result.ok) return alert(result.message || '操作失败')
+      alert(now ? '已建群发，去企业微信点「发送」' : `已加入队列 ${result.queued} 条，下一轮优先推送`)
+      await reload()
+    }
+    const pickNow = panel.querySelector('#pick-now')
+    if (pickNow) pickNow.onclick = () => sendPicks(true)
+    const pickQueue = panel.querySelector('#pick-queue')
+    if (pickQueue) pickQueue.onclick = () => sendPicks(false)
     const refreshBtn = panel.querySelector('#push-refresh')
     if (refreshBtn) refreshBtn.onclick = () => reload()
     const toggleBtn = panel.querySelector('#push-toggle')

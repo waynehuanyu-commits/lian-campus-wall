@@ -21,6 +21,7 @@ const db = require('./db')
 const { classifyForPush, isUrgent } = require('./push-risk')
 const pushConfirm = require('./push-confirm')
 const exposureFold = require('./exposure-fold')
+const homeFeed = require('../../utils/home-feed')
 
 const PER_MESSAGE = 8
 // 北京时间的固定时段；00:30 算前一天晚上的最后一轮
@@ -413,6 +414,45 @@ function start() {
   return true
 }
 
+/**
+ * 人工圈选（紧急时用）：运营在后台勾选帖子。
+ * - now=true：立即推送这几条，不看时段、夜间和风险分级（运营自己把关），急事标记照常
+ * - now=false：放进队列最前面并标为已确认，下一轮（时段 / 急事 / 满 8 条）优先推出
+ */
+async function pushPicked(picks, { now = false, operator = '' } = {}) {
+  const items = []
+  for (const pick of (picks || []).slice(0, 24)) {
+    const type = pick && pick.contentType === 'wall' ? 'wall' : 'forum'
+    const post = await db.getDoc(type === 'wall' ? 'wall_posts' : 'forum_posts', String((pick && pick.contentId) || '')).catch(() => null)
+    if (!post) continue
+    items.push({ ...homeFeed.digestQueueItem(post, type), queuedAt: 1, confirm: 'approved', pushChecked: true, urgent: isUrgent(post), manual: true, manualBy: operator })
+  }
+  if (!items.length) return { ok: false, message: '勾选的帖子不存在' }
+  if (!now) {
+    await Promise.all(items.map((item) => db.setDoc('digest_queue', item.id, item)))
+    return { ok: true, queued: items.length }
+  }
+  if (running) return { ok: false, message: '推送正在进行，稍等几秒再点' }
+  running = true
+  try {
+    const token = await wecomToken()
+    const results = await pushRound(token, items)
+    // 圈选的帖子如果也在自动队列里，推完一并移除，避免重复推
+    await Promise.all(items.map((item) => db.removeDoc('digest_queue', item.id).catch(() => {})))
+    const ok = results.some((r) => r.ok)
+    if (ok) {
+      const state = await loadState()
+      await db.setDoc('meta', STATE_ID, { ...state, id: STATE_ID, lastPushAt: Date.now() })
+    }
+    console.log(`[wecom-auto] (manual ${operator}) ${items.length} 条 → ${ok ? '已建群发' : '失败'}`)
+    return { ok, results }
+  } catch (err) {
+    return { ok: false, message: err.message || '推送失败' }
+  } finally {
+    running = false
+  }
+}
+
 /** 下一个固定时段（毫秒）；夜间返回早上 8 点 */
 function nextSlotAt(now = Date.now()) {
   const dayStart = Math.floor((now + 8 * 3600 * 1000) / (24 * 3600 * 1000)) * 24 * 3600 * 1000 - 8 * 3600 * 1000
@@ -480,4 +520,4 @@ async function getStatus(now = Date.now()) {
   }
 }
 
-module.exports = { start, tick, buildText, pushReason, latestSlotAt, isQuiet, nextSlotAt, getStatus, setEnabled, isEnabled, PER_MESSAGE }
+module.exports = { start, tick, pushPicked, buildText, pushReason, latestSlotAt, isQuiet, nextSlotAt, getStatus, setEnabled, isEnabled, PER_MESSAGE }

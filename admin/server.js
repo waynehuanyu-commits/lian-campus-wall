@@ -560,6 +560,19 @@ const routes = {
     json(res, 200, { ok: !result.error, result, status: await wecomAuto.getStatus() })
   },
 
+  // 人工圈选推送：列最近帖子；勾选后立即推或插队到下一轮
+  'GET /api/wecom/candidates': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, { ok: true, list: await service.listDigestCandidates(30) })
+  },
+
+  'POST /api/wecom/push-picked': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    const body = await readBody(req)
+    json(res, 200, await wecomAuto.pushPicked(body.picks, { now: !!body.now, operator: operatorOf(session) }))
+  },
+
   'POST /api/groups/remove': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const body = await readBody(req)

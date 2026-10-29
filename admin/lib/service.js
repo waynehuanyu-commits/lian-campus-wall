@@ -1436,6 +1436,7 @@ async function dashboard() {
 }
 
 module.exports = {
+  listDigestCandidates,
   dashboard,
   overview,
   listKeywords,

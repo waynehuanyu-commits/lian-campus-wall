@@ -1345,3 +1345,10 @@ aside nav button {
 .push-grid > div { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: rgba(15, 23, 42, 0.04); }
 .push-logs { margin-top: 12px; border-top: 1px solid rgba(15, 23, 42, 0.08); }
 .push-logs .row { padding: 8px 0; border-bottom: 1px solid rgba(15, 23, 42, 0.05); font-size: 13px; gap: 12px; }
+
+/* 人工圈选 */
+.pick-list { max-height: 420px; overflow-y: auto; margin: 10px 0; border-top: 1px solid rgba(15, 23, 42, 0.08); }
+.pick-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid rgba(15, 23, 42, 0.05); cursor: pointer; }
+.pick-row input { margin-top: 4px; }
+.pick-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pick-excerpt { color: #475569; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 640px; }
