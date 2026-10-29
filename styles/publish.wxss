@@ -10,9 +10,9 @@
   margin: 0 24rpx 20rpx;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  background: rgba(255,255,255, 0.94);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
 }
 
 .pub-label {
@@ -95,12 +95,12 @@
 }
 
 .upload-item image {
-  background: #eef2f8;
+  background: #F1F3F6;
 }
 
 .upload-add {
-  border: 2rpx dashed rgba(10, 92, 255, 0.25);
-  background: rgba(10, 92, 255, 0.03);
+  border: 2rpx dashed rgba(10,92,255, 0.25);
+  background: rgba(10,92,255, 0.03);
   color: var(--ink-3);
   font-size: 22rpx;
   gap: 10rpx;
@@ -195,7 +195,7 @@
   height: 40rpx;
   border-radius: 50%;
   margin-right: 16rpx;
-  border: 3rpx solid #C5CCD8;
+  border: 3rpx solid #D5D9E0;
   box-sizing: border-box;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
@@ -237,8 +237,8 @@
   height: 36rpx;
   margin-left: 12rpx;
   border-radius: 50%;
-  border: 3rpx solid #C5CCD8;
-  color: #9AA3B2;
+  border: 3rpx solid #D5D9E0;
+  color: #858D9C;
   font-size: 22rpx;
   font-weight: 700;
   box-sizing: border-box;
@@ -256,7 +256,7 @@
   bottom: 0;
   z-index: 20;
   padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: rgba(242, 245, 250, 0.88);
+  background: rgba(244,245,242, 0.88);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   border-top: 1rpx solid var(--line);
@@ -269,12 +269,12 @@
   margin: 0;
   padding: 0;
   border-radius: 24rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  background: linear-gradient(145deg, #0A5CFF 0%, #0848D1 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
-  box-shadow: 0 12rpx 28rpx rgba(10, 82, 230, 0.28);
+  box-shadow: 0 12rpx 28rpx rgba(10,92,255, 0.28);
 }
 
 .pub-submit::after {
@@ -282,8 +282,8 @@
 }
 
 .pub-submit[disabled] {
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%) !important;
-  color: rgba(255, 255, 255, 0.75) !important;
+  background: linear-gradient(145deg, #0A5CFF 0%, #0848D1 100%) !important;
+  color: rgba(255,255,255, 0.75) !important;
   opacity: 0.7;
 }
 

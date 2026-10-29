@@ -224,7 +224,7 @@
           <view class="switch-title">接收 10 条汇总</view>
           <view class="item-meta">打开后，满 10 条就通知这个群的群主</view>
         </view>
-        <switch checked="{{groupReceiveDigest}}" color="#3B82F6" bindchange="onGroupDigestChange" />
+        <switch checked="{{groupReceiveDigest}}" color="#0A5CFF" bindchange="onGroupDigestChange" />
       </view>
       <button class="primary-btn" bindtap="onAddGroup">添加并指定</button>
     </view>
@@ -237,7 +237,7 @@
             <view wx:if="{{item.designated}}" class="accent">已指定接收汇总</view>
             <view wx:else class="item-meta">未指定</view>
           </view>
-          <switch checked="{{item.enabled}}" color="#3B82F6" data-id="{{item.id}}" bindchange="onToggleGroup" />
+          <switch checked="{{item.enabled}}" color="#0A5CFF" data-id="{{item.id}}" bindchange="onToggleGroup" />
         </view>
         <view class="item-meta">{{item.desc}}</view>
         <view class="item-meta">{{item.bindText}}</view>

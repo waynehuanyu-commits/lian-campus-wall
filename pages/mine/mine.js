@@ -253,7 +253,7 @@ Page({
         title: '没有拿到微信头像',
         content: '请先在小程序后台的隐私保护指引里声明「收集你的昵称、头像」，并在弹窗里点同意。也可以点右下角改用相册或拍照。',
         showCancel: false,
-        confirmColor: '#2F7DFF'
+        confirmColor: '#0A5CFF'
       })
       return
     }
@@ -278,7 +278,7 @@ Page({
         const content = /privacy|隐私|api scope/i.test(raw)
           ? '请先同意隐私保护提示，再选一张照片。'
           : (raw || '请允许微信访问相册后再试')
-        wx.showModal({ title: '没有打开相册', content, showCancel: false, confirmColor: '#2F7DFF' })
+        wx.showModal({ title: '没有打开相册', content, showCancel: false, confirmColor: '#0A5CFF' })
       }
     })
   },
@@ -301,7 +301,7 @@ Page({
       const content = /451|欠费|arrears/i.test(raw)
         ? '云存储现在存不了图，头像换不上去。微信云开发充值之后再试一次。'
         : (raw || '头像上传失败')
-      wx.showModal({ title: '头像没换上', content, showCancel: false, confirmColor: '#2F7DFF' })
+      wx.showModal({ title: '头像没换上', content, showCancel: false, confirmColor: '#0A5CFF' })
       return
     }
     const result = await repo.updateUser({ avatar: nextAvatar })
@@ -312,7 +312,7 @@ Page({
         title: '头像没换上',
         content: (result && result.message) || '头像保存失败',
         showCancel: false,
-        confirmColor: '#2F7DFF'
+        confirmColor: '#0A5CFF'
       })
       return
     }
@@ -370,7 +370,7 @@ Page({
       const content = raw.indexOf('未知操作') >= 0
         ? '云函数 userApi 还是旧的，登录没有生效。请在微信开发者工具里上传并部署 userApi，然后再点一次。'
         : raw
-      wx.showModal({ title: '登录失败', content, showCancel: false, confirmColor: '#2F7DFF' })
+      wx.showModal({ title: '登录失败', content, showCancel: false, confirmColor: '#0A5CFF' })
       return
     }
     inbox.reset((result.user && result.user.id) || '')
@@ -378,10 +378,10 @@ Page({
     inbox.refresh(true).catch(() => {})
     const now = getApp().globalData.user
     if (!now || !now.officialLogin) {
-      wx.showModal({ title: '切换没有生效', content: '请重新进入「我的」页再试一次。', showCancel: false, confirmColor: '#2F7DFF' })
+      wx.showModal({ title: '切换没有生效', content: '请重新进入「我的」页再试一次。', showCancel: false, confirmColor: '#0A5CFF' })
       return
     }
-    wx.showModal({ title: '已登录', content: '现在发帖和评论会显示为黎安校园墙。', showCancel: false, confirmColor: '#2F7DFF' })
+    wx.showModal({ title: '已登录', content: '现在发帖和评论会显示为黎安校园墙。', showCancel: false, confirmColor: '#0A5CFF' })
   },
 
   async leaveOfficial() {
@@ -398,7 +398,7 @@ Page({
         title: '退出失败',
         content: (result && result.message) || '退出失败',
         showCancel: false,
-        confirmColor: '#2F7DFF'
+        confirmColor: '#0A5CFF'
       })
       return
     }

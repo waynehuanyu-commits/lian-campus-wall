@@ -1585,6 +1585,75 @@ function mergeFeedPosts(primary, pinned, mine) {
   return list
 }
 
+// 首页「评论外显」：评论不超过 5 条的帖子，在卡片里直接带上评论（只给名字和文字，不给作者 id）。
+// 一页帖子只多查 1 次 comments；同一帖评论数不变时 60 秒内复用，不重复查库。
+const COMMENT_PREVIEW_MAX = 5
+const commentPreviewCache = new Map()
+
+function previewText(comment) {
+  const text = String(comment.content || '').replace(/\s+/g, ' ').trim()
+  if (text) return text.length > 60 ? `${text.slice(0, 60)}…` : text
+  return Array.isArray(comment.images) && comment.images.length ? '[图片]' : ''
+}
+
+function previewName(comment) {
+  const anonymous = comment.anonymous || defaultProfile.isAnonymousNickname(comment.authorName)
+  return anonymous
+    ? defaultProfile.resolveAuthorName(comment.authorName, comment.id, { anonymous: true })
+    : (comment.authorName || '同学')
+}
+
+async function attachCommentPreviews(posts) {
+  const now = Date.now()
+  const wanted = (posts || []).filter((item) => {
+    const n = Number(item && item.commentCount) || 0
+    return n > 0 && n <= COMMENT_PREVIEW_MAX
+  })
+  const missing = wanted.filter((item) => {
+    const hit = commentPreviewCache.get(item.id)
+    return !(hit && hit.count === item.commentCount && now - hit.at < FEED_CACHE_TTL)
+  })
+  if (missing.length) {
+    try {
+      const res = await db.collection('comments')
+        .where({ targetId: _.in(missing.map((item) => item.id)) })
+        .limit(missing.length * COMMENT_PREVIEW_MAX + 20)
+        .get()
+      const grouped = {}
+      ;(res.data || [])
+        .filter((row) => row && moderation.isPublicStatus(row.reviewStatus || 'approved'))
+        .sort((a, b) => (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0))
+        .forEach((row) => { (grouped[row.targetId] = grouped[row.targetId] || []).push(row) })
+      missing.forEach((item) => {
+        const rows = grouped[item.id] || []
+        // 楼中楼排在所属评论后面
+        const roots = rows.filter((row) => !row.parentId)
+        const ordered = []
+        roots.forEach((root) => {
+          ordered.push(root)
+          rows.filter((row) => row.parentId === root.id).forEach((reply) => ordered.push(reply))
+        })
+        rows.filter((row) => row.parentId && !ordered.includes(row)).forEach((row) => ordered.push(row))
+        const preview = ordered.slice(0, COMMENT_PREVIEW_MAX).map((row) => ({
+          id: row.id,
+          name: previewName(row),
+          reply: !!row.parentId,
+          text: previewText(row)
+        })).filter((row) => row.text)
+        commentPreviewCache.set(item.id, { count: item.commentCount, at: now, preview })
+      })
+      if (commentPreviewCache.size > 500) commentPreviewCache.clear()
+    } catch (err) {
+      // 预览拿不到不影响首页
+      return posts
+    }
+  }
+  return posts.map((item) => {
+    const hit = wanted.includes(item) ? commentPreviewCache.get(item.id) : null
+    return hit && hit.preview.length ? { ...item, commentPreview: hit.preview } : item
+  })
+}
+
 function compactFeedItem(item) {
   const content = String(item.content || '')
   return {
@@ -3006,9 +3075,10 @@ const handlers = {
       ...decorate(wallPage, 'wall', user, wallLiked)
     ]
     const hydrated = await hydrateLegacyAvatars(decorated, user)
-    const posts = homeFeed.sortHomePosts(hydrated.map(compactFeedItem), hot)
+    const cards = homeFeed.sortHomePosts(hydrated.map(compactFeedItem), hot)
       .map((item) => homeFeed.toHomeCard(item, item.contentType))
       .filter((item) => item && item.id)
+    const posts = await attachCommentPreviews(cards)
     return {
       ok: true,
       paged: true,

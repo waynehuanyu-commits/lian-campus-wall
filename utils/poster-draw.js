@@ -40,7 +40,7 @@ function drawCover(ctx, img, x, y, w, h) {
 function drawBrandMark(ctx, x, y, size) {
   ctx.save()
   ctx.translate(x, y)
-  ctx.strokeStyle = '#2F6FE0'
+  ctx.strokeStyle = '#0A5CFF'
   ctx.lineWidth = 7
   ctx.lineCap = 'round'
   ctx.beginPath()
@@ -55,7 +55,7 @@ function drawBrandMark(ctx, x, y, size) {
 function drawPerson(ctx, x, y, size) {
   ctx.save()
   ctx.translate(x, y)
-  ctx.fillStyle = '#C5CEDA'
+  ctx.fillStyle = '#D5D9E0'
   ctx.beginPath()
   ctx.arc(size / 2, size * 0.38, size * 0.16, 0, Math.PI * 2)
   ctx.fill()
@@ -131,7 +131,7 @@ async function drawSharePoster(canvas, payload) {
 
   let y = 40
   drawBrandMark(ctx, pad, y + 8, 56)
-  ctx.fillStyle = '#1A3E78'
+  ctx.fillStyle = '#0A2A7A'
   ctx.font = '700 34px sans-serif'
   ctx.fillText('黎安话事', pad + 72, y + 46)
 
@@ -140,15 +140,15 @@ async function drawSharePoster(canvas, payload) {
     const label = post.category
     const tw = ctx.measureText(label).width + 36
     const pillX = width - pad - tw
-    ctx.fillStyle = '#E5F0FF'
+    ctx.fillStyle = '#E9EFFF'
     roundRect(ctx, pillX, y + 10, tw, 48, 24)
     ctx.fill()
-    ctx.fillStyle = '#3B78D6'
+    ctx.fillStyle = '#0A5CFF'
     ctx.fillText(label, pillX + 18, y + 42)
   }
   y += headerH + 20
 
-  ctx.fillStyle = '#1A3E78'
+  ctx.fillStyle = '#0A2A7A'
   ctx.font = '700 52px sans-serif'
   titleWrap.lines.forEach((line) => {
     ctx.fillText(line, pad, y + 48)
@@ -159,10 +159,10 @@ async function drawSharePoster(canvas, payload) {
   ctx.font = '500 30px sans-serif'
   bodyWrap.lines.forEach((line, index) => {
     const showExpand = bodyWrap.overflow && bodyWrap.expand && index === bodyWrap.lines.length - 1
-    ctx.fillStyle = '#1A3E78'
+    ctx.fillStyle = '#0A2A7A'
     ctx.fillText(line, pad, y + 32)
     if (showExpand) {
-      ctx.fillStyle = '#8A97AB'
+      ctx.fillStyle = '#858D9C'
       ctx.fillText(bodyWrap.expand, pad + ctx.measureText(line).width, y + 32)
     }
     y += bodyLineH
@@ -186,7 +186,7 @@ async function drawSharePoster(canvas, payload) {
   ctx.beginPath()
   ctx.arc(pad + avatarSize / 2, y + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2)
   ctx.closePath()
-  ctx.fillStyle = anonymous ? '#EEF1F5' : '#F3D5DC'
+  ctx.fillStyle = anonymous ? '#F1F3F6' : '#F3D5DC'
   ctx.fill()
   ctx.clip()
   if (avatarPath) {
@@ -202,7 +202,7 @@ async function drawSharePoster(canvas, payload) {
   ctx.restore()
 
   const nameX = pad + avatarSize + 20
-  ctx.fillStyle = '#1A3E78'
+  ctx.fillStyle = '#0A2A7A'
   ctx.font = '600 30px sans-serif'
   const name = post.authorName || (anonymous ? '分身同学' : '同学')
   ctx.fillText(name, nameX, y + (anonymous ? 46 : 34))
@@ -212,14 +212,14 @@ async function drawSharePoster(canvas, payload) {
     const school = post.authorSchool
     const sw = ctx.measureText(school).width + 24
     const sx = nameX + nameW + 16
-    ctx.fillStyle = '#E7EEF8'
+    ctx.fillStyle = '#E9EFFF'
     roundRect(ctx, sx, y + 8, sw, 36, 18)
     ctx.fill()
-    ctx.fillStyle = '#5C7194'
+    ctx.fillStyle = '#5E6678'
     ctx.fillText(school, sx + 12, y + 33)
   }
   if (!anonymous && post.createdText) {
-    ctx.fillStyle = '#8A97AB'
+    ctx.fillStyle = '#858D9C'
     ctx.font = '400 24px sans-serif'
     ctx.fillText(post.createdText, nameX, y + 72)
   }
@@ -245,16 +245,16 @@ async function drawSharePoster(canvas, payload) {
     ctx.fill()
     ctx.strokeStyle = '#E4DDD2'
     ctx.strokeRect(codeX + 1, y + 1, codeSize - 2, codeSize - 2)
-    ctx.fillStyle = '#8A97AB'
+    ctx.fillStyle = '#858D9C'
     ctx.font = '500 22px sans-serif'
     const hint = '原帖码待补'
     const hw = ctx.measureText(hint).width
     ctx.fillText(hint, codeX + (codeSize - hw) / 2, y + codeSize / 2 + 8)
   }
-  ctx.fillStyle = '#1A3E78'
+  ctx.fillStyle = '#0A2A7A'
   ctx.font = '700 32px sans-serif'
   ctx.fillText('查看详情并留言', pad, y + 58)
-  ctx.fillStyle = '#8A97AB'
+  ctx.fillStyle = '#858D9C'
   ctx.font = '400 24px sans-serif'
   ctx.fillText(bodyWrap.overflow ? '扫码展开全文' : '长按识别，进入原帖', pad, y + 100)
 

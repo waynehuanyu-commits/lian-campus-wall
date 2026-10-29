@@ -51,7 +51,7 @@
 
     <view class="detail-foot">
       <view class="detail-foot-left">
-        <view wx:if="{{post.categoryLabel}}" class="category-pill">
+        <view wx:if="{{post.categoryLabel}}" class="category-pill tone-{{post.categoryTone}}">
           <text class="category-hash">#</text>
           <text class="category-text">{{post.categoryLabel}}</text>
         </view>

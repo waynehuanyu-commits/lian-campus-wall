@@ -9,7 +9,7 @@
   top: 0;
   z-index: 31;
   padding-left: 32rpx;
-  background: rgba(233, 240, 255, 0.86);
+  background: rgba(233,240,255, 0.86);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
@@ -26,7 +26,7 @@
   height: 52rpx;
   border-radius: 14rpx;
   flex-shrink: 0;
-  box-shadow: 0 4rpx 12rpx rgba(10, 92, 255, 0.18);
+  box-shadow: 0 4rpx 12rpx rgba(10,92,255, 0.18);
 }
 
 .masthead-name {
@@ -42,7 +42,7 @@
   position: sticky;
   z-index: 30;
   padding: 8rpx 0 8rpx 32rpx;
-  background: rgba(238, 243, 252, 0.86);
+  background: rgba(238,243,252, 0.86);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
@@ -81,7 +81,7 @@
   overflow: hidden;
   border-radius: 24rpx;
   background: var(--surface);
-  box-shadow: 0 2rpx 10rpx rgba(10, 42, 122, 0.05);
+  box-shadow: 0 2rpx 10rpx rgba(10,42,122, 0.05);
   transform: translateZ(0);
   transition: transform 0.18s ease;
 }
@@ -157,7 +157,7 @@
 
 .gd-sk-cover {
   height: 299rpx;
-  background: linear-gradient(90deg, #eef2f8 25%, #f6f8fc 50%, #eef2f8 75%);
+  background: linear-gradient(90deg, #F1F3F6 25%, #F7F8FA 50%, #F1F3F6 75%);
   background-size: 400% 100%;
   animation: gd-shine 1.4s ease infinite;
 }
@@ -166,7 +166,7 @@
   height: 28rpx;
   margin: 22rpx 24rpx 0;
   border-radius: 8rpx;
-  background: #eef2f8;
+  background: #F1F3F6;
 }
 
 .gd-sk-line.short {
@@ -194,7 +194,7 @@
   color: #fff;
   font-size: 28rpx;
   font-weight: 700;
-  box-shadow: 0 16rpx 40rpx rgba(18, 26, 44, 0.28);
+  box-shadow: 0 16rpx 40rpx rgba(18,26,44, 0.28);
   transition: transform 0.15s ease;
 }
 

@@ -22,8 +22,8 @@
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 4rpx 12rpx rgba(10, 42, 122, 0.12);
+  background: rgba(255,255,255, 0.82);
+  box-shadow: 0 4rpx 12rpx rgba(10,42,122, 0.12);
   pointer-events: auto;
   position: relative;
 }
@@ -69,17 +69,17 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(242, 245, 250, 0) 0%, rgba(242, 245, 250, 0) 72%, rgba(242, 245, 250, 0.86) 90%, #eff3fa 100%);
+  background: linear-gradient(180deg, rgba(244,245,242, 0) 0%, rgba(244,245,242, 0) 72%, rgba(244,245,242, 0.86) 90%, #E9EFFF 100%);
 }
 
 .up-cover-credit {
   position: absolute;
   right: 28rpx;
   top: 380rpx;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255,255,255, 0.92);
   font-size: 20rpx;
   letter-spacing: 1rpx;
-  text-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1rpx 4rpx rgba(0,0,0, 0.35);
 }
 
 .profile-page > .hero,
@@ -106,8 +106,8 @@
   height: 128rpx;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #e9edf4;
-  box-shadow: 0 0 0 6rpx #fff, 0 10rpx 24rpx rgba(10, 42, 122, 0.14);
+  background: #E6E9EE;
+  box-shadow: 0 0 0 6rpx #fff, 0 10rpx 24rpx rgba(10,42,122, 0.14);
 }
 
 .profile-main {
@@ -165,7 +165,7 @@
   height: 40rpx;
   padding: 0 14rpx;
   border-radius: 6rpx;
-  background: rgba(10, 92, 255, 0.12);
+  background: rgba(10,92,255, 0.12);
   color: var(--brand);
   font-size: 22rpx;
   font-weight: 600;
@@ -177,9 +177,9 @@
   margin: 0 24rpx 20rpx;
   padding: 28rpx 0;
   border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  background: rgba(255,255,255, 0.94);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
 }
 
 .stat {
@@ -213,7 +213,7 @@
   margin: 0 24rpx 16rpx;
   padding: 6rpx;
   border-radius: 999rpx;
-  background: rgba(18, 26, 44, 0.05);
+  background: rgba(18,26,44, 0.05);
 }
 
 .tab {
@@ -231,7 +231,7 @@
   background: #fff;
   color: var(--ink);
   font-weight: 700;
-  box-shadow: 0 2rpx 8rpx rgba(18, 26, 44, 0.08);
+  box-shadow: 0 2rpx 8rpx rgba(18,26,44, 0.08);
 }
 
 .list {
@@ -242,9 +242,9 @@
   margin-bottom: 16rpx;
   padding: 26rpx 28rpx 22rpx;
   border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  background: rgba(255,255,255, 0.94);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
   transition: transform 0.18s ease;
 }
 

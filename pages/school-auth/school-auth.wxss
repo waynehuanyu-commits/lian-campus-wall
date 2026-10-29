@@ -10,12 +10,12 @@
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  background: rgba(255,255,255, 0.94);
+  border: 1rpx solid rgba(255,255,255, 0.9);
   border-radius: 24rpx;
   padding: 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
 }
 
 .notice-text {
@@ -36,7 +36,7 @@
 
 .lock-tag.ok {
   color: #07c160;
-  background: rgba(7, 193, 96, 0.1);
+  background: rgba(7,193,96, 0.1);
 }
 
 .lock-tag.danger {
@@ -53,7 +53,7 @@
 
 .pending-line {
   margin: 12rpx 0 8rpx;
-  color: #333;
+  color: #232A3A;
 }
 
 .rule-block {
@@ -101,7 +101,7 @@
   justify-content: center;
   color: var(--brand);
   font-size: 48rpx;
-  border: 2rpx dashed rgba(10, 92, 255, 0.25);
+  border: 2rpx dashed rgba(10,92,255, 0.25);
 }
 
 .image-remove {
@@ -109,7 +109,7 @@
   top: 4rpx;
   right: 8rpx;
   color: #fff;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0,0,0, 0.45);
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;

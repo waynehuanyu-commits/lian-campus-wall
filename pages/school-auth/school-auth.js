@@ -122,7 +122,7 @@ Page({
     wx.showModal({
       title: '提交学生认证？',
       content: '证明照片为选填，可不上传。材料仅用于管理员核验，不会出现在公开内容中。',
-      confirmColor: '#2F7DFF',
+      confirmColor: '#0A5CFF',
       success: async (res) => {
         if (!res.confirm) return
         const result = await repo.submitStudentAuth({

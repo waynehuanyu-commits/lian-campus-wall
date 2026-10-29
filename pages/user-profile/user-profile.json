@@ -1,7 +1,7 @@
 {
   "navigationBarTitleText": "个人主页",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#F2F5FA",
+  "backgroundColor": "#F4F5F2",
   "usingComponents": {
     "report-sheet": "/components/report-sheet/report-sheet"
   },

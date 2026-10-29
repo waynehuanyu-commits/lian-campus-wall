@@ -199,7 +199,23 @@ function digestQueueItem(post, type) {
   }
 }
 
+// 话题配色：每个话题一个辅助色（样式在 app.wxss .tone-*），没列出的话题用灰
+const TOPIC_TONES = {
+  学习交流: 'blue',
+  日常投稿: 'violet',
+  二手闲置: 'teal',
+  拼车: 'coral',
+  失物招领: 'amber',
+  求助: 'rose',
+  官方: 'gold'
+}
+
+function topicTone(topic) {
+  return TOPIC_TONES[normalizeTopic(topic)] || 'gray'
+}
+
 module.exports = {
+  topicTone,
   postTopic,
   digestQueueItem,
   clipChars,

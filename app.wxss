@@ -1,24 +1,43 @@
 page {
-  --paper: #f2f5fa;
+  /* 配色：品牌亮蓝 #0A5CFF 为主（蓝色只用下面这套色阶），冷灰统一为 ink 系列；
+     在此基础上加一组设计辅助色，用于话题标签、热门、官方等，各带浅底（-soft）。
+     新写样式一律用变量，不要再写死颜色 */
+  --paper: #F4F5F2;
   --surface: #ffffff;
   --ink: #121a2c;
   --ink-2: #3b4458;
   --ink-3: #858d9c;
   --ink-4: #b4bac5;
-  --line: rgba(18, 26, 44, 0.07);
+  --line: rgba(18,26,44, 0.07);
   --brand-deep: #0a2a7a;
   --brand: #0a5cff;
   --brand-soft: #e9efff;
-  --lime: #d4f01e;
-  --lime-soft: #f3fbc4;
+  --brand-2: #0848D1;
+  --brand-tint: #F3F6FF;
+  --amber: #F2A93B;
+  --amber-ink: #8A5300;
+  --amber-soft: #FDF1DC;
+  --violet: #6E56F0;
+  --violet-soft: #F0EDFF;
+  --teal: #0E9F8A;
+  --teal-soft: #E2F6F2;
+  --coral: #F0713A;
+  --coral-soft: #FFEEE4;
+  --rose: #E5486B;
+  --rose-soft: #FDE9EE;
+  --gold: #B8860B;
+  --gold-soft: #FFF4D6;
+  /* --lime 为兼容旧样式保留的名字，值已换成琥珀 */
+  --lime: #F2A93B;
+  --lime-soft: #FDF1DC;
   --like: #ff3b5c;
   /* 渐变直接画在页面背景上（固定长度，末端与窗口底色一致）。
      不要用 position:fixed + 负 z-index 的背景层，也不要把 page 设为 100vh：
      iOS 上会让评论框刚弹键盘就失焦收起 */
   background-color: var(--paper);
   background-image:
-    radial-gradient(640rpx 460rpx at 100% 0, rgba(10, 92, 255, 0.16) 0%, rgba(10, 92, 255, 0) 70%),
-    linear-gradient(180deg, #e6eeff 0, #eff3fa 520rpx, #f2f5fa 900rpx);
+    radial-gradient(640rpx 460rpx at 100% 0, rgba(10,92,255, 0.16) 0%, rgba(10,92,255, 0) 70%),
+    linear-gradient(180deg, #E9EFFF 0, #F1F3F6 520rpx, #F4F5F2 900rpx);
   background-repeat: no-repeat;
   background-size: 100% 900rpx;
   color: var(--ink);
@@ -54,11 +73,11 @@ page {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #333;
+  color: #232A3A;
 }
 
 .muted {
-  color: #999;
+  color: #858D9C;
 }
 
 .pink,
@@ -84,7 +103,7 @@ page {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: #e8ecf2;
+  background: #E6E9EE;
   flex-shrink: 0;
 }
 
@@ -97,9 +116,9 @@ page {
   width: 132rpx;
   height: 132rpx;
   border-radius: 50%;
-  background: #e8ecf2;
+  background: #E6E9EE;
   border: 4rpx solid #fff;
-  box-shadow: 0 8rpx 24rpx rgba(31, 35, 41, 0.08);
+  box-shadow: 0 8rpx 24rpx rgba(18,26,44, 0.08);
 }
 
 .chip {
@@ -108,8 +127,8 @@ page {
   height: 56rpx;
   padding: 0 24rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.86);
-  color: #5c6b80;
+  background: rgba(255,255,255, 0.86);
+  color: #5E6678;
   font-size: 24rpx;
   font-weight: 500;
   border: none;
@@ -132,8 +151,8 @@ page {
   border-radius: 8rpx;
   font-size: 20rpx;
   font-weight: 500;
-  background: #f5f5f5;
-  color: #666;
+  background: #F1F3F6;
+  color: #5E6678;
 }
 
 .pin-tag {
@@ -151,8 +170,8 @@ page {
 }
 
 .pin-tag.official {
-  color: #fff;
-  background: var(--ink);
+  color: var(--gold);
+  background: var(--gold-soft);
 }
 
 .meta {
@@ -163,7 +182,7 @@ page {
 .btn-primary {
   height: 88rpx;
   border-radius: 24rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  background: linear-gradient(145deg, #0A5CFF 0%, #0848D1 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
@@ -183,8 +202,8 @@ page {
   height: 76rpx;
   border-radius: 999rpx;
   background: #fff;
-  color: #333;
-  border: 2rpx solid #e5e5e5;
+  color: #232A3A;
+  border: 2rpx solid #E6E9EE;
   font-size: 26rpx;
   font-weight: 500;
   display: flex;
@@ -201,14 +220,14 @@ page {
   height: 68rpx;
   padding: 0 28rpx;
   border-radius: 18rpx;
-  background: #eef5ff;
+  background: #F3F6FF;
   color: var(--brand);
   font-size: 26rpx;
   font-weight: 650;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1rpx solid rgba(47, 125, 255, 0.22);
+  border: 1rpx solid rgba(10,92,255, 0.22);
   box-sizing: border-box;
 }
 
@@ -226,7 +245,7 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14rpx 30rpx rgba(10, 92, 255, 0.32);
+  box-shadow: 0 14rpx 30rpx rgba(10,92,255, 0.32);
   z-index: 20;
 }
 
@@ -273,7 +292,7 @@ page {
   font-size: 16rpx;
   line-height: 28rpx;
   text-align: center;
-  box-shadow: 0 4rpx 10rpx rgba(20, 56, 120, 0.18);
+  box-shadow: 0 4rpx 10rpx rgba(20,56,120, 0.18);
 }
 
 .fab-text {
@@ -305,7 +324,7 @@ page {
   height: 64rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #e9edf4;
+  background: #E6E9EE;
 }
 
 .feed-head-main {
@@ -379,7 +398,7 @@ page {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #8a9199;
+  color: #858D9C;
   font-size: 22rpx;
   line-height: 1.4;
 }
@@ -398,11 +417,11 @@ page {
   gap: 2rpx;
   max-width: 100%;
   height: 40rpx;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  background: var(--brand-soft);
   color: var(--brand);
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 600;
   line-height: 1;
   overflow: hidden;
@@ -413,9 +432,28 @@ page {
 }
 
 .feed-tag-hash {
-  color: var(--brand);
+  color: inherit;
   font-weight: 700;
+  opacity: 0.7;
 }
+
+/* 话题配色（utils/home-feed.js topicTone）：首页标签、详情页标签共用 */
+.tone-blue { color: var(--brand) !important; background: var(--brand-soft) !important; }
+.tone-violet { color: var(--violet) !important; background: var(--violet-soft) !important; }
+.tone-teal { color: var(--teal) !important; background: var(--teal-soft) !important; }
+.tone-coral { color: var(--coral) !important; background: var(--coral-soft) !important; }
+.tone-amber { color: var(--amber-ink) !important; background: var(--amber-soft) !important; }
+.tone-rose { color: var(--rose) !important; background: var(--rose-soft) !important; }
+.tone-gold { color: var(--gold) !important; background: var(--gold-soft) !important; }
+.tone-gray { color: var(--ink-2) !important; background: #F1F3F6 !important; }
+.tone-blue .category-hash, .tone-blue .category-text,
+.tone-violet .category-hash, .tone-violet .category-text,
+.tone-teal .category-hash, .tone-teal .category-text,
+.tone-coral .category-hash, .tone-coral .category-text,
+.tone-amber .category-hash, .tone-amber .category-text,
+.tone-rose .category-hash, .tone-rose .category-text,
+.tone-gold .category-hash, .tone-gold .category-text,
+.tone-gray .category-hash, .tone-gray .category-text { color: inherit; }
 
 .feed-views {
   flex-shrink: 0;
@@ -447,7 +485,7 @@ page {
   text-overflow: ellipsis;
   font-size: 30rpx;
   font-weight: 600;
-  color: #222;
+  color: #121A2C;
 }
 
 .feed .image-grid.thumbs {
@@ -538,7 +576,7 @@ page {
   justify-content: space-around;
   gap: 8rpx;
   padding: 8rpx 4rpx 4rpx;
-  border-top: 1rpx solid #eef1f5;
+  border-top: 1rpx solid #F1F3F6;
 }
 
 .engage-bar .engage-item {
@@ -547,7 +585,7 @@ page {
   position: relative;
   gap: 10rpx;
   font-size: 26rpx;
-  color: #333;
+  color: #232A3A;
   white-space: nowrap;
 }
 
@@ -575,7 +613,7 @@ page {
 
 .engage-bar .engage-cta.soft {
   background: transparent;
-  color: #5b677a;
+  color: #5E6678;
   box-shadow: none;
   border: none;
 }
@@ -601,7 +639,7 @@ page {
   flex: none;
   font-size: 24rpx;
   line-height: 1.2;
-  color: #8a9199;
+  color: #858D9C;
   padding: 10rpx 0;
   white-space: nowrap;
 }
@@ -631,7 +669,7 @@ page {
   top: 0;
   bottom: 0;
   z-index: 1000;
-  background: rgba(17, 24, 39, 0.36);
+  background: rgba(18,26,44, 0.36);
   display: flex;
   align-items: flex-end;
 }
@@ -640,14 +678,14 @@ page {
   width: 100%;
   padding: 28rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
   border-radius: 28rpx 28rpx 0 0;
-  background: #f3f6fb;
+  background: #F3F6FF;
   box-sizing: border-box;
 }
 
 .share-sheet-title {
   text-align: center;
   font-size: 26rpx;
-  color: #8a9199;
+  color: #858D9C;
   margin-bottom: 18rpx;
 }
 
@@ -658,7 +696,7 @@ page {
   margin-bottom: 12rpx;
   border-radius: 20rpx;
   background: #fff;
-  color: #1f2329;
+  color: #121A2C;
   font-size: 32rpx;
   font-weight: 650;
   border: none;
@@ -675,7 +713,7 @@ page {
   text-align: center;
   border-radius: 20rpx;
   background: #fff;
-  color: #8a9199;
+  color: #858D9C;
   font-size: 30rpx;
   margin-top: 8rpx;
 }
@@ -758,7 +796,7 @@ button.share-pick {
 
 .share-pick-label {
   font-size: 24rpx;
-  color: #5c6770;
+  color: #5E6678;
 }
 
 .stat-row .engage-item {
@@ -788,9 +826,9 @@ button.share-pick {
   margin: 20rpx 24rpx 0;
   padding: 24rpx 28rpx 6rpx;
   border-radius: 24rpx;
-  background: linear-gradient(180deg, #e9f0ff 0%, rgba(255, 255, 255, 0.96) 56%);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  background: linear-gradient(180deg, #E9EFFF 0%, rgba(255,255,255, 0.96) 56%);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
   position: relative;
   overflow: hidden;
 }
@@ -861,7 +899,7 @@ button.share-pick {
   width: 40rpx;
   flex-shrink: 0;
   text-align: center;
-  color: rgba(10, 92, 255, 0.45);
+  color: rgba(10,92,255, 0.45);
   font-size: 32rpx;
   font-weight: 800;
   font-style: italic;
@@ -878,7 +916,7 @@ button.share-pick {
 }
 
 .hot-line-rank.top3 {
-  color: rgba(10, 92, 255, 0.7);
+  color: rgba(10,92,255, 0.7);
 }
 
 .hot-line-title {
@@ -906,10 +944,10 @@ button.share-pick {
   height: 72rpx;
   padding: 0 28rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  background: rgba(255,255,255, 0.82);
+  border: 1rpx solid rgba(255,255,255, 0.9);
   margin-bottom: 0;
-  box-shadow: 0 4rpx 14rpx rgba(10, 42, 122, 0.05);
+  box-shadow: 0 4rpx 14rpx rgba(10,42,122, 0.05);
 }
 
 .search-bar input {
@@ -930,20 +968,20 @@ button.share-pick {
   height: 72rpx;
   border-radius: 18rpx;
   background: #fff;
-  box-shadow: 0 8rpx 18rpx rgba(47, 125, 255, 0.18);
+  box-shadow: 0 8rpx 18rpx rgba(10,92,255, 0.18);
 }
 
 .brand-name {
   font-size: 34rpx;
   font-weight: 780;
-  color: #1f2329;
+  color: #121A2C;
   letter-spacing: 1rpx;
 }
 
 .brand-sub {
   margin-top: 2rpx;
   font-size: 20rpx;
-  color: #9a8a90;
+  color: #858D9C;
 }
 
 .search-icon {
@@ -1009,7 +1047,7 @@ button.share-pick {
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  color: #8a9199;
+  color: #858D9C;
   font-size: 26rpx;
 }
 
@@ -1030,13 +1068,13 @@ button.share-pick {
 .empty {
   padding: 160rpx 48rpx;
   text-align: center;
-  color: #9aa1a9;
+  color: #858D9C;
   font-size: 26rpx;
 }
 
 .empty-title {
   font-size: 30rpx;
-  color: #60666f;
+  color: #5E6678;
   font-weight: 650;
   margin-bottom: 12rpx;
 }
@@ -1046,7 +1084,7 @@ button.share-pick {
   align-items: center;
   gap: 16rpx;
   flex-shrink: 0;
-  color: #8a9199;
+  color: #858D9C;
   font-size: 22rpx;
 }
 
@@ -1067,7 +1105,7 @@ button.share-pick {
   width: 100%;
   height: 220rpx;
   border-radius: 16rpx;
-  background: #e8ecf2;
+  background: #E6E9EE;
   display: block;
 }
 
@@ -1092,8 +1130,8 @@ button.share-pick {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1rpx solid #eef0f3;
+  background: rgba(255,255,255, 0.96);
+  border-top: 1rpx solid #F1F3F6;
   padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
@@ -1107,12 +1145,12 @@ button.share-pick {
   justify-content: space-between;
   gap: 16rpx;
   padding: 0 4rpx;
-  color: #6b7280;
+  color: #5E6678;
   font-size: 24rpx;
 }
 
 .composer-reply-clear {
-  color: #999;
+  color: #858D9C;
   flex-shrink: 0;
 }
 
@@ -1133,7 +1171,7 @@ button.share-pick {
   width: 96rpx;
   height: 96rpx;
   border-radius: 12rpx;
-  background: #f3f5f8;
+  background: #F1F3F6;
 }
 
 .composer-thumb-x {
@@ -1143,7 +1181,7 @@ button.share-pick {
   width: 32rpx;
   height: 32rpx;
   border-radius: 50%;
-  background: rgba(31, 35, 41, 0.85);
+  background: rgba(18,26,44, 0.85);
   color: #fff;
   font-size: 20rpx;
   line-height: 32rpx;
@@ -1160,7 +1198,7 @@ button.share-pick {
 .composer input {
   flex: 1;
   height: 72rpx;
-  background: #f5f5f5;
+  background: #F1F3F6;
   border-radius: 36rpx;
   padding: 0 28rpx;
   font-size: 26rpx;
@@ -1171,8 +1209,8 @@ button.share-pick {
   width: 72rpx;
   height: 72rpx;
   border-radius: 50%;
-  background: #f5f5f5;
-  color: #666;
+  background: #F1F3F6;
+  color: #5E6678;
   font-size: 24rpx;
   font-weight: 600;
   display: flex;
@@ -1205,7 +1243,7 @@ button.share-pick {
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  color: #999;
+  color: #858D9C;
   font-size: 26rpx;
 }
 
@@ -1232,10 +1270,10 @@ button.share-pick {
   border-radius: 0;
   background: var(--brand-soft);
   box-shadow: none;
-  color: #666;
+  color: #5E6678;
   font-size: 24rpx;
   border: none;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 1rpx solid #F1F3F6;
 }
 
 .guest-tip .action {
@@ -1255,13 +1293,13 @@ button.share-pick {
 
 .form-label {
   font-size: 24rpx;
-  color: #8a9199;
+  color: #858D9C;
   margin: 28rpx 0 12rpx;
   font-weight: 500;
 }
 
 .field {
-  background: #f3f5f8;
+  background: #F1F3F6;
   border-radius: 18rpx;
   padding: 22rpx 24rpx;
   border: none;
@@ -1277,7 +1315,7 @@ button.share-pick {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f3f5f8;
+  background: #F1F3F6;
   border-radius: 18rpx;
   padding: 24rpx;
   border: none;
@@ -1305,20 +1343,20 @@ button.share-pick {
   border-radius: 16rpx;
   display: block;
   object-fit: cover;
-  background: #e8ecf2;
+  background: #E6E9EE;
 }
 
 .upload-add {
-  border: 2rpx dashed rgba(47, 125, 255, 0.28);
-  background: #f5f8fc;
-  color: #5b7394;
+  border: 2rpx dashed rgba(10,92,255, 0.28);
+  background: #F7F8FA;
+  color: #5E6678;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: 22rpx;
   gap: 8rpx;
-  box-shadow: 0 4rpx 12rpx rgba(30, 70, 140, 0.04);
+  box-shadow: 0 4rpx 12rpx rgba(10,42,122, 0.04);
 }
 
 .upload-remove {
@@ -1328,7 +1366,7 @@ button.share-pick {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background: rgba(31, 35, 41, 0.7);
+  background: rgba(18,26,44, 0.7);
   color: #fff;
   font-size: 22rpx;
   display: flex;
@@ -1345,12 +1383,12 @@ button.share-pick {
 .feed-item {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255,255,255, 0.94);
   padding: 26rpx 28rpx 22rpx;
   margin-bottom: 16rpx;
   border-radius: 24rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
 }
 
 .feed-item > .feed-head {
@@ -1361,6 +1399,10 @@ button.share-pick {
 .feed-item > .post-content,
 .feed-item > .body-more,
 .feed-item > .image-grid {
+  order: 2;
+}
+
+.feed-item > .feed-comments {
   order: 2;
 }
 
@@ -1403,8 +1445,8 @@ button.share-pick {
   min-width: 104rpx;
   height: 104rpx;
   border-radius: 34rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
-  box-shadow: 0 16rpx 32rpx rgba(10, 82, 230, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.25);
+  background: linear-gradient(145deg, #0A5CFF 0%, #0848D1 100%);
+  box-shadow: 0 16rpx 32rpx rgba(10,92,255, 0.32), inset 0 1rpx 0 rgba(255,255,255, 0.25);
 }
 
 .fab-icon {
@@ -1441,7 +1483,7 @@ button.share-pick {
   flex: 0 0 172rpx;
   border-radius: 12rpx;
   overflow: hidden;
-  background: #eef2f8;
+  background: #F1F3F6;
 }
 
 /* 审核状态标签（我的帖子）：警示色，区别于置顶 */

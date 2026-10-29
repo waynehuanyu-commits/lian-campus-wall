@@ -1,4 +1,5 @@
 const store = require('../../utils/store')
+const homeFeed = require('../../utils/home-feed')
 const { createExposureTracker } = require('../../utils/exposure')
 const repo = require('../../utils/repo')
 const auth = require('../../utils/auth')
@@ -249,6 +250,7 @@ Page({
         feedKey,
         uniq: `${feedKey}:${index}`,
         displayTag: item.displayTag || '',
+        topicTone: homeFeed.topicTone(item.official ? '官方' : item.displayTag),
         images: item.images || [],
         thumbStyle: (this._thumbStyles || {})[feedKey] || '',
         timeText: formatTime(item.createdAt),

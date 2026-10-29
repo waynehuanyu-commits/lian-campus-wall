@@ -1,4 +1,5 @@
 const repo = require('../../utils/repo')
+const homeFeed = require('../../utils/home-feed')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
 const share = require('../../utils/share')
@@ -184,7 +185,8 @@ Page({
         post: {
           ...post,
           timeText: formatTime(post.createdAt),
-          categoryLabel: post.category || post.tag || ''
+          categoryLabel: post.category || post.tag || '',
+          categoryTone: homeFeed.topicTone(post.official ? '官方' : (post.category || post.tag || ''))
         },
         loading: false,
         loadError: ''

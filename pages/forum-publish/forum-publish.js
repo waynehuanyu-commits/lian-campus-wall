@@ -103,7 +103,7 @@ Page({
       content: '勾选后，这条帖子对外显示系统随机生成的昵称和头像，其他同学点不进你的主页；同一帖子里你的分身名字保持不变。\n分身不等于匿名：平台仍记录你的真实账号，违规内容照常处理。',
       showCancel: false,
       confirmText: '知道了',
-      confirmColor: '#2F7DFF'
+      confirmColor: '#0A5CFF'
     })
   },
 

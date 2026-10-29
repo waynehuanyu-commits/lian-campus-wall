@@ -142,10 +142,19 @@
           </view>
         </block>
       </view>
+      <!-- 评论不多（≤5 条）时直接在卡片里展示，点哪里都进详情 -->
+      <view wx:if="{{item.commentPreview && item.commentPreview.length}}" class="feed-comments">
+        <view
+          wx:for="{{item.commentPreview}}"
+          wx:for-item="c"
+          wx:key="id"
+          class="feed-comment {{c.reply ? 'is-reply' : ''}}"
+        ><text class="feed-comment-name">{{c.name}}：</text><text class="feed-comment-text">{{c.text}}</text></view>
+      </view>
       <view class="feed-foot">
         <view class="feed-stats" catchtap="preventBubble">
           <view class="feed-foot-left">
-            <view wx:if="{{item.displayTag}}" class="feed-tag-pill">
+            <view wx:if="{{item.displayTag}}" class="feed-tag-pill tone-{{item.topicTone}}">
               <text class="feed-tag-hash">#</text>
               <text>{{item.displayTag}}</text>
             </view>

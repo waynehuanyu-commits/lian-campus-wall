@@ -5,7 +5,7 @@
   top: 0;
   bottom: 0;
   z-index: 10000;
-  background: rgba(20, 36, 64, 0.45);
+  background: rgba(20,36,64, 0.45);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -22,19 +22,19 @@
 .privacy-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #1a2b4a;
+  color: #232A3A;
   margin-bottom: 20rpx;
 }
 
 .privacy-body {
   font-size: 28rpx;
   line-height: 1.65;
-  color: #5a6b86;
+  color: #5E6678;
   margin-bottom: 36rpx;
 }
 
 .privacy-link {
-  color: #2f7dff;
+  color: #0A5CFF;
 }
 
 .privacy-actions {
@@ -58,11 +58,11 @@
 }
 
 .privacy-btn.ghost {
-  background: #eef3fa;
-  color: #5a6b86;
+  background: #E9EFFF;
+  color: #5E6678;
 }
 
 .privacy-btn.primary {
-  background: #2f7dff;
+  background: #0A5CFF;
   color: #ffffff;
 }

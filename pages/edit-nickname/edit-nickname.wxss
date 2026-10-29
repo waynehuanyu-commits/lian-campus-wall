@@ -15,7 +15,7 @@
   padding: 8rpx 28rpx 8rpx;
   border-radius: 20rpx;
   background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(30, 70, 140, 0.04);
+  box-shadow: 0 8rpx 24rpx rgba(10,42,122, 0.04);
 }
 
 .field-head {
@@ -33,7 +33,7 @@
 
 .count {
   font-size: 22rpx;
-  color: #b0bac8;
+  color: #B4BAC5;
 }
 
 .input {
@@ -47,7 +47,7 @@
 }
 
 .ph {
-  color: #c5ced9;
+  color: #D5D9E0;
   font-weight: 500;
 }
 
@@ -68,11 +68,11 @@
   line-height: 88rpx;
   text-align: center;
   border-radius: 999rpx;
-  background: linear-gradient(145deg, #6aadff 0%, var(--brand) 100%);
+  background: linear-gradient(145deg, #7FA6FF 0%, var(--brand) 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 650;
-  box-shadow: 0 10rpx 24rpx rgba(47, 125, 255, 0.24);
+  box-shadow: 0 10rpx 24rpx rgba(10,92,255, 0.24);
   padding: 0;
   margin: 0;
 }
@@ -87,7 +87,7 @@
 }
 
 .save-btn.disabled {
-  background: #c9d5e8;
+  background: #D5D9E0;
   color: #fff;
   box-shadow: none;
 }

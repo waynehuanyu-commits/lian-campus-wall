@@ -19,18 +19,18 @@
   right: 32rpx;
   top: 0;
   height: 1rpx;
-  background: #f0f0f0;
+  background: #F1F3F6;
 }
 
 .xhs-note-on {
-  background: #fafafa;
+  background: #F7F8FA;
 }
 
 .xhs-note-avatar {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: #f2f2f2;
+  background: #F1F3F6;
   flex-shrink: 0;
 }
 
@@ -71,14 +71,14 @@
 
 .xhs-note-dot {
   margin: 0 8rpx;
-  color: #ccc;
+  color: #D5D9E0;
 }
 
 .xhs-thumb {
   width: 88rpx;
   height: 88rpx;
   border-radius: 10rpx;
-  background: #f5f5f5;
+  background: #F1F3F6;
   flex-shrink: 0;
 }
 
@@ -105,7 +105,7 @@
   width: 132rpx;
   height: 132rpx;
   border-radius: 50%;
-  background: #f5f5f5;
+  background: #F1F3F6;
   margin-bottom: 28rpx;
   position: relative;
 }
@@ -118,7 +118,7 @@
   width: 60rpx;
   height: 60rpx;
   transform: translate(-50%, -50%);
-  background: #d0d0d0;
+  background: #D5D9E0;
 }
 
 .xhs-empty-ico.comment::after {
@@ -151,7 +151,7 @@
   margin: 0 24rpx;
   border-radius: 24rpx;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
+  background: rgba(255,255,255, 0.94);
+  border: 1rpx solid rgba(255,255,255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
 }

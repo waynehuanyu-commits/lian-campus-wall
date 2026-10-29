@@ -1,4 +1,5 @@
 const repo = require('../../utils/repo')
+const homeFeed = require('../../utils/home-feed')
 const store = require('../../utils/store')
 const auth = require('../../utils/auth')
 const contact = require('../../utils/contact')
@@ -201,6 +202,7 @@ Page({
           ...post,
           title: post.title || post.headline || '',
           categoryLabel: post.tag || post.category || '',
+          categoryTone: homeFeed.topicTone(post.official ? '官方' : (post.category || post.tag || '')),
           timeText: formatTime(post.createdAt)
         },
         loading: false,
