@@ -173,6 +173,11 @@ function postTopic(post, type) {
  * 企微自动推送队列（digest_queue）里的一条。云函数发帖、后台人工审核通过时都用它入队，
  * 文档 id 固定为 dq_<帖子id>，重复入队只会覆盖同一条，不会重复推送。
  */
+// 按完整字符截断：String.slice 会把表情（😭 等两个码元）切成半个，企微收到会报 40058 参数错误
+function clipChars(text, max) {
+  return Array.from(String(text || '')).slice(0, max).join('')
+}
+
 function digestQueueItem(post, type) {
   const id = String((post && (post.id || post._id)) || '')
   const kind = type === 'wall' ? 'wall' : 'forum'
@@ -180,14 +185,14 @@ function digestQueueItem(post, type) {
   const route = kind === 'wall' && (post.routeFrom || post.routeTo)
     ? `${post.routeFrom || '出发地'} → ${post.routeTo || '目的地'}`
     : ''
-  const title = String((post && post.title) || route || content.slice(0, 20) || postTopic(post, kind)).trim()
+  const title = String((post && post.title) || route || clipChars(content, 20) || postTopic(post, kind)).trim()
   const page = kind === 'wall' ? 'pages/wall-detail/wall-detail' : 'pages/forum-detail/forum-detail'
   return {
     id: `dq_${id}`,
     contentType: kind,
     contentId: id,
-    title: title.slice(0, 40),
-    summary: content.slice(0, 80),
+    title: clipChars(title, 40),
+    summary: clipChars(content, 80),
     channel: postTopic(post, kind),
     pagepath: `${page}?id=${id}`,
     queuedAt: Date.now()
@@ -197,6 +202,7 @@ function digestQueueItem(post, type) {
 module.exports = {
   postTopic,
   digestQueueItem,
+  clipChars,
   HOME_TOPICS,
   OTHER_TOPIC,
   OFFICIAL_TOPIC,

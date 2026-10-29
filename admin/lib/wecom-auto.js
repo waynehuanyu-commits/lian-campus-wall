@@ -20,6 +20,9 @@ const WECOM_HOST = 'https://qyapi.weixin.qq.com'
 const WX_HOST = 'https://api.weixin.qq.com'
 
 let running = false
+// 推送失败（如发送人不是群主、token 失效）后暂停 30 分钟再试，帖子放回队列不丢
+let pausedUntil = 0
+const RETRY_PAUSE_MS = 30 * 60 * 1000
 let coverCache = { id: '', at: 0 }
 
 function uid(prefix) {
@@ -80,20 +83,30 @@ async function shortLinks(items) {
   }
 }
 
+// 去掉被截成半个的表情（孤立代理字符），否则企微整条报 40058
+function cleanText(text) {
+  return String(text || '').replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, '')
+}
+
+function clip(text, max) {
+  return Array.from(cleanText(text)).slice(0, max).join('')
+}
+
 /** 群消息正文：标题 + 摘要 + 短链，不出现小程序内部路径 */
 function buildText(digest, links) {
   const lines = (digest.items || []).map((item, index) => {
-    const summary = item.summary && item.summary !== item.title ? `\n${item.summary.slice(0, 40)}` : ''
+    const summary = item.summary && item.summary !== item.title ? `\n${clip(item.summary, 40)}` : ''
     const link = links[item.contentId] ? `\n${links[item.contentId]}` : ''
-    return `${index + 1}. 【${item.channel || '校园话题'}】${item.title}${summary}${link}`
+    return `${index + 1}. 【${cleanText(item.channel) || '校园话题'}】${cleanText(item.title)}${summary}${link}`
   })
-  return [
+  const text = [
     `黎安话事 · 最新 ${lines.length} 条`,
     '',
     lines.join('\n\n'),
     '',
     '打开小程序「黎安话事」看全文、参与评论'
-  ].join('\n').slice(0, 3900)
+  ].join('\n')
+  return clip(text, 3900)
 }
 
 async function targetChatIds() {
@@ -119,7 +132,7 @@ async function createGroupMessage(token, digest, chatIds, links) {
       attachments: [{
         msgtype: 'miniprogram',
         miniprogram: {
-          title: digest.title.slice(0, 20),
+          title: clip(digest.title, 20),
           pic_media_id: cover,
           appid: process.env.MINI_APPID,
           page: `pages/digest/digest.html?id=${digest.id}`
@@ -138,6 +151,7 @@ async function createGroupMessage(token, digest, chatIds, links) {
 /** 队列满 10 条 → 生成汇总并建群发。返回本轮做了什么，方便日志和手动触发 */
 async function tick({ force = false } = {}) {
   if (running) return { skipped: 'running' }
+  if (!force && Date.now() < pausedUntil) return { skipped: 'paused' }
   running = true
   try {
     const queued = (await db.allDocs('digest_queue')).sort((a, b) => ((a.queuedAt || 0) - (b.queuedAt || 0)) || String(a.id).localeCompare(String(b.id)))
@@ -185,6 +199,13 @@ async function tick({ force = false } = {}) {
       createdAt: Date.now()
     }
     await db.setDoc('distribute_logs', log.id, log)
+    if (!ok) {
+      // 帖子放回队列，下次重试；同一帖固定 dq_<帖子id>，不会重复
+      await Promise.all(items.map((item) => db.setDoc('digest_queue', item.id, item).catch(() => {})))
+      pausedUntil = Date.now() + RETRY_PAUSE_MS
+    } else {
+      pausedUntil = 0
+    }
     await db.setDoc('digests', digest.id, { ...digest, wecomStatus: log.status, wecom })
     console.log(`[wecom-auto] ${digest.id} ${items.length} 条 → ${ok ? '已建群发，等发送人确认' : `失败：${wecom.error || JSON.stringify(wecom.result)}`}`)
     return { digest: digest.id, ok, wecom }
