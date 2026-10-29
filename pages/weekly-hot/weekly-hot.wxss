@@ -39,9 +39,9 @@
   margin-bottom: 16rpx;
   padding: 26rpx 28rpx 22rpx 20rpx;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   transition: transform 0.18s ease;
 }
 
@@ -66,7 +66,7 @@
 
 .rank.top1,
 .rank.top2 { color: var(--brand); }
-.rank.top3 { color: rgba(10,92,255, 0.7); }
+.rank.top3 { color: rgba(10, 92, 255, 0.7); }
 
 .rank.top1::after {
   content: "";

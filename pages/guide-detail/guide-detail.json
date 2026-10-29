@@ -1,8 +1,8 @@
 {
   "navigationBarTitleText": "攻略详情",
-  "navigationBarBackgroundColor": "#E9EFFF",
+  "navigationBarBackgroundColor": "#E6EEFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#F4F5F2",
+  "backgroundColor": "#F2F5FA",
   "usingComponents": {
     "post-gallery": "/components/post-gallery/post-gallery",
     "campus-qr-card": "/components/campus-qr-card/campus-qr-card"

@@ -8,7 +8,7 @@
   margin: 0 24rpx 18rpx;
   display: flex;
   gap: 8rpx;
-  background: rgba(18,26,44, 0.05);
+  background: rgba(18, 26, 44, 0.05);
   border-radius: 999rpx;
   padding: 6rpx;
   box-sizing: border-box;
@@ -37,7 +37,7 @@
   background: #fff;
   color: var(--ink);
   font-weight: 700;
-  box-shadow: 0 2rpx 8rpx rgba(18,26,44, 0.08);
+  box-shadow: 0 2rpx 8rpx rgba(18, 26, 44, 0.08);
 }
 
 .list {
@@ -51,8 +51,8 @@
   margin-bottom: 0;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  box-shadow: 0 10rpx 28rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10rpx 28rpx rgba(30, 70, 140, 0.05);
 }
 
 .mini-title {
@@ -65,7 +65,7 @@
 .mini-content {
   margin-top: 8rpx;
   margin-bottom: 4rpx;
-  color: #5E6678;
+  color: #6f5f66;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

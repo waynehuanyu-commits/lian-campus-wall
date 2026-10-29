@@ -47,7 +47,7 @@
   border-radius: 50%;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 0 0 4rpx rgba(255,255,255, 0.9);
+  box-shadow: 0 0 0 4rpx rgba(255, 255, 255, 0.9);
 }
 
 .avatar-lg {
@@ -55,7 +55,7 @@
   height: 128rpx;
   border-radius: 50%;
   display: block;
-  background: #E6E9EE;
+  background: #e9edf4;
   border: none;
   box-sizing: border-box;
   box-shadow: none;
@@ -91,7 +91,7 @@
   height: 40rpx;
   border-radius: 50%;
   background: var(--ink);
-  border: 4rpx solid #E9EFFF;
+  border: 4rpx solid #eef3fc;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -182,12 +182,12 @@
 }
 
 .school-pill.done {
-  background: rgba(10,92,255, 0.12);
+  background: rgba(10, 92, 255, 0.12);
   color: var(--brand);
 }
 
 .soft-pill.ok {
-  background: rgba(10,92,255, 0.12);
+  background: rgba(10, 92, 255, 0.12);
   color: var(--brand);
 }
 
@@ -201,19 +201,19 @@
   padding: 24rpx 28rpx;
   border-radius: 24rpx;
   background: #fff6e8;
-  border: 1rpx solid rgba(245,158,11, 0.2);
+  border: 1rpx solid rgba(245, 158, 11, 0.2);
 }
 
 .notice-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #232A3A;
+  color: #333;
 }
 
 .notice-desc {
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #858D9C;
+  color: #999;
   line-height: 1.5;
 }
 
@@ -222,9 +222,9 @@
   margin: 0 24rpx 20rpx;
   padding: 0;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   overflow: hidden;
 }
 
@@ -252,7 +252,7 @@
 }
 
 .nav-item-hover {
-  background: rgba(10,92,255, 0.04);
+  background: rgba(10, 92, 255, 0.04);
 }
 
 .nav-left {
@@ -348,7 +348,7 @@
 }
 
 .nav-arrow {
-  color: #D5D9E0;
+  color: #ccc;
   font-size: 36rpx;
   line-height: 1;
   font-weight: 300;
@@ -377,7 +377,7 @@
 }
 
 .logout-btn-on {
-  background: rgba(18,26,44, 0.04);
+  background: rgba(18, 26, 44, 0.04);
 }
 
 .foot-note {
@@ -395,7 +395,7 @@
   top: 0;
   bottom: 0;
   z-index: 50;
-  background: rgba(0,0,0, 0.45);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: flex-end;
 }
@@ -418,9 +418,9 @@
   line-height: 100rpx;
   text-align: center;
   font-size: 32rpx;
-  color: #232A3A;
+  color: #333;
   background: #fff;
-  border-bottom: 1rpx solid #F1F3F6;
+  border-bottom: 1rpx solid #f0f0f0;
 }
 
 .avatar-option:last-child {
@@ -433,7 +433,7 @@
 }
 
 .avatar-option-hover {
-  background: #F7F8FA;
+  background: #fafafa;
 }
 
 .nav-block {
@@ -442,9 +442,9 @@
   margin: 0 24rpx 20rpx;
   padding: 0;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   overflow: hidden;
 }
 
@@ -552,7 +552,7 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(244,245,242, 0) 0%, rgba(244,245,242, 0) 78%, rgba(244,245,242, 0.85) 92%, #E9EFFF 100%);
+  background: linear-gradient(180deg, rgba(242, 245, 250, 0) 0%, rgba(242, 245, 250, 0) 78%, rgba(242, 245, 250, 0.85) 92%, #eff3fa 100%);
 }
 
 .mine-page {
@@ -573,10 +573,10 @@
   position: absolute;
   right: 28rpx;
   top: 452rpx;
-  color: rgba(255,255,255, 0.92);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 20rpx;
   letter-spacing: 1rpx;
-  text-shadow: 0 1rpx 4rpx rgba(0,0,0, 0.35);
+  text-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.35);
 }
 
 .mine-page > .hero {

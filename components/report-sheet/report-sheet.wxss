@@ -5,7 +5,7 @@
   right: 0;
   bottom: 0;
   z-index: 10000;
-  background: rgba(18,26,44, 0.45);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: flex-end;
 }
@@ -20,7 +20,7 @@
 
 .title {
   font-size: 28rpx;
-  color: #858D9C;
+  color: #8a9199;
   text-align: center;
   margin-bottom: 12rpx;
 }
@@ -31,12 +31,12 @@
   line-height: 88rpx;
   text-align: center;
   font-size: 32rpx;
-  color: #232A3A;
-  border-top: 1rpx solid #F1F3F6;
+  color: #1f2937;
+  border-top: 1rpx solid #eef1f5;
 }
 
 .cancel {
   margin-top: 12rpx;
-  color: #5E6678;
+  color: #6b7280;
   border-top: none;
 }

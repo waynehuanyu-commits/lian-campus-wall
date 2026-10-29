@@ -58,7 +58,7 @@ async function goLogin() {
       title: (gate && gate.title) || '暂无法操作',
       content: (gate && gate.message) || '当前账号暂不能发言',
       showCancel: false,
-      confirmColor: '#0A5CFF'
+      confirmColor: '#2F7DFF'
     })
   } catch (err) {
     wx.hideLoading()
@@ -87,7 +87,7 @@ function ensureCanSpeak() {
       content: gate.message || '发帖、评论前请先完成登录与学校认证',
       confirmText: '去开通',
       cancelText: '先看看',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#2F7DFF',
       success(res) {
         if (res.confirm) goLogin()
       }
@@ -100,7 +100,7 @@ function ensureCanSpeak() {
       content: gate.message || '发帖、评论前请先完成学校认证',
       confirmText: '去认证',
       cancelText: '先看看',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#2F7DFF',
       success(res) {
         if (res.confirm) goSchoolAuth()
       }
@@ -111,7 +111,7 @@ function ensureCanSpeak() {
     title: gate.title || '暂无法操作',
     content: gate.message || '当前账号暂不能发言',
     showCancel: false,
-    confirmColor: '#0A5CFF'
+    confirmColor: '#2F7DFF'
   })
   return false
 }
@@ -123,7 +123,7 @@ function promptReportBlocked(check) {
       content: '浏览开放。举报需要先登录并完成学校认证。',
       confirmText: '去开通',
       cancelText: '先看看',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#2F7DFF',
       success(res) {
         if (res.confirm) goLogin()
       }
@@ -136,7 +136,7 @@ function promptReportBlocked(check) {
       content: '完成学校认证后才能举报。填写所在学校即可，提交后立即生效。',
       confirmText: '去认证',
       cancelText: '先看看',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#2F7DFF',
       success(res) {
         if (res.confirm) goSchoolAuth()
       }
@@ -180,7 +180,7 @@ function showActionError(result) {
     title: titles[result.code] || '未通过校验',
     content: result.message || '请稍后再试',
     showCancel: false,
-    confirmColor: '#0A5CFF'
+    confirmColor: '#2F7DFF'
   })
   return true
 }

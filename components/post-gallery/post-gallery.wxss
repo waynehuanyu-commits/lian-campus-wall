@@ -9,7 +9,7 @@
   position: relative;
   overflow: hidden;
   border-radius: 16rpx;
-  background: #F1F3F6;
+  background: #f2f3f5;
 }
 
 /* 多图：方形网格 */
@@ -71,10 +71,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #858D9C;
+  color: #8a9199;
   font-size: 22rpx;
 }
 
 .gallery-fail.muted {
-  color: #B4BAC5;
+  color: #b0b4ba;
 }

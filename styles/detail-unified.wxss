@@ -6,11 +6,11 @@
 }
 
 .detail-card {
-  background: rgba(255,255,255, 0.94);
+  background: rgba(255, 255, 255, 0.94);
   padding: 28rpx 28rpx 24rpx;
   margin: 20rpx 24rpx 16rpx;
   border-radius: 24rpx;
-  border: 1rpx solid rgba(255,255,255, 0.9);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
   box-shadow: none;
 }
 
@@ -25,7 +25,7 @@
   height: 72rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #E6E9EE;
+  background: #e9edf4;
 }
 
 .author-meta {
@@ -179,10 +179,10 @@
 }
 
 .comment-panel {
-  background: rgba(255,255,255, 0.94);
+  background: rgba(255, 255, 255, 0.94);
   margin: 0 24rpx;
   border-radius: 24rpx;
-  border: 1rpx solid rgba(255,255,255, 0.9);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
   overflow: hidden;
   padding: 4rpx 0 8rpx;
   box-shadow: none;
@@ -226,7 +226,7 @@
 }
 
 .comment-group + .comment-group {
-  border-top: 1rpx solid #F1F3F6;
+  border-top: 1rpx solid #f2f3f5;
   margin-top: 8rpx;
   padding-top: 12rpx;
 }
@@ -248,7 +248,7 @@
   height: 64rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #E6E9EE;
+  background: #e9edf4;
 }
 
 .comment-item.reply .comment-avatar {

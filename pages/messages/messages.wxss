@@ -21,8 +21,8 @@
   gap: 20rpx;
   padding: 24rpx;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
   box-sizing: border-box;
   transition: transform 0.15s ease;
 }
@@ -87,8 +87,8 @@
 
 .msg-entry.active {
   background: #fff;
-  border-color: rgba(10,92,255, 0.35);
-  box-shadow: 0 10rpx 24rpx rgba(10,42,122, 0.08);
+  border-color: rgba(10, 92, 255, 0.35);
+  box-shadow: 0 10rpx 24rpx rgba(10, 42, 122, 0.08);
 }
 
 .msg-entry.active .msg-label {
@@ -99,9 +99,9 @@
   margin: 0 24rpx 20rpx;
   padding: 4rpx 0;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   overflow: hidden;
 }
 
@@ -124,7 +124,7 @@
 }
 
 .msg-row-on {
-  background: rgba(10,92,255, 0.04);
+  background: rgba(10, 92, 255, 0.04);
 }
 
 .msg-row-avatar {
@@ -132,7 +132,7 @@
   height: 64rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #E6E9EE;
+  background: #e9edf4;
 }
 
 .msg-row-main {
@@ -185,7 +185,7 @@
   height: 104rpx;
   flex-shrink: 0;
   border-radius: 14rpx;
-  background: #E6E9EE;
+  background: #e9edf4;
 }
 
 .msg-row-thumb-text {

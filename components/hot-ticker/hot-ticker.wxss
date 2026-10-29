@@ -3,9 +3,9 @@
   position: relative;
   margin: 0 24rpx 20rpx;
   border-radius: 24rpx;
-  background: rgba(255,255,255, 0.94);
-  border: 1rpx solid rgba(255,255,255, 0.9);
-  box-shadow: 0 6rpx 20rpx rgba(10,42,122, 0.05);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   overflow: hidden;
 }
 
@@ -36,7 +36,7 @@
 }
 
 .ticker-row-on {
-  background: rgba(10,92,255, 0.04);
+  background: rgba(10, 92, 255, 0.04);
 }
 
 /* 皇冠：三个尖角 + 底座，名次写在底座上 */
@@ -52,7 +52,7 @@
 }
 
 .crown-2 {
-  background: linear-gradient(180deg, #E6E9EE, #B4BAC5);
+  background: linear-gradient(180deg, #e3e9f2, #b7c2d3);
 }
 
 .crown-3 {
@@ -72,7 +72,7 @@
 }
 
 .crown-2 .crown-num {
-  color: #3B4458;
+  color: #4a5568;
 }
 
 .crown-3 .crown-num {
@@ -85,14 +85,14 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #121A2C;
+  color: #1a2233;
   font-size: 28rpx;
 }
 
 .ticker-go {
   flex-shrink: 0;
   margin-left: 12rpx;
-  color: #B4BAC5;
+  color: #a3acba;
   font-size: 36rpx;
   line-height: 1;
 }

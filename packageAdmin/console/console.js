@@ -277,7 +277,7 @@ Page({
     wx.showModal({
       title,
       content: status === 'active' ? '解除后可正常发言。' : '封禁/禁言后无法发帖、评论和查看联系方式。',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#3B82F6',
       success: (res) => {
         if (!res.confirm) return
         const result = store.setAccountStatus(id, { status, reason, muteHours })
@@ -303,7 +303,7 @@ Page({
     wx.showModal({
       title: approved ? '通过该申请？' : '驳回该申请？',
       content: approved ? '通过后将更新对应用户的学校信息。' : '驳回后用户仍使用原学校信息。',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#3B82F6',
       success: (res) => {
         if (!res.confirm) return
         const result = store.reviewSchoolChange(id, { approved })
@@ -321,7 +321,7 @@ Page({
     wx.showModal({
       title: '生成汇总？',
       content: `打包当前 ${this.data.progress.count} 条。本地只做演示；正式环境由云函数/后台走企微自动群发。`,
-      confirmColor: '#0A5CFF',
+      confirmColor: '#3B82F6',
       success: (res) => {
         if (!res.confirm) return
         const flushed = store.flushDigest(true)
@@ -334,7 +334,7 @@ Page({
           title: '汇总已生成',
           content: '本地汇总已生成。正式环境请配好企微参数，满 10 条会自动建群发，群主确认即可。',
           showCancel: false,
-          confirmColor: '#0A5CFF'
+          confirmColor: '#3B82F6'
         })
       }
     })
@@ -443,7 +443,7 @@ Page({
     wx.showModal({
       title: '恢复示例数据',
       content: '将清空本地发布、点赞和评论，并恢复演示内容。个人资料会保留。',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#3B82F6',
       success: (res) => {
         if (!res.confirm) return
         store.resetDemo()
@@ -457,7 +457,7 @@ Page({
     wx.showModal({
       title: '退出管理端？',
       content: '退出后需重新登录才能进入控制台。',
-      confirmColor: '#0A5CFF',
+      confirmColor: '#3B82F6',
       success: (res) => {
         if (!res.confirm) return
         adminAuth.logout()

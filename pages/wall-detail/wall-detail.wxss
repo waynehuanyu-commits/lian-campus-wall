@@ -22,25 +22,25 @@
 }
 
 .status-done {
-  color: #0A5CFF;
-  background: #E9EFFF;
+  color: #1d4ed8;
+  background: #e8eefc;
 }
 
 .status-closed {
-  color: #5E6678;
-  background: #F1F3F6;
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
 .status-panel {
   margin-top: 20rpx;
   padding: 20rpx;
   border-radius: 16rpx;
-  background: #F7F8FA;
+  background: #f7f9fc;
 }
 
 .status-panel-title {
   font-size: 24rpx;
-  color: #5E6678;
+  color: #6b7280;
   margin-bottom: 12rpx;
 }
 
@@ -54,28 +54,28 @@
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
   font-size: 24rpx;
-  color: #3B4458;
+  color: #4b5563;
   background: #fff;
-  border: 1rpx solid #E6E9EE;
+  border: 1rpx solid #e5e7eb;
 }
 
 .status-action.active {
-  color: #0A5CFF;
-  border-color: #7FA6FF;
-  background: #F3F6FF;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #eff6ff;
   font-weight: 650;
 }
 
 .ride-line {
   margin-top: 12rpx;
   font-size: 26rpx;
-  color: #3B4458;
+  color: #4b5563;
 }
 
 .detail-summary {
   margin-top: 12rpx;
   font-size: 28rpx;
-  color: #3B4458;
+  color: #4b5563;
   line-height: 1.55;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -85,7 +85,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(18,26,44, 0.42);
+  background: rgba(17, 24, 39, 0.42);
   display: flex;
   align-items: flex-end;
 }
@@ -102,34 +102,34 @@
   width: 64rpx;
   height: 8rpx;
   border-radius: 999rpx;
-  background: #E6E9EE;
+  background: #e5e7eb;
   margin: 0 auto 20rpx;
 }
 
 .sheet-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #121A2C;
+  color: #111827;
   margin-bottom: 16rpx;
 }
 
 .sheet-label {
   font-size: 24rpx;
-  color: #858D9C;
+  color: #8a9199;
 }
 
 .sheet-value {
   margin-top: 8rpx;
   font-size: 34rpx;
   font-weight: 700;
-  color: #121A2C;
+  color: #111827;
   word-break: break-all;
 }
 
 .sheet-tip {
   margin-top: 16rpx;
   font-size: 24rpx;
-  color: #858D9C;
+  color: #8a9199;
   line-height: 1.55;
 }
 
@@ -137,7 +137,7 @@
   margin-top: 24rpx;
   height: 88rpx;
   border-radius: 20rpx;
-  background: #0A5CFF;
+  background: #2f7dff;
   color: #fff;
   font-size: 30rpx;
   font-weight: 650;
@@ -151,8 +151,8 @@
 }
 
 .sheet-btn-secondary {
-  background: #F3F6FF;
-  color: #0A5CFF;
+  background: #eef4ff;
+  color: #1d4ed8;
 }
 
 .sheet-cancel {
@@ -161,7 +161,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #858D9C;
+  color: #8a9199;
   font-size: 28rpx;
 }
 
@@ -175,14 +175,14 @@
 .feedback-chip {
   padding: 12rpx 20rpx;
   border-radius: 999rpx;
-  background: #F1F3F6;
-  color: #3B4458;
+  background: #f3f5f8;
+  color: #4b5563;
   font-size: 24rpx;
 }
 
 .feedback-chip.on {
-  background: #E9EFFF;
-  color: #0A5CFF;
+  background: #e8f0ff;
+  color: #1d4ed8;
   font-weight: 650;
 }
 
@@ -192,7 +192,7 @@
   min-height: 140rpx;
   padding: 16rpx;
   border-radius: 16rpx;
-  background: #F1F3F6;
+  background: #f3f5f8;
   box-sizing: border-box;
   font-size: 26rpx;
 }
