@@ -166,6 +166,88 @@
   line-height: 1.6;
 }
 
+/* 分身发帖：圆形勾选 + 说明按钮 */
+.pub-alias {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4rpx 24rpx 20rpx;
+  padding: 0 12rpx;
+}
+
+.pub-alias-main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex: 1;
+  min-width: 0;
+  padding: 16rpx 0;
+  border-radius: 16rpx;
+}
+
+.pub-alias-main--press {
+  opacity: 0.6;
+}
+
+.pub-alias-check {
+  position: relative;
+  flex-shrink: 0;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 3rpx solid #C5CCD8;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pub-alias-check.on {
+  background: #0A5CFF;
+  border-color: #0A5CFF;
+}
+
+.pub-alias-check.on::after {
+  content: '';
+  position: absolute;
+  left: 11rpx;
+  top: 5rpx;
+  width: 10rpx;
+  height: 18rpx;
+  border: solid #FFFFFF;
+  border-width: 0 4rpx 4rpx 0;
+  transform: rotate(45deg);
+}
+
+.pub-alias-text {
+  color: var(--ink);
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.pub-alias-sub {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.pub-alias-info {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: 12rpx;
+  border-radius: 50%;
+  border: 3rpx solid #C5CCD8;
+  color: #9AA3B2;
+  font-size: 22rpx;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.pub-alias-info--press {
+  opacity: 0.5;
+}
+
 /* 底部固定发布栏 */
 .pub-submit-bar {
   position: fixed;

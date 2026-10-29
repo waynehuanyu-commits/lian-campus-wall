@@ -68,13 +68,13 @@
         <text class="pub-row-title">{{extraLabel}}（选填）</text>
         <input class="pub-row-input" maxlength="30" placeholder="{{extraPlaceholder}}" placeholder-class="pub-ph" value="{{extraField}}" bindinput="onExtraFieldInput" />
       </view>
-      <view class="pub-row">
-        <view class="pub-row-copy">
-          <text class="pub-row-title">分身发布</text>
-          <text class="pub-row-desc">对外显示随机昵称；拼车和二手建议用本人，方便对接</text>
-        </view>
-        <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
+    </view>
+    <view class="pub-alias" role="checkbox" aria-checked="{{anonymous}}">
+      <view class="pub-alias-main" bindtap="toggleAlias" hover-class="pub-alias-main--press">
+        <view class="pub-alias-check {{anonymous ? 'on' : ''}}"></view>
+        <text class="pub-alias-text">分身发帖<text class="pub-alias-sub">（随机昵称，别人看不到你的主页）</text></text>
       </view>
+      <view class="pub-alias-info" bindtap="showAliasTip" hover-class="pub-alias-info--press" aria-label="分身发帖说明">!</view>
     </view>
     <view class="pub-note">线下交易请注意安全，平台不介入纠纷。</view>
 

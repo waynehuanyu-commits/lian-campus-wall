@@ -53,14 +53,12 @@
     </view>
   </view>
 
-  <view class="pub-card pub-list">
-    <view class="pub-row">
-      <view class="pub-row-copy">
-        <text class="pub-row-title">分身发布</text>
-        <text class="pub-row-desc">对外显示随机昵称，别人进不了你的主页</text>
-      </view>
-      <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
+  <view class="pub-alias" role="checkbox" aria-checked="{{anonymous}}">
+    <view class="pub-alias-main" bindtap="toggleAlias" hover-class="pub-alias-main--press">
+      <view class="pub-alias-check {{anonymous ? 'on' : ''}}"></view>
+      <text class="pub-alias-text">分身发帖<text class="pub-alias-sub">（随机昵称，别人看不到你的主页）</text></text>
     </view>
+    <view class="pub-alias-info" bindtap="showAliasTip" hover-class="pub-alias-info--press" aria-label="分身发帖说明">!</view>
   </view>
 
   <view class="pub-submit-bar">
