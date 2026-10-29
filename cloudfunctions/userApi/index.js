@@ -471,7 +471,7 @@ function wallHeadline(item) {
   if (item.tag === '出行拼车' && (item.routeFrom || item.routeTo)) {
     return `${item.routeFrom || '出发地'} → ${item.routeTo || '目的地'}`
   }
-  return item.tag || '互助广场'
+  return item.tag || '校园话题'
 }
 
 function wallSummary(item) {
@@ -1739,7 +1739,7 @@ async function enqueueWall(post) {
     contentId: post.id,
     title: wallHeadline(post),
     summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    channel: `互助广场 · ${post.tag}`,
+    channel: homeFeed.postTopic(post, 'wall'),
     pagepath: `pages/wall-detail/wall-detail?id=${post.id}`,
     wecomPage: `pages/wall-detail/wall-detail.html?id=${post.id}`,
     queuedAt: Date.now()
@@ -2213,7 +2213,7 @@ async function ensureDemoWeeklyHot() {
   const next = {
     id: 'current',
     title: '园区热议',
-    subtitle: '学习分享 + 互助广场热榜',
+    subtitle: '本周校园精选',
     enabled: true,
     schemaVersion: 2,
     items,
@@ -3244,7 +3244,7 @@ const handlers = {
     }
     if (moderation.isPublicStatus(post.reviewStatus)) invalidateFeedCache('forum_posts')
     if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
-      await handleReviewViolation(user, review, '学习分享发帖')
+      await handleReviewViolation(user, review, '发帖')
     }
     const result = publishReviewResult(review, post)
     return { ...result, speakGate: speakGate(user) }
@@ -3329,7 +3329,7 @@ const handlers = {
     }
     if (moderation.isPublicStatus(post.reviewStatus)) invalidateFeedCache('wall_posts')
     if (moderation.countsAsViolation(review.outcome) || review.restrictAccount) {
-      await handleReviewViolation(user, review, '校园墙发帖')
+      await handleReviewViolation(user, review, '发帖')
     }
     const result = publishReviewResult(review, post)
     if (!review.passed) return { ...result, speakGate: speakGate(user) }
@@ -3972,7 +3972,7 @@ const handlers = {
         postTitle: canOpen
           ? (item.targetType === 'wall' ? wallHeadline(post) : post.title)
           : '原帖已不可用',
-        postBadge: item.targetType === 'wall' ? '互助广场' : '学习分享'
+        postBadge: canOpen ? homeFeed.postTopic(post, item.targetType) : ''
       }
     })
     return { ok: true, comments, snapshotAt }
@@ -4025,7 +4025,7 @@ const handlers = {
         postTitle: canOpen
           ? (type === 'wall' ? wallHeadline(post) : post.title)
           : '原帖已不可用',
-        postBadge: type === 'wall' ? '互助广场' : '学习分享'
+        postBadge: canOpen ? homeFeed.postTopic(post, type) : ''
       }
     })
     return { ok: true, likes, snapshotAt }
@@ -4050,7 +4050,7 @@ const handlers = {
         postTitle: post
           ? (item.targetType === 'wall' ? wallHeadline(post) : post.title)
           : '原帖已删除',
-        postBadge: item.targetType === 'wall' ? '互助广场' : '学习分享'
+        postBadge: post ? homeFeed.postTopic(post, item.targetType) : ''
       }
     })
     return { ok: true, comments }

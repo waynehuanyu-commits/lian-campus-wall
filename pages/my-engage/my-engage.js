@@ -2,6 +2,7 @@ const repo = require('../../utils/repo')
 const userNav = require('../../utils/user')
 const auth = require('../../utils/auth')
 const { formatTime } = require('../../utils/util')
+const homeFeed = require('../../utils/home-feed')
 
 Page({
   data: {
@@ -43,7 +44,7 @@ Page({
           ...item,
           type: 'forum',
           uniq: `forum:${item.id}`,
-          badge: '学习分享',
+          badge: homeFeed.postTopic(item, 'forum'),
           title: item.title,
           timeText: formatTime(item.createdAt)
         }))
@@ -51,7 +52,7 @@ Page({
           ...item,
           type: 'wall',
           uniq: `wall:${item.id}`,
-          badge: '互助广场',
+          badge: homeFeed.postTopic(item, 'wall'),
           title: item.headline || item.title,
           timeText: formatTime(item.createdAt)
         }))

@@ -43,7 +43,7 @@ Page({
         ...item,
         uniq: item.id || `${item.contentType}:${item.postId}:${item.userId}`,
         timeText: formatTime(item.createdAt),
-        postBadge: item.postBadge || (item.contentType === 'wall' ? '互助广场' : '学习分享')
+        postBadge: item.postBadge || ''
       }))
       const cursor = inbox.seenCursor(list, packed && packed.snapshotAt)
       this.setData({ loading: false, loadError: '', list }, () => {

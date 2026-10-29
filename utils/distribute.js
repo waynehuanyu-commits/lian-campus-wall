@@ -7,7 +7,7 @@ function wallHeadline(post) {
   if (post.tag === '出行拼车' && (post.routeFrom || post.routeTo)) {
     return `${post.routeFrom || '出发地'} → ${post.routeTo || '目的地'}`
   }
-  return post.tag || '互助广场'
+  return post.tag || '校园话题'
 }
 
 function buildShareCard(type, post, appid = 'touristappid') {
@@ -25,7 +25,7 @@ function buildShareCard(type, post, appid = 'touristappid') {
     query,
     pagepath: `${path}?${query}`,
     wecomPage: `${path}.html?${query}`,
-    channel: type === 'forum' ? `学习分享 · ${post.category}` : `互助广场 · ${post.tag}`
+    channel: (type === 'forum' ? post.category : post.tag) || '校园话题'
   }
 }
 

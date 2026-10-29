@@ -159,7 +159,15 @@ function toHomeCard(post, type) {
   }
 }
 
+/** 帖子对外显示的话题标签（消息、分享、我的互动等处统一用它，不再区分旧版块） */
+function postTopic(post, type) {
+  if (!post) return TAG_FALLBACK
+  if (isOfficialPost(post)) return OFFICIAL_TOPIC
+  return normalizeTopic(primaryTag(post, type))
+}
+
 module.exports = {
+  postTopic,
   HOME_TOPICS,
   OTHER_TOPIC,
   OFFICIAL_TOPIC,

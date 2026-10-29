@@ -55,7 +55,8 @@
         bindtap="goPost"
       >
         <view class="row between">
-          <view class="tag">{{item.postBadge}}</view>
+          <view wx:if="{{item.postBadge}}" class="tag">{{item.postBadge}}</view>
+          <view wx:else></view>
           <view class="meta">{{item.timeText}}</view>
         </view>
         <view class="engage-target">我评论了 · {{item.postExists ? item.postTitle : '原帖已不可用'}}</view>

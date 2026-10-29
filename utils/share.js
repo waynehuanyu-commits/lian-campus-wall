@@ -72,16 +72,16 @@ function appMessageTitle({ title, tag, section }) {
 
 function forumPost(post = {}, id) {
   const contentId = id || post.id || ''
-  const titleText = post.title || '学习分享新鲜事'
+  const titleText = post.title || '园区新鲜事'
   const images = post.images || []
   return {
     appMessage: {
-      title: appMessageTitle({ title: titleText, tag: post.category, section: '学习分享' }),
+      title: appMessageTitle({ title: titleText, tag: post.category, section: '校园话题' }),
       path: `/pages/forum-detail/forum-detail?${buildQuery({ id: contentId, from: 'share' })}`,
       imageUrl: firstImage(images) || COVER_CARD
     },
     timeline: {
-      title: timelineTitle({ title: titleText, tag: post.category, section: '学习分享' }),
+      title: timelineTitle({ title: titleText, tag: post.category, section: '校园话题' }),
       query: buildQuery({ id: contentId, from: 'timeline' }),
       imageUrl: firstImage(images) || COVER_SQUARE
     }
@@ -90,16 +90,16 @@ function forumPost(post = {}, id) {
 
 function wallPost(post = {}, id) {
   const contentId = id || post.id || ''
-  const titleText = post.headline || post.title || post.content || '互助广场有人在喊'
+  const titleText = post.headline || post.title || post.content || '园区有人在求助'
   const images = post.images || []
   return {
     appMessage: {
-      title: appMessageTitle({ title: titleText, tag: post.tag, section: '互助广场' }),
+      title: appMessageTitle({ title: titleText, tag: post.tag, section: '校园话题' }),
       path: `/pages/wall-detail/wall-detail?${buildQuery({ id: contentId, from: 'share' })}`,
       imageUrl: firstImage(images) || COVER_CARD
     },
     timeline: {
-      title: timelineTitle({ title: titleText, tag: post.tag, section: '互助广场' }),
+      title: timelineTitle({ title: titleText, tag: post.tag, section: '校园话题' }),
       query: buildQuery({ id: contentId, from: 'timeline' }),
       imageUrl: firstImage(images) || COVER_SQUARE
     }

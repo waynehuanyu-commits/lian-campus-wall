@@ -58,10 +58,10 @@ const DIGEST_SIZE = 10
 
 const FORUM_CATEGORIES = ['校园生活', '学习交流', '吐槽树洞', '活动组队']
 const WALL_BOARDS = ['二手闲置流转', '出行拼车', '拼单互助', '求物求助', '失物招领']
-const SECTION_LABELS = { forum: '学习分享', wall: '互助广场' }
+const SECTION_LABELS = { forum: '帖子', wall: '帖子' }
 
-function sectionLabel(type) {
-  return type === 'forum' ? SECTION_LABELS.forum : SECTION_LABELS.wall
+function sectionLabel() {
+  return '帖子'
 }
 
 function isForumSectionTab(tab) {
@@ -1263,7 +1263,7 @@ function wallHeadline(item) {
   if (item.tag === '出行拼车' && (item.routeFrom || item.routeTo)) {
     return `${item.routeFrom || '出发地'} → ${item.routeTo || '目的地'}`
   }
-  return item.tag || sectionLabel('wall')
+  return item.tag || '校园话题'
 }
 
 function wallSummary(item) {
@@ -1778,7 +1778,7 @@ function createForumPost(payload) {
     viewCount: 0
   }
   saveForumPosts([post, ...getForumPosts()])
-  const result = publishReviewResult(review, post, '学习分享发帖', user)
+  const result = publishReviewResult(review, post, '发帖', user)
   if (!review.passed) return result
   if (!user.postWhitelist && security.countRecentByAuthor(getForumPosts().concat(getWallPosts()), user.id, 30 * security.MINUTE) >= 8) {
     applyUserPatch(user.id, {
@@ -3568,7 +3568,7 @@ function addWeeklyHotItem(contentId, contentType = 'wall') {
   const list = type === 'forum' ? getForumPosts() : getWallPosts()
   const post = list.find((item) => item.id === contentId)
   if (!post || post.reviewStatus !== 'approved') {
-    return { ok: false, message: type === 'forum' ? '只能添加已通过的学习分享内容' : '只能添加已通过的互助广场内容' }
+    return { ok: false, message: type === 'forum' ? '只能添加已通过的内容' : '只能添加已通过的内容' }
   }
   const board = getWeeklyHotRaw()
   if ((board.items || []).some((item) => item.contentId === contentId && (item.contentType || 'wall') === type)) {
