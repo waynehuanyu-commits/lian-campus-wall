@@ -68,6 +68,13 @@
         <text class="pub-row-title">{{extraLabel}}（选填）</text>
         <input class="pub-row-input" maxlength="30" placeholder="{{extraPlaceholder}}" placeholder-class="pub-ph" value="{{extraField}}" bindinput="onExtraFieldInput" />
       </view>
+      <view class="pub-row">
+        <view class="pub-row-copy">
+          <text class="pub-row-title">分身发布</text>
+          <text class="pub-row-desc">对外显示随机昵称；拼车和二手建议用本人，方便对接</text>
+        </view>
+        <switch checked="{{anonymous}}" color="#0A5CFF" bindchange="onAnonymousChange" />
+      </view>
     </view>
     <view class="pub-note">线下交易请注意安全，平台不介入纠纷。</view>
 

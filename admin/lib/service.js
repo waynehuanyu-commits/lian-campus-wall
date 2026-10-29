@@ -976,7 +976,7 @@ async function listDigestCandidates(limit = 30) {
       : homeFeed.normalizeTopic(homeFeed.primaryTag(post, item.contentType)),
     imageCount: Array.isArray(post.images) ? post.images.length : 0,
     excerpt: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    authorName: post.anonymous ? '匿名' : (post.authorName || ''),
+    authorName: post.anonymous ? `分身·${post.authorName || ''}` : (post.authorName || ''),
     likeCount: Number(post.likeCount) || 0,
     commentCount: Number(post.commentCount) || 0
   }))

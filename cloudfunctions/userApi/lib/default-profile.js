@@ -93,11 +93,33 @@ function resolveProfileNickname(name, seed) {
   return text || stableNickname(seed)
 }
 
-/** 帖子/评论展示名：匿名固定「匿名同学」，旧默认名按作者换成「黎安人xxx」 */
+// 分身昵称：形容词 + 名词，按种子稳定生成；同一种子永远是同一个名字
+const ALIAS_ADJECTIVES = [
+  '安静的', '路过的', '早起的', '熬夜的', '认真的', '迷糊的', '快乐的', '温柔的',
+  '勇敢的', '慢吞吞的', '爱笑的', '发呆的', '好奇的', '靠谱的', '神秘的', '元气的',
+  '佛系的', '努力的', '爱吃的', '散步的', '晒太阳的', '追风的', '淡定的', '话少的',
+  '热心的', '刚下课的', '不想早八的', '想放假的', '在图书馆的', '在食堂的', '听歌的', '看书的'
+]
+const ALIAS_NOUNS = [
+  '柚子', '银杏', '橘猫', '海盐', '松果', '小熊', '芒果', '企鹅',
+  '月亮', '星星', '薄荷', '桃子', '奶茶', '鲸鱼', '蘑菇', '饺子',
+  '仙人掌', '向日葵', '小鹿', '豆浆', '云朵', '刺猬', '柠檬', '包子',
+  '海豚', '兔子', '樱桃', '土豆', '橙子', '麻雀', '松鼠', '西瓜'
+]
+
+/** 分身昵称：种子由云端用不可逆哈希生成，前端只在旧数据缺名字时用帖子/评论 id 兜底 */
+function aliasNickname(seed) {
+  const hash = hashSeed(`alias:${seed}`)
+  return ALIAS_ADJECTIVES[hash % ALIAS_ADJECTIVES.length]
+    + ALIAS_NOUNS[Math.floor(hash / ALIAS_ADJECTIVES.length) % ALIAS_NOUNS.length]
+}
+
+/** 帖子/评论展示名：分身用存下的分身昵称（旧「匿名同学」按 id 换成分身昵称），旧默认名按作者换成「黎安人xxx」 */
 function resolveAuthorName(name, seed, options = {}) {
   const text = String(name || '').trim()
   const anonymous = !!(options && options.anonymous)
-  if (anonymous || isAnonymousNickname(text)) return '匿名同学'
+  if (isAnonymousNickname(text)) return aliasNickname(seed)
+  if (anonymous) return text || aliasNickname(seed)
   if (isLegacyNickname(text)) return stableNickname(seed)
   return text || stableNickname(seed)
 }
@@ -148,7 +170,7 @@ function resolveAvatar(avatar, seed) {
 function resolveAuthorAvatar(avatar, seed, options = {}) {
   const anonymous = !!(options && options.anonymous)
   const name = String((options && options.authorName) || '').trim()
-  if (anonymous || name === '匿名同学') return stableAvatar(seed)
+  if (anonymous || isAnonymousNickname(name)) return stableAvatar(seed)
   return resolveAvatar(avatar, seed)
 }
 
@@ -170,6 +192,7 @@ module.exports = {
   stableNickname,
   isLegacyNickname,
   isAnonymousNickname,
+  aliasNickname,
   resolveProfileNickname,
   resolveAuthorName,
   isLegacyAvatar,

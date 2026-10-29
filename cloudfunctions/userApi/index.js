@@ -309,6 +309,13 @@ function formatSchool(user) {
   return [user.schoolName, user.schoolCampus].filter(Boolean).join(' · ')
 }
 
+// 分身昵称：同一用户在同一帖子（含帖下评论）里名字固定，换个帖子就换名字，别人无法跨帖关联
+// 哈希里带用户 id，前端拿不到 id，也就推不出是谁；后台仍按 authorId 看到真实账号
+function aliasNameFor(userId, threadId) {
+  const seed = crypto.createHash('sha1').update(`alias|${userId}|${threadId}`).digest('hex').slice(0, 12)
+  return defaultProfile.aliasNickname(seed)
+}
+
 function authorSchoolForUser(user, anonymous) {
   if (anonymous) return ''
   if (!user || !user.schoolLocked || !user.showSchoolTag) return ''
@@ -1484,15 +1491,15 @@ function decorate(list, type, user, liked) {
     next._legacyName = !item.anonymous
       && !defaultProfile.isAnonymousNickname(item.authorName)
       && defaultProfile.isLegacyNickname(item.authorName)
-    next.authorName = defaultProfile.resolveAuthorName(item.authorName, item.authorId || id, {
+    next.authorName = defaultProfile.resolveAuthorName(item.authorName, item.anonymous ? id : (item.authorId || id), {
       anonymous: !!item.anonymous
     })
     next.authorAvatar = defaultProfile.resolveAuthorAvatar(
       item.authorAvatar,
-      item.anonymous || item.authorName === '匿名同学' ? (id || item.authorId) : item.authorId,
+      item.anonymous || defaultProfile.isAnonymousNickname(item.authorName) ? (id || item.authorId) : item.authorId,
       { anonymous: !!item.anonymous, authorName: item.authorName }
     )
-    next._legacyAvatar = !(item.anonymous || item.authorName === '匿名同学')
+    next._legacyAvatar = !(item.anonymous || defaultProfile.isAnonymousNickname(item.authorName))
       && defaultProfile.isLegacyAvatar(item.authorAvatar)
     if (type === 'wall') {
       next.dealStatus = normalizeWallDealStatus(item.dealStatus)
@@ -1648,15 +1655,12 @@ async function backfillAuthorNames(user) {
       allDocs('wall_posts', { authorId: next.id }),
       allDocs('comments', { authorId: next.id })
     ])
-    const anonRows = (rows) => rows.filter((item) => item.anonymous && item.authorName !== '匿名同学')
     const legacyRows = (rows) => rows.filter((item) => (
       !item.anonymous
       && !defaultProfile.isAnonymousNickname(item.authorName)
       && defaultProfile.isLegacyNickname(item.authorName)
     ))
     await Promise.all([
-      updateDocsByIds('forum_posts', anonRows(forum), { authorName: '匿名同学' }),
-      updateDocsByIds('wall_posts', anonRows(wall), { authorName: '匿名同学' }),
       updateDocsByIds('forum_posts', legacyRows(forum), { authorName: next.nickname }),
       updateDocsByIds('wall_posts', legacyRows(wall), { authorName: next.nickname }),
       updateDocsByIds('comments', comments.filter((item) => defaultProfile.isLegacyNickname(item.authorName)), { authorName: next.nickname })
@@ -2490,6 +2494,9 @@ function shapeComments(rows, user, likedIds) {
   const liked = likedIds instanceof Set ? likedIds : new Set()
   return (rows || []).map((item) => publicCommentFields({
     ...item,
+    authorName: item.anonymous || defaultProfile.isAnonymousNickname(item.authorName)
+      ? defaultProfile.resolveAuthorName(item.authorName, item.id, { anonymous: true })
+      : item.authorName,
     parentId: item.parentId || '',
     replyToId: item.replyToId || '',
     replyToName: item.replyToName || '',
@@ -3168,8 +3175,8 @@ const handlers = {
   },
 
   async createForumPost(rawPayload, user) {
-    // 2026-10 审核整改：发帖不再支持匿名（平台不开放匿名社交），老版本前端传 anonymous 也一律实名
-    const payload = { ...(rawPayload || {}), anonymous: false }
+    // 分身发布：对外显示随机分身昵称、不能进主页；后台仍记录真实作者
+    const payload = { ...(rawPayload || {}), anonymous: !!(rawPayload && rawPayload.anonymous) }
     const gate = speakGate(user)
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const title = String(payload.title || '').trim()
@@ -3216,7 +3223,7 @@ const handlers = {
       content,
       images,
       authorId: user.id,
-      authorName: payload.anonymous ? '匿名同学' : user.nickname,
+      authorName: payload.anonymous ? aliasNameFor(user.id, postId) : user.nickname,
       authorAvatar: payload.anonymous ? defaultProfile.stableAvatar(postId) : defaultProfile.resolveAvatar(user.avatar, user.id),
       authorSchool: authorSchoolForUser(user, payload.anonymous),
       authorOfficial: (!!user.appAdmin || user.id === OFFICIAL_AUTHOR_ID) && !payload.anonymous,
@@ -3244,8 +3251,8 @@ const handlers = {
   },
 
   async createWallPost(rawPayload, user) {
-    // 2026-10 审核整改：发帖不再支持匿名（平台不开放匿名社交），老版本前端传 anonymous 也一律实名
-    const payload = { ...(rawPayload || {}), anonymous: false }
+    // 分身发布：对外显示随机分身昵称、不能进主页；后台仍记录真实作者
+    const payload = { ...(rawPayload || {}), anonymous: !!(rawPayload && rawPayload.anonymous) }
     const gate = speakGate(user)
     if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
     const contact = validateWallContact(payload.contactType, payload.contactValue, payload.tag)
@@ -3302,7 +3309,7 @@ const handlers = {
       contactType: contact.contactType,
       contactValue: contact.contactValue,
       authorId: user.id,
-      authorName: payload.anonymous ? '匿名同学' : user.nickname,
+      authorName: payload.anonymous ? aliasNameFor(user.id, postId) : user.nickname,
       authorAvatar: payload.anonymous ? defaultProfile.stableAvatar(postId) : defaultProfile.resolveAvatar(user.avatar, user.id),
       authorSchool: authorSchoolForUser(user, payload.anonymous),
       authorOfficial: (!!user.appAdmin || user.id === OFFICIAL_AUTHOR_ID) && !payload.anonymous,
@@ -3562,7 +3569,11 @@ const handlers = {
       }
       depth = (Number(parent.depth) || 0) + 1
       if (!replyToId) replyToId = parent.id
-      if (!replyToName) replyToName = parent.authorName || ''
+      if (!replyToName) {
+        replyToName = parent.anonymous || defaultProfile.isAnonymousNickname(parent.authorName)
+          ? defaultProfile.resolveAuthorName(parent.authorName, parent.id, { anonymous: true })
+          : (parent.authorName || '')
+      }
       replyToUserId = parent.authorId || ''
     } else {
       replyToId = ''
@@ -3585,7 +3596,7 @@ const handlers = {
       replyToName,
       depth,
       authorId: user.id,
-      authorName: anonymous ? '匿名同学' : user.nickname,
+      authorName: anonymous ? aliasNameFor(user.id, payload.id) : user.nickname,
       authorAvatar: anonymous
         ? defaultProfile.stableAvatar(`${payload.id}:${user.id}`)
         : defaultProfile.resolveAvatar(user.avatar, user.id),

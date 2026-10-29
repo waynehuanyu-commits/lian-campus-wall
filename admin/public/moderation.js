@@ -142,7 +142,7 @@ function reportCaseHtml(item) {
         <span>${esc(MOD_TYPE_LABEL[item.targetType] || item.targetType)} · 本轮有效举报 ${item.activeReporterCount} / ${item.threshold} 人</span>
       </div>
       <div class="meta">
-        内容作者 ${author ? `${esc(author.nickname || item.authorName || '未设昵称')}（${esc(author.id)}）` : '—'}${item.anonymous ? ' <span class="anon-tag">匿名发布</span>' : ''}
+        内容作者 ${author ? `${esc(author.nickname || item.authorName || '未设昵称')}（${esc(author.id)}）` : '—'}${item.anonymous ? ` <span class="anon-tag">分身发布 · 对外显示「${esc(item.authorName || '')}」</span>` : ''}
         ${author ? accountTag(author) : ''}
         ${item.reviewStatusLabel ? ` · <span class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel)}</span>` : ''}
         ${item.reportHidden ? ' <span class="status-pill warn">因举报自动隐藏</span>' : ''}

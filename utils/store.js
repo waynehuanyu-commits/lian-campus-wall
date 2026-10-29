@@ -1723,8 +1723,7 @@ function localPostId(prefix, submitId) {
   return /^[A-Za-z0-9_-]{8,64}$/.test(text) ? `${prefix}${text}` : ''
 }
 
-function createForumPost(rawPayload) {
-  const payload = { ...(rawPayload || {}), anonymous: false }
+function createForumPost(payload) {
   const gate = getSpeakGate()
   if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
   const user = getUser()
@@ -1755,15 +1754,16 @@ function createForumPost(rawPayload) {
     category: tag,
     channel: tag
   })
+  const postId = forumId || uid('f_')
   const post = {
-    id: forumId || uid('f_'),
+    id: postId,
     tag,
     category: tag,
     title,
     content,
     images,
     authorId: user.id,
-    authorName: payload.anonymous ? '匿名同学' : user.nickname,
+    authorName: payload.anonymous ? defaultProfile.aliasNickname(`${user.id}|${postId}`) : user.nickname,
     authorAvatar: payload.anonymous
       ? defaultProfile.stableAvatar('anonymous')
       : defaultProfile.resolveAvatar(user.avatar, user.id),
@@ -1798,8 +1798,7 @@ function createForumPost(rawPayload) {
   return { ok: true, post }
 }
 
-function createWallPost(rawPayload) {
-  const payload = { ...(rawPayload || {}), anonymous: false }
+function createWallPost(payload) {
   const gate = getSpeakGate()
   if (!gate.ok) return { ok: false, code: gate.code, message: gate.message }
   const user = getUser()
@@ -1835,8 +1834,9 @@ function createWallPost(rawPayload) {
     tag: payload.tag,
     channel: payload.tag
   })
+  const postId = wallId || uid('w_')
   const post = {
-    id: wallId || uid('w_'),
+    id: postId,
     tag: payload.tag,
     title,
     price: (payload.price || '').trim(),
@@ -1849,7 +1849,7 @@ function createWallPost(rawPayload) {
     contactType: contact.contactType,
     contactValue: contact.contactValue,
     authorId: user.id,
-    authorName: payload.anonymous ? '匿名同学' : user.nickname,
+    authorName: payload.anonymous ? defaultProfile.aliasNickname(`${user.id}|${postId}`) : user.nickname,
     authorAvatar: payload.anonymous
       ? defaultProfile.stableAvatar('anonymous')
       : defaultProfile.resolveAvatar(user.avatar, user.id),
@@ -2392,7 +2392,7 @@ function addComment(type, id, content, extra = {}) {
     replyToName,
     depth,
     authorId: user.id,
-    authorName: extra.anonymous ? '匿名同学' : user.nickname,
+    authorName: extra.anonymous ? defaultProfile.aliasNickname(`${user.id}|${id}`) : user.nickname,
     authorAvatar: extra.anonymous ? defaultProfile.stableAvatar(`${id}:${user.id}`) : user.avatar,
     anonymous: !!extra.anonymous,
     likeCount: 0,

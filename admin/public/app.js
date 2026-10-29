@@ -151,13 +151,13 @@ function retiredHint(ids) {
   return retiredOnly(ids) ? '<span class="retired-hint">只命中已停用规则，按新规可直接通过</span>' : ''
 }
 
-// 匿名内容在后台标出来，并给出真实账号（昵称 + u_ 编号）
+// 分身内容在后台标出来，并给出分身昵称和真实账号（昵称 + u_ 编号）
 function authorHtml(name, anonymous, real) {
   if (!anonymous) return esc(name || '—')
   const who = real && real.id
     ? `真实账号 ${esc(real.nickname || '未设昵称')}（${esc(real.id)}）`
     : '真实账号未知'
-  return `<span class="anon-tag">匿名</span> ${who}`
+  return `<span class="anon-tag">分身</span> ${esc(name || '')} · ${who}`
 }
 
 function esc(text) {
@@ -261,7 +261,7 @@ async function render() {
           ${listOrEmpty(reviews, (item) => `
             <button class="review-card ${state.selectedReview && state.selectedReview.id === item.id ? 'active' : ''}" data-open-type="${esc(item.contentType)}" data-open-id="${esc(item.id)}" type="button">
               <div class="row">
-                <strong>${item.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(item.headline || '')}</strong>
+                <strong>${item.anonymous ? '<span class="anon-tag">分身</span> ' : ''}${esc(item.headline || '')}</strong>
                 <span class="status-pill ${statusClass(item.reviewStatus)}">${esc(item.reviewStatusLabel || '')}${item.reviewPriority === 'high' ? ' · 优先' : ''}</span>
               </div>
               <div class="meta">${esc(TYPE_LABEL[item.contentType] || '')} · ${esc(item.channel || '')} · ${formatTime(item.createdAt)}</div>
@@ -1601,7 +1601,7 @@ function guideRow(item, categories, index, total) {
   const kind = item.kind === 'article' || item.kind === 'pick' ? item.kind : 'post'
   const author = kind === 'article'
     ? ''
-    : ` · ${item.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(item.authorName || '')}${item.authorId ? `（${esc(item.authorId)}）` : ''}`
+    : ` · ${item.anonymous ? '<span class="anon-tag">分身</span> ' : ''}${esc(item.authorName || '')}${item.authorId ? `（${esc(item.authorId)}）` : ''}`
   const catSelect = guideCategorySelect(`data-guide-cat="${esc(item.id)}"`, categories, item.category)
   let ops = ''
   if (status === 'pending') {
@@ -1709,7 +1709,7 @@ function guidePickView(categories) {
           <div class="gd-copy">
             <strong>${esc(post.title)}</strong>
             ${post.excerpt && post.excerpt !== post.title ? `<span class="meta gd-excerpt">${esc(post.excerpt)}</span>` : ''}
-            <span class="meta">${post.tag ? `${esc(post.tag)} · ` : ''}${post.anonymous ? '<span class="anon-tag">匿名</span> ' : ''}${esc(post.authorName)} · ${formatTime(post.createdAt)} · 赞 ${post.likeCount} · 评 ${post.commentCount}</span>
+            <span class="meta">${post.tag ? `${esc(post.tag)} · ` : ''}${post.anonymous ? '<span class="anon-tag">分身</span> ' : ''}${esc(post.authorName)} · ${formatTime(post.createdAt)} · 赞 ${post.likeCount} · 评 ${post.commentCount}</span>
           </div>
           <div class="gd-ops">
             ${post.picked

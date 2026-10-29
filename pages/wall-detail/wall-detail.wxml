@@ -225,7 +225,7 @@
   </view>
   <view class="composer-row">
     <view class="composer-photo" bindtap="chooseCommentImages"></view>
-    <view class="composer-anon {{draftAnonymous ? 'on' : ''}}" bindtap="toggleDraftAnonymous">匿名</view>
+    <view class="composer-anon {{draftAnonymous ? 'on' : ''}}" bindtap="toggleDraftAnonymous">分身</view>
     <textarea
       placeholder="{{draftPlaceholder}}"
       placeholder-class="muted"

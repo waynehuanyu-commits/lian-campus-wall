@@ -204,7 +204,7 @@ async function drawSharePoster(canvas, payload) {
   const nameX = pad + avatarSize + 20
   ctx.fillStyle = '#1A3E78'
   ctx.font = '600 30px sans-serif'
-  const name = post.authorName || (anonymous ? '匿名同学' : '同学')
+  const name = post.authorName || (anonymous ? '分身同学' : '同学')
   ctx.fillText(name, nameX, y + (anonymous ? 46 : 34))
   if (!anonymous && post.authorSchool) {
     const nameW = ctx.measureText(name).width

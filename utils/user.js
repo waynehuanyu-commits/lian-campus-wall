@@ -1,5 +1,5 @@
 /**
- * 打开用户主页：匿名不可进；自己则切到「我的」
+ * 打开用户资料：分身不可看；自己则切到「我的」
  */
 function isTruthy(value) {
   return value === true || value === 1 || value === '1' || value === 'true'
@@ -9,8 +9,8 @@ function openProfile(options = {}) {
   const userId = options.userId || options.id || ''
   if (isTruthy(options.anonymous)) {
     wx.showModal({
-      title: '匿名发布',
-      content: '对方选择了匿名，无法查看个人主页。',
+      title: '分身发布',
+      content: '对方使用了分身，无法查看个人信息。',
       showCancel: false,
       confirmText: '知道了',
       confirmColor: '#2F7DFF'
