@@ -48,6 +48,7 @@
     </view>
   </view>
 
+  <hot-ticker exclude-id="{{id}}" surface="forum-detail" />
   <campus-qr-card />
 
   <view class="comment-panel">

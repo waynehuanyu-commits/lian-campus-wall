@@ -74,6 +74,7 @@
     </view>
   </view>
 
+  <hot-ticker exclude-id="{{id}}" surface="wall-detail" />
   <campus-qr-card />
 
   <view class="comment-panel">

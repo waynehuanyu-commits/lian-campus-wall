@@ -7,6 +7,7 @@
     "post-gallery": "/components/post-gallery/post-gallery",
     "privacy-popup": "/components/privacy-popup/privacy-popup",
     "report-sheet": "/components/report-sheet/report-sheet",
-    "campus-qr-card": "/components/campus-qr-card/campus-qr-card"
+    "campus-qr-card": "/components/campus-qr-card/campus-qr-card",
+    "hot-ticker": "/components/hot-ticker/hot-ticker"
   }
 }

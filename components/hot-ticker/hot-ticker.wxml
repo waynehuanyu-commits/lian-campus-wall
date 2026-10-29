@@ -1,0 +1,29 @@
+<view wx:if="{{items.length}}" class="ticker">
+  <text class="ticker-tag">热门话题</text>
+  <swiper
+    class="ticker-swiper"
+    vertical
+    circular
+    autoplay="{{items.length > 1}}"
+    interval="3200"
+    duration="420"
+  >
+    <swiper-item wx:for="{{items}}" wx:key="key">
+      <view
+        class="ticker-row"
+        hover-class="ticker-row-on"
+        hover-stay-time="80"
+        data-id="{{item.id}}"
+        data-type="{{item.type}}"
+        data-rank="{{item.rank}}"
+        bindtap="onTap"
+      >
+        <view class="crown crown-{{item.rank}}">
+          <text class="crown-num">{{item.rank}}</text>
+        </view>
+        <text class="ticker-title">{{item.title}}</text>
+        <text class="ticker-go">›</text>
+      </view>
+    </swiper-item>
+  </swiper>
+</view>
