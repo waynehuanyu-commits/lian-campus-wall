@@ -540,6 +540,12 @@ const routes = {
     json(res, 200, await service.updateGroup(body.id, body))
   },
 
+  'POST /api/groups/remove': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const body = await readBody(req)
+    json(res, 200, await service.removeGroup(body.id))
+  },
+
   'POST /api/groups/toggle': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const body = await readBody(req)

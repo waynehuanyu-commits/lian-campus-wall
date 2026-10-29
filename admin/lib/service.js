@@ -755,7 +755,17 @@ async function pullWecomGroups() {
   try {
     const token = await getWecom().getWecomToken()
     const groups = await getWecom().listCustomerGroupsDetailed(token)
-    return { ok: true, groups, status }
+    // 群主 userid 换成企微里的名字，方便运营认
+    const names = {}
+    for (const owner of [...new Set(groups.map((item) => item.owner).filter(Boolean))]) {
+      try {
+        const res = await fetch(`https://qyapi.weixin.qq.com/cgi-bin/user/get?access_token=${token}&userid=${encodeURIComponent(owner)}`).then((r) => r.json())
+        names[owner] = res.name || owner
+      } catch (err) {
+        names[owner] = owner
+      }
+    }
+    return { ok: true, groups: groups.map((item) => ({ ...item, ownerName: names[item.owner] || item.owner })), status }
   } catch (err) {
     return { ok: false, message: err.message || '拉取客户群失败', status }
   }
@@ -1013,7 +1023,7 @@ async function publishDigest(items) {
     await db.setDoc('digests', digest.id, digest)
   } catch (err) {
     console.error('[publishDigest] setDoc', err && err.message)
-    return { ok: false, message: `写入推文失败：${err.message || '云数据库错误'}` }
+    return { ok: false, message: `写入文字链失败：${err.message || '云数据库错误'}` }
   }
   let saved = digest
   try {
@@ -1031,7 +1041,7 @@ async function publishDigest(items) {
   return {
     ok: true,
     digest: saved,
-    message: '汇总文案已生成。到「公众号推文」页复制，贴进公众号即可。'
+    message: '文字链已生成。到「手动生成文字链」页复制即可。'
   }
 }
 
@@ -1058,7 +1068,7 @@ async function buildDigestByTime(range) {
     if (result.ok) {
       const byTime = range === '24h' || range === '7d'
       const extra = byTime && list.length > picked.length ? `。这个范围共 ${list.length} 条，已取最新 ${picked.length} 条` : ''
-      result.message = `已按时间生成${label}的推文${extra}。复制后贴进公众号即可。`
+      result.message = `已按时间生成${label}的文字链${extra}。复制即可。`
     }
     return result
   } catch (err) {
@@ -1078,7 +1088,7 @@ async function buildDigestFromSelection(picks) {
       seen.add(contentId)
       wanted.push({ contentType, contentId })
     })
-    if (!wanted.length) return { ok: false, message: '先勾选要放进推文的帖子' }
+    if (!wanted.length) return { ok: false, message: '先勾选要放进文字链的帖子' }
     const items = []
     for (const pick of wanted) {
       const post = await db.getDoc(pick.contentType === 'forum' ? 'forum_posts' : 'wall_posts', pick.contentId)
@@ -1089,40 +1099,36 @@ async function buildDigestFromSelection(picks) {
     items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     if (!items.length) return { ok: false, message: '勾选的帖子不存在，或还没通过审核' }
     const result = await publishDigest(items)
-    if (result.ok) result.message = `已用勾选的 ${items.length} 条生成推文，按时间从新到旧排列。`
+    if (result.ok) result.message = `已用勾选的 ${items.length} 条生成文字链，按时间从新到旧排列。`
     return result
   } catch (err) {
     console.error('[buildDigestFromSelection]', err && err.message)
-    return { ok: false, message: err.message || '生成推文失败' }
+    return { ok: false, message: err.message || '生成文字链失败' }
   }
 }
 
+// 企微推送目标群（distribute_targets）：enabled + receiveDigest + chatId 齐全的群才会收到自动推送（admin/lib/wecom-auto.js）。
+// 后台「企微群发」页从企微拉客户群一键加入 / 停推 / 移除，加新群不用改代码、不用重新提审小程序。
 async function listGroups() {
-  return cache.wrap('groups', 60000, async () => {
-    const groups = await db.recentDocs('distribute_targets', 50)
-    if (groups.length) return groups
-    const seed = {
-      id: 'g_customer',
-      name: '群聊推送测试',
-      type: 'external',
-      enabled: true,
-      webhook: '',
-      chatId: '',
-      sender: '',
-      scopes: ['wall'],
-      categories: [],
-      boards: ['*'],
-      desc: '群主企微 + 同学微信',
-      receiveDigest: true
-    }
-    await db.setDoc('distribute_targets', seed.id, seed)
-    return [seed]
-  })
+  return cache.wrap('groups', 60000, async () => db.recentDocs('distribute_targets', 50))
+}
+
+async function removeGroup(id) {
+  const group = await db.getDoc('distribute_targets', id)
+  if (!group) return { ok: false, message: '群不存在' }
+  await db.removeDoc('distribute_targets', id)
+  bustReadCache()
+  return { ok: true }
 }
 
 async function addGroup(payload) {
   const name = String(payload.name || '').trim()
   if (!name) return { ok: false, message: '请填写群名称' }
+  const chatId = String(payload.chatId || '').trim()
+  if (chatId) {
+    const existing = (await db.recentDocs('distribute_targets', 50)).find((item) => item.chatId === chatId)
+    if (existing) return { ok: false, message: '这个群已经在推送名单里了' }
+  }
   const group = {
     id: uid('g_'),
     name,
@@ -1131,6 +1137,7 @@ async function addGroup(payload) {
     webhook: '',
     chatId: String(payload.chatId || '').trim(),
     sender: String(payload.sender || '').trim(),
+    ownerName: String(payload.ownerName || '').trim(),
     scopes: ['wall'],
     categories: [],
     boards: ['*'],
@@ -1138,6 +1145,7 @@ async function addGroup(payload) {
     receiveDigest: payload.receiveDigest !== false
   }
   await db.setDoc('distribute_targets', group.id, group)
+  bustReadCache()
   return { ok: true, group }
 }
 
@@ -1152,6 +1160,7 @@ async function updateGroup(id, payload) {
   }
   if (!next.name) return { ok: false, message: '请填写群名称' }
   await db.setDoc('distribute_targets', id, next)
+  bustReadCache()
   return { ok: true, group: next }
 }
 
@@ -1165,6 +1174,7 @@ async function toggleGroup(id, field) {
     group.enabled = !group.enabled
   }
   await db.setDoc('distribute_targets', id, group)
+  bustReadCache()
   return { ok: true, group }
 }
 
@@ -1467,6 +1477,7 @@ module.exports = {
   addGroup,
   updateGroup,
   toggleGroup,
+  removeGroup,
   wecomStatus,
   pullWecomGroups,
   syncTestGroup,

@@ -108,7 +108,7 @@ function envStatus() {
   const missing = []
   if (!process.env.WECOM_CORP_ID) missing.push('企业ID')
   if (!process.env.WECOM_SECRET) missing.push('应用Secret')
-  if (!process.env.WECOM_SENDER) missing.push('群主账号')
+  // 发送人现在按群自动取群主（admin/lib/wecom-auto.js），不再要求 WECOM_SENDER
   return {
     ready: missing.length === 0,
     missing,
@@ -130,13 +130,13 @@ function ownerUserids() {
  * POST /cgi-bin/externalcontact/groupchat/list
  * 必填 limit；首次不传 cursor；群主建议用 owner_filter，避免可见范围过大报 81017。
  */
-function buildGroupChatListBody(cursor) {
+function buildGroupChatListBody(cursor, owners) {
   const limit = Number(process.env.WECOM_GROUP_LIST_LIMIT || 100)
   const body = {
     status_filter: Number(process.env.WECOM_STATUS_FILTER || 0),
     limit: Math.min(1000, Math.max(1, Number.isFinite(limit) ? limit : 100))
   }
-  const useridList = ownerUserids()
+  const useridList = owners && owners.length ? owners : ownerUserids()
   if (useridList.length) {
     body.owner_filter = { userid_list: useridList }
   }
@@ -144,11 +144,17 @@ function buildGroupChatListBody(cursor) {
   return body
 }
 
-async function listCustomerGroups(wecomToken, cursor = '') {
+async function listCustomerGroups(wecomToken, cursor = '', owners) {
   return postJson(
     `${WECOM_HOST}/cgi-bin/externalcontact/groupchat/list?access_token=${wecomToken}`,
-    buildGroupChatListBody(cursor)
+    buildGroupChatListBody(cursor, owners)
   )
+}
+
+/** 开了「客户联系」的成员：他们建的客户群都能拉到；新同事开通后不用改配置 */
+async function followUserIds(wecomToken) {
+  const res = await fetch(`${WECOM_HOST}/cgi-bin/externalcontact/get_follow_user_list?access_token=${wecomToken}`).then((r) => r.json())
+  return res.errcode ? [] : (res.follow_user || []).slice(0, 100)
 }
 
 function extractDeniedIp(errmsg) {
@@ -178,8 +184,9 @@ function formatGroupListError(data) {
 async function listAllCustomerGroups(wecomToken) {
   const chats = []
   let cursor = ''
+  const owners = await followUserIds(wecomToken).catch(() => [])
   do {
-    const list = await listCustomerGroups(wecomToken, cursor)
+    const list = await listCustomerGroups(wecomToken, cursor, owners)
     if (list.errcode) throw new Error(formatGroupListError(list))
     chats.push(...(list.group_chat_list || []))
     cursor = list.next_cursor || ''
@@ -206,10 +213,12 @@ async function listCustomerGroupsDetailed(wecomToken) {
   const detailed = []
   for (const item of chats) {
     const detail = await getCustomerGroup(wecomToken, item.chat_id)
+    const chat = detail.group_chat || {}
     detailed.push({
       chatId: item.chat_id,
-      name: (detail.group_chat && detail.group_chat.name) || '未命名群',
-      owner: (detail.group_chat && detail.group_chat.owner) || ''
+      name: chat.name || '未命名群',
+      owner: chat.owner || '',
+      memberCount: Array.isArray(chat.member_list) ? chat.member_list.length : 0
     })
   }
   return detailed

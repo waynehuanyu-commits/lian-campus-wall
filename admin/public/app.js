@@ -32,7 +32,7 @@ const titles = {
   whitelist: ['', '用户管理'],
   official: ['', '用户管理'],
   staff: ['', '后台成员'],
-  digest: ['', '公众号推文'],
+  digest: ['', '手动生成文字链'],
   weekly: ['', '园区热议'],
   cover: ['', '我的页封面'],
   guides: ['', '黎安攻略'],
@@ -909,7 +909,7 @@ async function render() {
     panel.innerHTML = `
       <div class="card">
         <h3>一键生成</h3>
-        <p class="muted">从已通过的帖子里，按发帖时间从新到旧取帖，直接生成可复制的推文。一次最多 10 条。</p>
+        <p class="muted">从已通过的帖子里，按发帖时间从新到旧取帖，直接生成可复制的文字链。一次最多 10 条。</p>
         <div class="actions">
           <button type="button" data-by-time="latest5">最近 5 条</button>
           <button type="button" data-by-time="latest">最近 10 条</button>
@@ -921,7 +921,7 @@ async function render() {
         <div class="row">
           <div>
             <h3>自己挑帖子</h3>
-            <p class="muted">勾选要放进推文的帖子，最多 10 条，按时间从新到旧排列。没通过审核的帖不会出现在这里。</p>
+            <p class="muted">勾选要放进文字链的帖子，最多 10 条，按时间从新到旧排列。没通过审核的帖不会出现在这里。</p>
           </div>
         </div>
         ${candidates.length ? `
@@ -955,14 +955,14 @@ async function render() {
               <span id="pick-dock-count" class="pick-count"></span>
               <span id="pick-order" class="pick-order"></span>
             </div>
-            <button id="custom-digest" type="button">用勾选的生成推文</button>
+            <button id="custom-digest" type="button">用勾选的生成文字链</button>
           </div>` : '<p class="muted">还没有已通过的帖子。</p>'}
       </div>
       <div class="card">
         <div class="row">
           <div>
             <h3>审核队列 ${progress.count || 0}</h3>
-            <p class="muted">新帖审核通过后自动进这个队列，满 10 条由服务器自动推到企微群（发送人要在企业微信里点「发送」）。点「用队列生成」会把队列里的帖子拿去做公众号推文，这几条就不再推企微。</p>
+            <p class="muted">新帖审核通过后自动进这个队列，由服务器按时段自动推到企微群（规则见「企微群发」页，群主要在企业微信里点「发送」）。点「用队列生成」会把队列里的帖子拿去手动生成文字链，这几条就不再推企微。</p>
           </div>
           <button id="flush-btn" type="button">用队列生成</button>
         </div>
@@ -972,7 +972,7 @@ async function render() {
           <strong>${index + 1}. ${esc(item.title)}</strong>
           <div class="meta">${esc(item.channel)} · ${esc(item.summary)}</div>
         </div>`)}
-      <h3>已生成的推文</h3>
+      <h3>已生成的文字链</h3>
       ${listOrEmpty(data.digests, (item) => `
         <div class="card list-item">
           <div class="row">
@@ -981,7 +981,7 @@ async function render() {
           </div>
           <textarea data-paste="${esc(item.id)}" readonly style="width:100%;min-height:180px;margin-top:12px;box-sizing:border-box">${esc(item.pasteText || '还没有文字链。点下面的按钮生成。')}</textarea>
           <div class="actions">
-            <button type="button" data-copy="${esc(item.id)}">复制推文</button>
+            <button type="button" data-copy="${esc(item.id)}">复制文字链</button>
             <button type="button" data-repaste="${esc(item.id)}">重新生成文字链</button>
           </div>
         </div>`)}`
@@ -993,7 +993,7 @@ async function render() {
             method: 'POST',
             body: JSON.stringify({ range: btn.dataset.byTime })
           })
-          alert(result.ok ? (result.message || '推文已生成') : (result.message || '失败'))
+          alert(result.ok ? (result.message || '文字链已生成') : (result.message || '失败'))
           await refreshDigest()
         } catch (err) {
           alert((err && err.message) || '按时间出成稿失败')
@@ -1107,63 +1107,70 @@ async function render() {
     return
   }
   if (state.nav === 'groups') {
+    // 推送目标群：从企微拉客户群一键加入。加新群不用改代码、不用重新提审小程序（见 admin/lib/wecom-auto.js）
     const wecom = data.wecom || {}
+    const targets = data.groups || []
+    const pulled = data.wecomGroups
+    const inTargets = new Set(targets.map((item) => item.chatId).filter(Boolean))
+    const pushOn = (item) => item.enabled !== false && item.receiveDigest && item.chatId
     panel.innerHTML = `
       <div class="card">
-        <h3>企微自动群发</h3>
-        <p class="muted">开发者可以不在这家公司。公司里的人把企业ID、Secret、群主账号发给开发者，填进 server/.env 和云函数环境变量。</p>
-        <p class="muted">${wecom.ready ? `已配置，群主账号：${esc(wecom.sender)}` : `还没配齐：${esc((wecom.missing || []).join('、') || '企业ID、Secret、群主账号')}`}</p>
-        <button id="sync-group" type="button">拉取并绑定「群聊推送测试」</button>
+        <h3>企微自动推送</h3>
+        <p class="muted">${wecom.ready ? '企微已接通。' : `企微还没配齐：${esc((wecom.missing || []).join('、'))}。`}每天 08:00–00:30 推送：固定时段 08:00 / 12:10 / 13:50 / 17:20 / 20:00 / 22:30 / 00:30；攒满 8 条提前推；急事 10 分钟内插队。每次推送都要群主在自己的企业微信里点「发送」。</p>
       </div>
       <div class="card">
-        <h3>添加客户群</h3>
-        <label class="field-label">群名称</label><input id="g-name" />
-        <label class="field-label">chatId</label><input id="g-chat" />
-        <label class="field-label">发送成员（可选）</label><input id="g-sender" />
-        <button id="add-group" type="button" style="margin-top:16px">保存并指定</button>
+        <div class="row"><h3>正在推送的群</h3><span>${targets.filter(pushOn).length} 个</span></div>
+        ${targets.length ? targets.map((item) => `
+          <div class="list-item" style="padding:12px 0;border-top:1px solid var(--line, #eee)">
+            <div class="row"><strong>${esc(item.name)}</strong><span>${pushOn(item) ? '推送中' : (item.chatId ? '已停推' : '缺 chatId，推不了')}</span></div>
+            <div class="meta">群主：${esc(item.ownerName || item.sender || '—')}</div>
+            <div class="actions">
+              ${item.chatId ? `<button data-toggle="enabled" data-id="${esc(item.id)}">${pushOn(item) ? '停推' : '恢复推送'}</button>` : ''}
+              <button data-remove="${esc(item.id)}" data-name="${esc(item.name)}">移出名单</button>
+            </div>
+          </div>`).join('') : '<p class="muted">还没有推送的群。点下面「拉取企微客户群」，在要推送的群后面点「加入推送」。</p>'}
       </div>
-      ${listOrEmpty(data.groups, (item) => `
-        <div class="card list-item">
-          <div class="row"><strong>${esc(item.name)}</strong><span>${item.enabled ? '启用' : '停用'} · ${item.receiveDigest ? '接收汇总' : '不接收'}</span></div>
-          <div class="meta">${item.chatId ? `chatId：${esc(item.chatId)}` : '未填 chatId，还不能自动群发'}</div>
-          <div class="actions">
-            <button data-toggle="enabled" data-id="${esc(item.id)}">启停</button>
-            <button data-toggle="receiveDigest" data-id="${esc(item.id)}">是否接收汇总</button>
-          </div>
-          <label class="field-label">更新 chatId</label>
-          <div class="row">
-            <input data-edit="${esc(item.id)}" value="${esc(item.chatId || '')}" />
-            <button data-save="${esc(item.id)}" type="button">保存</button>
-          </div>
-        </div>`)}`
-    panel.querySelector('#sync-group').onclick = async () => {
-      const result = await api('/api/wecom/sync', { method: 'POST', body: '{}' })
-      alert(result.ok ? `已绑定：${result.group && result.group.name}（${result.group && result.group.chatId}）` : (result.message || '失败'))
-      await reload()
+      <div class="card">
+        <div class="row"><h3>企微里的客户群</h3><button id="pull-groups" type="button">${pulled ? '重新拉取' : '拉取企微客户群'}</button></div>
+        <p class="muted">只列开通了「客户联系」的同事做群主的外部客户群。新建群后点重新拉取即可。</p>
+        ${pulled ? (pulled.length ? pulled.map((g) => `
+          <div class="row" style="padding:10px 0;border-top:1px solid var(--line, #eee)">
+            <div><strong>${esc(g.name)}</strong><div class="meta">群主 ${esc(g.ownerName || g.owner)} · ${g.memberCount || 0} 人</div></div>
+            ${inTargets.has(g.chatId) ? '<span class="muted">已在名单</span>' : `<button data-add="${esc(g.chatId)}" data-name="${esc(g.name)}" data-owner="${esc(g.owner)}" data-owner-name="${esc(g.ownerName || '')}">加入推送</button>`}
+          </div>`).join('') : '<p class="muted">企微里没有找到客户群。</p>') : ''}
+      </div>`
+    panel.querySelector('#pull-groups').onclick = async (event) => {
+      event.target.disabled = true
+      event.target.textContent = '拉取中…'
+      const result = await api('/api/wecom/groups')
+      if (!result.ok) {
+        event.target.disabled = false
+        event.target.textContent = '拉取企微客户群'
+        return alert(result.message || '拉取失败')
+      }
+      state.data.wecomGroups = result.groups || []
+      render()
     }
-    panel.querySelector('#add-group').onclick = async () => {
-      const result = await api('/api/groups', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: panel.querySelector('#g-name').value,
-          chatId: panel.querySelector('#g-chat').value,
-          sender: panel.querySelector('#g-sender').value,
-          receiveDigest: true
-        })
-      })
-      if (!result.ok) return alert(result.message)
-      await reload()
-    }
-    panel.querySelectorAll('[data-toggle]').forEach((btn) => {
+    panel.querySelectorAll('[data-add]').forEach((btn) => {
       btn.onclick = async () => {
-        await api('/api/groups/toggle', { method: 'POST', body: JSON.stringify({ id: btn.dataset.id, field: btn.dataset.toggle }) })
+        const result = await api('/api/groups', {
+          method: 'POST',
+          body: JSON.stringify({ name: btn.dataset.name, chatId: btn.dataset.add, sender: btn.dataset.owner, ownerName: btn.dataset.ownerName, receiveDigest: true })
+        })
+        if (!result.ok) return alert(result.message)
         await reload()
       }
     })
-    panel.querySelectorAll('[data-save]').forEach((btn) => {
+    panel.querySelectorAll('[data-toggle]').forEach((btn) => {
       btn.onclick = async () => {
-        const input = panel.querySelector(`[data-edit="${btn.dataset.save}"]`)
-        const result = await api('/api/groups', { method: 'PUT', body: JSON.stringify({ id: btn.dataset.save, chatId: input.value }) })
+        await api('/api/groups/toggle', { method: 'POST', body: JSON.stringify({ id: btn.dataset.id, field: 'enabled' }) })
+        await reload()
+      }
+    })
+    panel.querySelectorAll('[data-remove]').forEach((btn) => {
+      btn.onclick = async () => {
+        if (!confirm(`把「${btn.dataset.name}」移出推送名单？之后不再往这个群推。`)) return
+        const result = await api('/api/groups/remove', { method: 'POST', body: JSON.stringify({ id: btn.dataset.remove }) })
         if (!result.ok) return alert(result.message)
         await reload()
       }
