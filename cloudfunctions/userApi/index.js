@@ -14,6 +14,32 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
+// 计量：每次调用累计数据库请求次数，写进云函数日志（[db-meter] 接口名 次数 耗时），用来找最费钱的接口。
+// 只计数不改行为；拿到数据、优化完后可以整段删掉。
+const { AsyncLocalStorage } = require('async_hooks')
+const dbMeter = new AsyncLocalStorage()
+const DB_TERMINAL_OPS = new Set(['get', 'set', 'update', 'add', 'remove', 'count'])
+
+function meterQuery(target) {
+  return new Proxy(target, {
+    get(obj, prop) {
+      const value = obj[prop]
+      if (typeof value !== 'function') return value
+      return function metered(...args) {
+        if (DB_TERMINAL_OPS.has(prop)) {
+          const store = dbMeter.getStore()
+          if (store) store.count += 1
+        }
+        const out = value.apply(obj, args)
+        return out && typeof out === 'object' && typeof out.then !== 'function' ? meterQuery(out) : out
+      }
+    }
+  })
+}
+
+const rawCollection = db.collection.bind(db)
+db.collection = (name) => meterQuery(rawCollection(name))
+
 const DIGEST_SIZE = 10
 
 /** 云存储 fileID → 临时 HTTPS（云函数有管理端权限，比小程序端更稳） */
@@ -4925,7 +4951,15 @@ const GUEST_OK = new Set([
 
 const WEB_AUTH_ACTIONS = new Set(['webRegister', 'webLogin', 'createWebLoginTicket', 'pollWebLogin'])
 
-exports.main = async (event) => {
+exports.main = (event) => {
+  const meter = { count: 0, start: Date.now() }
+  return dbMeter.run(meter, () => handleEvent(event)).finally(() => {
+    const action = (event && event.action) || ''
+    console.log(`[db-meter] ${action} ${meter.count} ${Date.now() - meter.start}ms`)
+  })
+}
+
+async function handleEvent(event) {
   const action = (event && event.action) || ''
   const payload = (event && event.payload) || {}
   const handler = handlers[action]

@@ -197,6 +197,36 @@ async function previewImages(current, urls = []) {
   wx.previewImage({ current: cur, urls: resolved })
 }
 
+// 大图上传前温和压缩：只处理超过 300KB 的，长边限 1600、质量 85，手机上看不出差别；任何一步失败都用原图
+const SHRINK_OVER_BYTES = 300 * 1024
+const SHRINK_LONG_EDGE = 1600
+
+function shrinkIfLarge(file) {
+  const src = file && file.tempFilePath
+  return new Promise((resolve) => {
+    if (!src || !(Number(file.size) > SHRINK_OVER_BYTES) || typeof wx.compressImage !== 'function') {
+      resolve(src)
+      return
+    }
+    const compress = (info) => {
+      const opts = {
+        src,
+        quality: 85,
+        success: (res) => resolve((res && res.tempFilePath) || src),
+        fail: () => resolve(src)
+      }
+      if (info && info.width >= info.height && info.width > SHRINK_LONG_EDGE) opts.compressedWidth = SHRINK_LONG_EDGE
+      else if (info && info.height > info.width && info.height > SHRINK_LONG_EDGE) opts.compressedHeight = SHRINK_LONG_EDGE
+      wx.compressImage(opts)
+    }
+    if (typeof wx.getImageInfo !== 'function') {
+      compress(null)
+      return
+    }
+    wx.getImageInfo({ src, success: compress, fail: () => compress(null) })
+  })
+}
+
 function chooseImages({ count = 9, existing = [] } = {}) {
   const remain = Math.max(0, Number(count) || 0)
   const base = Array.isArray(existing) ? existing.slice() : []
@@ -208,8 +238,10 @@ function chooseImages({ count = 9, existing = [] } = {}) {
       sourceType: ['album', 'camera'],
       sizeType: ['compressed'],
       success: (res) => {
-        const paths = (res.tempFiles || []).map((file) => file.tempFilePath).filter(Boolean)
-        resolve(base.concat(paths).slice(0, base.length + remain))
+        Promise.all((res.tempFiles || []).map(shrinkIfLarge)).then((list) => {
+          const paths = list.filter(Boolean)
+          resolve(base.concat(paths).slice(0, base.length + remain))
+        })
       },
       fail: (err) => {
         const msg = String((err && err.errMsg) || '')
