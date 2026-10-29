@@ -179,7 +179,8 @@ function extractEntities(originalText, prepared) {
   const source = `${prepared.simplified || ''} ${prepared.digitSwapped || ''} ${originalText || ''}`
   const compact = prepared.normalizedText || ''
   const phones = []
-  const phoneRe = /(?<!\d)(1[3-9]\d{9})(?!\d)/g
+  // 不用后行断言 (?<!\d)：iOS 16.4 以下的 JSCore 不认，整个文件会解析失败导致小程序打不开
+  const phoneRe = /(?:^|\D)(1[3-9]\d{9})(?!\d)/g
   let match
   const compactDigits = compact.replace(/[^\d]/g, '')
   while ((match = phoneRe.exec(source.replace(/\s+/g, ''))) !== null) phones.push(match[1])

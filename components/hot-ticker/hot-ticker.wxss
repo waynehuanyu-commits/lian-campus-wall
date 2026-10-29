@@ -30,7 +30,6 @@
 .ticker-row {
   display: flex;
   align-items: center;
-  gap: 18rpx;
   height: 104rpx;
   padding: 10rpx 28rpx 0 26rpx;
   box-sizing: border-box;
@@ -47,6 +46,8 @@
   width: 46rpx;
   height: 40rpx;
   background: linear-gradient(180deg, #ffd84d, #ffb31a);
+  margin-right: 18rpx;
+  -webkit-clip-path: polygon(0 18%, 26% 46%, 50% 0, 74% 46%, 100% 18%, 92% 100%, 8% 100%);
   clip-path: polygon(0 18%, 26% 46%, 50% 0, 74% 46%, 100% 18%, 92% 100%, 8% 100%);
 }
 
@@ -90,6 +91,7 @@
 
 .ticker-go {
   flex-shrink: 0;
+  margin-left: 12rpx;
   color: #a3acba;
   font-size: 36rpx;
   line-height: 1;

@@ -28,7 +28,12 @@
 .head {
   display: flex;
   align-items: center;
-  gap: 28rpx;
+}
+
+/* 不用 flex gap：iOS 14.5 以下不支持，改用外边距 */
+.head .avatar,
+.loading .sk-avatar {
+  margin-right: 28rpx;
 }
 
 .avatar {
@@ -56,7 +61,6 @@
 .pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
   margin-top: 12rpx;
 }
 
@@ -110,7 +114,6 @@
 .loading {
   display: flex;
   align-items: center;
-  gap: 28rpx;
   padding-bottom: 40rpx;
 }
 
@@ -154,4 +157,12 @@
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+.pills .pill {
+  margin: 0 12rpx 12rpx 0;
+}
+
+.pills {
+  margin-bottom: -12rpx;
 }
