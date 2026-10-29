@@ -1,3 +1,9 @@
+// ⚠ 帖子分两张表：forum_posts（type/contentType/targetType = 'forum'）和 wall_posts（= 'wall'）。
+// 这是早期「学习分享 / 互助广场」两个版块留下的存储分法；产品上早已合并成一个首页、一个发帖入口，
+// 对用户只显示「帖子」+ 话题（homeFeed.postTopic）。规则：
+// 1. 不要合表、不要改 'forum' / 'wall' 取值——评论、点赞、举报、热榜、分享链接、老版本小程序都靠它定位帖子；
+// 2. 任何返回给前端或后台显示的文字，不要再出现「学习分享 / 互助广场 / 校园墙」，用话题或「帖子」；
+// 3. 新发帖统一进 forum_posts（发帖页只有一个），wall_posts 只读老数据，相关接口仍需同时兼容两张表。
 const crypto = require('crypto')
 const https = require('https')
 const cloud = require('wx-server-sdk')
@@ -4558,6 +4564,7 @@ const handlers = {
     const forumCount = allItems.filter((item) => item.contentType === 'forum').length
     const wallCount = allItems.filter((item) => item.contentType !== 'forum').length
     let items = allItems
+    // 旧版块名只用来兼容老版本 / 老链接传进来的 tab 参数，界面上不显示
     if (tab === 'forum' || tab === '论坛' || tab === '园区论坛' || tab === '学习分享') {
       items = allItems.filter((item) => item.contentType === 'forum')
     }

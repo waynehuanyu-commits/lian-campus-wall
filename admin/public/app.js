@@ -84,9 +84,11 @@ function renderSubtabs() {
   })
 }
 
+// forum / wall 是数据库里两张帖子表（forum_posts / wall_posts）的历史分法，产品上早已合成一个首页、一个发帖入口。
+// 对外和后台界面一律只显示「帖子」+ 话题，不再出现「学习分享 / 互助广场」；contentType 的取值本身不能改，接口和老数据都靠它。
 const TYPE_LABEL = {
-  forum: '学习分享',
-  wall: '互助广场',
+  forum: '帖子',
+  wall: '帖子',
   comment: '评论'
 }
 
@@ -202,7 +204,7 @@ async function render() {
         <div class="row">
           <div>
             <h3>内容风控</h3>
-            <p class="muted">学习分享 ${ov.forumCount || 0} · 互助广场 ${ov.wallCount || 0} · 评论 ${ov.commentCount || 0}</p>
+            <p class="muted">帖子 ${(ov.forumCount || 0) + (ov.wallCount || 0)} · 评论 ${ov.commentCount || 0}</p>
             <p class="muted">客户群 ${ov.designatedGroups || 0}/${ov.groupCount || 0}</p>
           </div>
           <div class="actions">
@@ -714,7 +716,7 @@ async function render() {
         </div>`) : ''}
       <div class="card">
         <h3>小程序官方发帖号</h3>
-        <p class="muted">运营要共用一个微信号登录小程序、把朋友圈内容批量发到互助广场或学习分享。先让这个微信号登录一次小程序，打开「我的」复制账号编号，再到左侧「用户管理 › 发帖白名单」里贴上编号，点加入。白名单号不受 10 分钟 5 条、每天 15 条的发帖限制，也不会因为短时间重复内容被拦住。内容审核仍然会走。</p>
+        <p class="muted">运营要共用一个微信号登录小程序、把朋友圈内容批量发到小程序。先让这个微信号登录一次小程序，打开「我的」复制账号编号，再到左侧「用户管理 › 发帖白名单」里贴上编号，点加入。白名单号不受 10 分钟 5 条、每天 15 条的发帖限制，也不会因为短时间重复内容被拦住。内容审核仍然会走。</p>
       </div>`
     const createBtn = panel.querySelector('#staff-create')
     if (createBtn) {
@@ -825,7 +827,7 @@ async function render() {
             <span class="hot-rank">${item.rank}</span>
             <div class="hot-copy">
               <strong>${esc(item.title)}</strong>
-              <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+              <span class="meta">${esc(item.tag || '帖子')}</span>
             </div>
             <div class="hot-ops">
               <button class="quiet" data-weekly-move="up" data-id="${esc(item.contentId)}" data-type="${esc(item.contentType || 'wall')}" type="button">上移</button>
@@ -835,7 +837,7 @@ async function render() {
           </div>`)}
       </div>
       <div class="card">
-        <h3>添加学习分享 / 互助广场内容</h3>
+        <h3>添加帖子</h3>
         <div class="row gap">
           <input id="weekly-keyword" placeholder="搜索标题/正文" value="${esc(state.weeklyKeyword)}" />
           <button id="weekly-search" type="button">搜索</button>
@@ -844,7 +846,7 @@ async function render() {
           <div class="hot-row">
             <div class="hot-copy">
               <strong>${esc(item.title)}</strong>
-              <span class="meta">${item.contentType === 'forum' ? '学习分享' : '互助广场'}${item.tag ? ' · ' + esc(item.tag) : ''}</span>
+              <span class="meta">${esc(item.tag || '帖子')}</span>
               <span class="meta hot-stats">${weeklyStats(item)}</span>
             </div>
             <button class="quiet" data-weekly-add="${esc(item.id)}" data-type="${esc(item.contentType || 'wall')}" type="button">加入热榜</button>
@@ -907,7 +909,7 @@ async function render() {
     panel.innerHTML = `
       <div class="card">
         <h3>一键生成</h3>
-        <p class="muted">从已通过的学习分享和互助广场里，按发帖时间从新到旧取帖，直接生成可复制的推文。一次最多 10 条。</p>
+        <p class="muted">从已通过的帖子里，按发帖时间从新到旧取帖，直接生成可复制的推文。一次最多 10 条。</p>
         <div class="actions">
           <button type="button" data-by-time="latest5">最近 5 条</button>
           <button type="button" data-by-time="latest">最近 10 条</button>
@@ -960,7 +962,7 @@ async function render() {
         <div class="row">
           <div>
             <h3>审核队列 ${progress.count || 0}</h3>
-            <p class="muted">互助广场通过审核后会进这个队列，仅供查看。不会再满 10 条就自动出文。</p>
+            <p class="muted">原互助类帖子（拼车、二手、求助等）通过审核后会进这个队列，仅供查看。不会再满 10 条就自动出文。</p>
           </div>
           <button id="flush-btn" type="button">用队列生成</button>
         </div>
@@ -1276,10 +1278,10 @@ async function render() {
     </div>
     <div class="card">
       <h3>联系反馈</h3>
-      <p class="muted">互助广场查看微信号后的对接反馈（靠谱 / 未回复 / 疑似诈骗等）</p>
+      <p class="muted">用户查看帖子微信号后的对接反馈（靠谱 / 未回复 / 疑似诈骗等）</p>
       ${listOrEmpty(data.contactFeedbacks, (item) => `
         <div class="list-item">
-          <div class="row"><strong>${esc(item.reasonLabel || item.reason)}</strong><span>${esc(item.tag || '互助广场')}</span></div>
+          <div class="row"><strong>${esc(item.reasonLabel || item.reason)}</strong><span>${esc(item.tag || '帖子')}</span></div>
           <div>${esc(item.postHeadline || item.postId)}</div>
           <div class="meta">${esc(item.viewerName || item.viewerId)} · ${formatTime(item.updatedAt || item.createdAt)}</div>
           ${item.note ? `<div class="meta">${esc(item.note)}</div>` : ''}

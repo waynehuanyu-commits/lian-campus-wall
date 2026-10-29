@@ -159,7 +159,10 @@ function toHomeCard(post, type) {
   }
 }
 
-/** 帖子对外显示的话题标签（消息、分享、我的互动等处统一用它，不再区分旧版块） */
+/**
+ * 帖子对外显示的话题标签（消息、分享、我的互动等处统一用它）。
+ * type 仍是 'forum' / 'wall'（两张帖子表的历史分法，不能改），但显示上不要再出现「学习分享 / 互助广场」
+ */
 function postTopic(post, type) {
   if (!post) return TAG_FALLBACK
   if (isOfficialPost(post)) return OFFICIAL_TOPIC

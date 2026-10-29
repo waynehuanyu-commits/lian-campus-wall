@@ -58,12 +58,14 @@ const DIGEST_SIZE = 10
 
 const FORUM_CATEGORIES = ['校园生活', '学习交流', '吐槽树洞', '活动组队']
 const WALL_BOARDS = ['二手闲置流转', '出行拼车', '拼单互助', '求物求助', '失物招领']
+// forum / wall 是两张帖子表的历史分法（原「学习分享 / 互助广场」），取值不能改；界面一律显示「帖子」+ 话题，见云函数 index.js 顶部说明
 const SECTION_LABELS = { forum: '帖子', wall: '帖子' }
 
 function sectionLabel() {
   return '帖子'
 }
 
+// 旧版块名只用来兼容老链接传进来的 tab 参数，界面上不显示
 function isForumSectionTab(tab) {
   return tab === 'forum' || tab === '论坛' || tab === '园区论坛' || tab === '学习分享'
 }

@@ -77,6 +77,7 @@ Page({
     maxImages: 9
   },
 
+  // 原「互助广场」发布页已停用：发帖入口只有 forum-publish。保留页面只为兼容老链接，打开即跳走，别再往这里加功能
   onLoad() {
     wx.redirectTo({ url: '/pages/forum-publish/forum-publish' })
   },

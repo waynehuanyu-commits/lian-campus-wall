@@ -1,7 +1,8 @@
 // 举报工单 / 内容管理 / 处置记录。依赖 app.js 里的全局：state、api、esc、formatTime、authorHtml、
 // listOrEmpty、statusClass、render、TYPE_LABEL。数据按页向服务端取，筛选和搜索也在服务端做。
 
-const MOD_TYPE_LABEL = { forum: '学习分享', wall: '互助广场', comment: '评论', user: '用户', reporter: '举报者' }
+// forum / wall 只是两张帖子表的历史分法，界面统一叫「帖子」（见 app.js TYPE_LABEL 的说明）
+const MOD_TYPE_LABEL = { forum: '帖子', wall: '帖子', comment: '评论', user: '用户', reporter: '举报者' }
 const CONTENT_STATUS_TABS = [
   { id: 'public', label: '已公开' },
   { id: 'queue', label: '待审核' },

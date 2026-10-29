@@ -19,7 +19,7 @@ function wallHeadline(item) {
   if (item.tag === '出行拼车' && (item.routeFrom || item.routeTo)) {
     return `${item.routeFrom || '出发地'} → ${item.routeTo || '目的地'}`
   }
-  return item.tag || '互助广场'
+  return item.tag || '校园话题'
 }
 
 async function overview() {
@@ -940,9 +940,9 @@ function toDigestItem(post, type) {
     return {
       contentType: 'forum',
       contentId: id,
-      title: String(post.title || '学习分享').trim() || '学习分享',
+      title: String(post.title || '校园动态').trim() || '校园动态',
       summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-      channel: `学习分享 · ${post.category || '全部'}`,
+      channel: post.category || '校园话题',
       pagepath: `pages/forum-detail/forum-detail?id=${id}`,
       createdAt: post.createdAt || 0
     }
@@ -952,7 +952,7 @@ function toDigestItem(post, type) {
     contentId: id,
     title: wallHeadline(post),
     summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    channel: `互助广场 · ${post.tag || ''}`,
+    channel: post.tag || '校园话题',
     pagepath: `pages/wall-detail/wall-detail?id=${id}`,
     createdAt: post.createdAt || 0
   }
@@ -1202,7 +1202,7 @@ function buildWeeklyItem(type, post, rank = 1) {
     title: title || summary.slice(0, 36),
     summary,
     oneLiner: title || summary.slice(0, 36),
-    channel: contentType === 'forum' ? `学习分享 · ${post.category || ''}` : `互助广场 · ${post.tag || ''}`,
+    channel: (contentType === 'forum' ? post.category : post.tag) || '校园话题',
     tag: contentType === 'forum' ? (post.category || '') : (post.tag || ''),
     pagepath: contentType === 'forum'
       ? `pages/forum-detail/forum-detail?id=${post.id}`
@@ -1343,7 +1343,7 @@ async function addWeeklyHotItem(contentId, contentType = 'wall') {
   const collection = type === 'forum' ? 'forum_posts' : 'wall_posts'
   const post = await db.getDoc(collection, contentId)
   if (!post || !moderation.isPublicStatus(post.reviewStatus || 'approved')) {
-    return { ok: false, message: type === 'forum' ? '只能添加已通过的学习分享内容' : '只能添加已通过的互助广场内容' }
+    return { ok: false, message: '只能添加已通过的帖子' }
   }
   const board = await getWeeklyHotBoard()
   if ((board.items || []).some((item) => item.contentId === contentId && (item.contentType || 'wall') === type)) {
