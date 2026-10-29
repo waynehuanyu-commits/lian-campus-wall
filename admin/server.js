@@ -9,6 +9,7 @@ const cover = require('./lib/cover')
 const guides = require('./lib/guides')
 const reportCases = require('./lib/report-cases')
 const contentAdmin = require('./lib/content-admin')
+const wecomAuto = require('./lib/wecom-auto')
 
 loadEnv()
 const localEnv = path.join(__dirname, '.env')
@@ -647,4 +648,6 @@ server.listen(PORT, () => {
   const mode = service.mode()
   console.log(`黎安话事运营后台: http://127.0.0.1:${PORT}`)
   console.log(`数据模式: ${mode === 'local' ? '本地演示（未配云库或 ADMIN_LOCAL=1）' : '微信云开发'}`)
+  // 企微自动推送：只有 systemd 里设了 WECOM_AUTO_SEND=1 的进程才会跑
+  wecomAuto.start()
 })

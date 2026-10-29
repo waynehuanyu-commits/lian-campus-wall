@@ -9,7 +9,6 @@ const https = require('https')
 const cloud = require('wx-server-sdk')
 const security = require('./lib/security')
 const reportRules = require('./lib/report-rules')
-const wecom = require('./lib/wecom')
 const moderation = require('./lib/moderation')
 const wxSecurity = require('./lib/wx-security')
 const homeFeed = require('./lib/home-feed')
@@ -90,7 +89,6 @@ async function flushMeter(force) {
   }
 }
 
-const DIGEST_SIZE = 10
 
 /** 云存储 fileID → 临时 HTTPS（云函数有管理端权限，比小程序端更稳） */
 function isCloudFileId(value) {
@@ -1733,112 +1731,22 @@ async function listPosts(collection, type, user, filter = {}) {
   return decorated.map(compactFeedItem)
 }
 
-async function enqueueWall(post) {
-  if (!moderation.isPublicStatus(post && post.reviewStatus)) return digestProgress()
-  const exists = await db.collection('digest_queue').where({ contentId: post.id }).limit(1).get()
-  if (exists.data.length) {
-    return digestProgress()
-  }
-  const item = {
-    id: uid('dq_'),
-    contentType: 'wall',
-    contentId: post.id,
-    title: wallHeadline(post),
-    summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    channel: homeFeed.postTopic(post, 'wall'),
-    pagepath: `pages/wall-detail/wall-detail?id=${post.id}`,
-    wecomPage: `pages/wall-detail/wall-detail.html?id=${post.id}`,
-    queuedAt: Date.now()
-  }
-  await db.collection('digest_queue').doc(item.id).set({ data: item })
-  const progress = await digestProgress()
-  let flushed = null
-  if (progress.count >= DIGEST_SIZE) flushed = await flushDigest(false)
-  return { ...(await digestProgress()), flushed }
-}
-
-async function digestProgress() {
-  const queued = (await allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
-  const groups = (await allDocs('distribute_targets')).filter((item) => item.enabled && item.receiveDigest)
-  return {
-    size: DIGEST_SIZE,
-    count: queued.length,
-    remain: Math.max(0, DIGEST_SIZE - queued.length),
-    queued,
-    digestGroups: groups,
-    digestGroupText: groups.length ? groups.map((item) => item.name).join('、') : '尚未指定',
-    flushed: null
-  }
-}
-
-async function sortDigestItemsByHeat(items) {
-  const walls = await allDocs('wall_posts')
-  const byId = {}
-  walls.forEach((post) => { byId[post.id || post._id] = post })
-  const now = Date.now()
-  return items.slice().sort((a, b) => {
-    const pa = byId[a.contentId] || { createdAt: a.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const pb = byId[b.contentId] || { createdAt: b.queuedAt || 0, likeCount: 0, commentCount: 0, viewCount: 0 }
-    const diff = postHeatScore(pb, now) - postHeatScore(pa, now)
-    if (diff !== 0) return diff
-    return (pb.createdAt || 0) - (pa.createdAt || 0)
-  })
-}
-
-async function flushDigest(force) {
-  const queued = (await allDocs('digest_queue')).sort((a, b) => a.queuedAt - b.queuedAt)
-  if (!queued.length) return null
-  if (!force && queued.length < DIGEST_SIZE) return null
-  const picked = queued.slice(0, DIGEST_SIZE)
-  const items = (await sortDigestItemsByHeat(picked)).map(({ _id, ...rest }) => rest)
-  await Promise.all(picked.map((item) => db.collection('digest_queue').doc(item.id || item._id).remove()))
-  const digest = {
-    id: uid('dg_'),
-    items,
-    title: `本周精选 · ${items.length}条`,
-    summary: items.map((item, index) => `${index + 1}.${item.title}`).join(' ').slice(0, 120),
-    createdAt: Date.now()
-  }
-  digest.pagepath = `pages/digest/digest?id=${digest.id}`
-  digest.sharePath = `/pages/digest/digest?id=${digest.id}`
-  digest.wecomPage = `pages/digest/digest.html?id=${digest.id}`
-  await db.collection('digests').doc(digest.id).set({ data: digest })
-
-  const groups = (await allDocs('distribute_targets')).filter((item) => (
-    item.enabled !== false && item.receiveDigest && item.chatId
-  ))
-  let wecomSend = null
+// 企微自动推送入队：审核通过的新帖写进 digest_queue（每帖固定一条 dq_<帖子id>，只需 1 次写库）。
+// 攒满 10 条后由成都服务器（admin/lib/wecom-auto.js）生成汇总、调企微给客户群建群发。
+// 云函数自己不调企微：云函数出口 IP 不固定，会被企微「企业可信IP」拦下（60020）。
+async function enqueueDigestPost(post, type) {
+  if (!post || !moderation.isPublicStatus(post.reviewStatus)) return null
+  const item = homeFeed.digestQueueItem(post, type)
   try {
-    wecomSend = await wecom.sendDigest(digest, {
-      chatIds: groups.map((item) => item.chatId).filter(Boolean),
-      sender: (groups.find((item) => item.sender) || {}).sender || process.env.WECOM_SENDER
-    })
+    await db.collection('digest_queue').doc(item.id).set({ data: item })
+    return item
   } catch (err) {
-    wecomSend = { error: err.message || String(err) }
+    // 入队失败不影响发帖本身
+    console.warn('[enqueueDigestPost]', err && err.message)
+    return null
   }
-  const ok = wecomSend && wecomSend.result && !wecomSend.result.errcode
-  const log = {
-    id: uid('dl_'),
-    groupId: 'g_customer',
-    groupName: process.env.WECOM_GROUP_NAME || '群聊推送测试',
-    groupType: 'external',
-    contentType: 'digest',
-    contentId: digest.id,
-    title: digest.title,
-    summary: digest.summary,
-    pagepath: digest.pagepath,
-    wecomPage: digest.wecomPage,
-    sharePath: digest.sharePath,
-    items: digest.items,
-    itemCount: digest.items.length,
-    status: ok ? 'confirm' : (wecomSend && wecomSend.skipped ? 'simulated' : 'failed'),
-    wecom: wecomSend,
-    createdAt: Date.now()
-  }
-  await db.collection('distribute_logs').doc(log.id).set({ data: log })
-  digest.wecom = wecomSend
-  return digest
 }
+
 
 /** 确认过有数据就不再重复 count，避免每次列表请求都多两次查询 */
 let demoContentReady = false
@@ -3253,6 +3161,7 @@ const handlers = {
       await handleReviewViolation(user, review, '发帖')
     }
     const result = publishReviewResult(review, post)
+    if (review.passed) await enqueueDigestPost(post, 'forum')
     return { ...result, speakGate: speakGate(user) }
   },
 
@@ -3339,8 +3248,8 @@ const handlers = {
     }
     const result = publishReviewResult(review, post)
     if (!review.passed) return { ...result, speakGate: speakGate(user) }
-    const distribution = await enqueueWall(post)
-    return { ...result, distribution, speakGate: speakGate(user) }
+    await enqueueDigestPost(post, 'wall')
+    return { ...result, speakGate: speakGate(user) }
   },
 
   async updateWallDealStatus(payload, user) {

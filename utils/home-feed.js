@@ -169,8 +169,34 @@ function postTopic(post, type) {
   return normalizeTopic(primaryTag(post, type))
 }
 
+/**
+ * 企微自动推送队列（digest_queue）里的一条。云函数发帖、后台人工审核通过时都用它入队，
+ * 文档 id 固定为 dq_<帖子id>，重复入队只会覆盖同一条，不会重复推送。
+ */
+function digestQueueItem(post, type) {
+  const id = String((post && (post.id || post._id)) || '')
+  const kind = type === 'wall' ? 'wall' : 'forum'
+  const content = String((post && post.content) || '').replace(/\s+/g, ' ').trim()
+  const route = kind === 'wall' && (post.routeFrom || post.routeTo)
+    ? `${post.routeFrom || '出发地'} → ${post.routeTo || '目的地'}`
+    : ''
+  const title = String((post && post.title) || route || content.slice(0, 20) || postTopic(post, kind)).trim()
+  const page = kind === 'wall' ? 'pages/wall-detail/wall-detail' : 'pages/forum-detail/forum-detail'
+  return {
+    id: `dq_${id}`,
+    contentType: kind,
+    contentId: id,
+    title: title.slice(0, 40),
+    summary: content.slice(0, 80),
+    channel: postTopic(post, kind),
+    pagepath: `${page}?id=${id}`,
+    queuedAt: Date.now()
+  }
+}
+
 module.exports = {
   postTopic,
+  digestQueueItem,
   HOME_TOPICS,
   OTHER_TOPIC,
   OFFICIAL_TOPIC,

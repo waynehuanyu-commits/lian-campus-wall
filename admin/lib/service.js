@@ -472,32 +472,23 @@ async function reviewContent(type, id, { outcome, note } = {}, operator = '') {
     createdAt: Date.now()
   })
   let distribution = null
-  if (nextStatus === 'approved' && type === 'wall') {
-    distribution = await enqueueApprovedWall(next)
+  if (nextStatus === 'approved' && type !== 'comment') {
+    distribution = await enqueueApprovedPost(next, type).catch((err) => {
+      console.warn('[enqueueApprovedPost]', err && err.message)
+      return null
+    })
   }
   bustReadCache()
   return { ok: true, post: next, distribution }
 }
 
-async function enqueueApprovedWall(post) {
+// 人工审核通过的帖子也进企微自动推送队列（与云函数发帖入队同一条规则，见 utils/home-feed.js digestQueueItem）
+async function enqueueApprovedPost(post, type) {
   if (!moderation.isPublicStatus(post.reviewStatus)) return null
-  const queue = await db.recentDocs('digest_queue', 50)
-  if (queue.some((item) => item.contentId === post.id)) {
-    return { queued: true, count: queue.length }
-  }
-  const item = {
-    id: uid('dq_'),
-    contentType: 'wall',
-    contentId: post.id,
-    title: wallHeadline(post),
-    summary: String(post.content || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    channel: post.tag || '',
-    pagepath: `pages/wall-detail/wall-detail?id=${post.id}`,
-    queuedAt: Date.now()
-  }
+  const item = homeFeed.digestQueueItem(post, type)
   await db.setDoc('digest_queue', item.id, item)
   bustReadCache()
-  return { queued: true, count: queue.length + 1 }
+  return { queued: true }
 }
 
 async function getLexiconMeta() {

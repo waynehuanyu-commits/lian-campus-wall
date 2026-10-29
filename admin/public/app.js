@@ -962,7 +962,7 @@ async function render() {
         <div class="row">
           <div>
             <h3>审核队列 ${progress.count || 0}</h3>
-            <p class="muted">原互助类帖子（拼车、二手、求助等）通过审核后会进这个队列，仅供查看。不会再满 10 条就自动出文。</p>
+            <p class="muted">新帖审核通过后自动进这个队列，满 10 条由服务器自动推到企微群（发送人要在企业微信里点「发送」）。点「用队列生成」会把队列里的帖子拿去做公众号推文，这几条就不再推企微。</p>
           </div>
           <button id="flush-btn" type="button">用队列生成</button>
         </div>
