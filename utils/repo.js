@@ -927,6 +927,17 @@ async function bumpView(type, id) {
   return callCloud('bumpView', { type, id })
 }
 
+/** 首页曝光一批（「围观」按曝光算，见 utils/exposure.js）；本地演示直接加到帖子上 */
+async function bumpExposure(items) {
+  const list = (items || []).filter((item) => item && item.id)
+  if (!list.length) return { ok: true }
+  if (!config.useCloud) {
+    list.forEach((item) => store.bumpView(item.type, item.id))
+    return { ok: true }
+  }
+  return callCloud('bumpExposure', { items: list })
+}
+
 async function createForumPost(payload) {
   const blocked = requireLoginResult()
   if (blocked) return blocked
@@ -1179,6 +1190,7 @@ module.exports = {
   HOME_FORUM_QUERY,
   HOME_WALL_QUERY,
   bumpView,
+  bumpExposure,
   createForumPost,
   createWallPost,
   updateWallDealStatus,

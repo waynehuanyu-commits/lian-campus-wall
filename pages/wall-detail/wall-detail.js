@@ -99,7 +99,7 @@ Page({
       return
     }
     await this.refresh({ trackView: true, initial: true })
-    repo.bumpView('wall', this.postId).catch(() => {})
+    // 「围观」改为首页曝光口径（utils/exposure.js），详情页不再单独 +1，避免重复计
   },
 
   async onShow() {

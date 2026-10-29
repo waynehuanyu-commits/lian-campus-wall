@@ -10,6 +10,7 @@ const guides = require('./lib/guides')
 const reportCases = require('./lib/report-cases')
 const contentAdmin = require('./lib/content-admin')
 const wecomAuto = require('./lib/wecom-auto')
+const pushConfirm = require('./lib/push-confirm')
 
 loadEnv()
 const localEnv = path.join(__dirname, '.env')
@@ -134,7 +135,28 @@ function serveStatic(req, res) {
   })
 }
 
+// 企微推送争议内容的确认页：企微消息里的签名链接直接打开，不走后台登录（签名校验见 lib/push-confirm.js）
+async function servePushConfirm(req, res) {
+  const url = new URL(req.url, 'http://local')
+  const query = Object.fromEntries(url.searchParams.entries())
+  let form = {}
+  if (req.method === 'POST') {
+    const raw = await new Promise((resolve, reject) => {
+      const chunks = []
+      req.on('data', (chunk) => { if (chunks.length < 8) chunks.push(chunk) })
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8').slice(0, 4096)))
+      req.on('error', reject)
+    })
+    form = Object.fromEntries(new URLSearchParams(raw).entries())
+  }
+  const out = await pushConfirm.handle(req.method, query, form)
+  res.writeHead(out.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+  res.end(out.html)
+}
+
 const routes = {
+  'GET /push-confirm': servePushConfirm,
+  'POST /push-confirm': servePushConfirm,
   'POST /api/login': async (req, res) => {
     const body = await readBody(req)
     const account = String(body.account || '').trim()

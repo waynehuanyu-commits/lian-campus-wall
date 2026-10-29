@@ -2,28 +2,37 @@
 // 8788 那个手动进程不设，避免同一批推两次）。
 //
 // 链路：发帖 / 人工审核通过 → digest_queue（每帖一条 dq_<帖子id>，见 utils/home-feed.js digestQueueItem）
-//      → 本模块每 2 分钟看一次，攒满 10 条就生成汇总 digests，调企微 add_msg_template 给客户群建群发
-//      → 发送人（客户群群主）在企业微信里点「发送」，消息才进群。这一步是企微对外部客户群的硬规定，绕不过去。
+//      → 本模块每 2 分钟看一次；距上次推送满 1 小时、且有可推的帖子，就推一轮：
+//        每条群消息最多 6 帖，超过 6 帖分两条发，一轮最多 12 帖，剩下的下一小时再推
+//      → 推送前按 push-risk.js 分级：风险内容不推；争议内容先发企微消息给确认人，确认后进下一轮
+//      → 每个客户群由它的群主在企业微信里点「发送」才进群（企微对外部客户群的硬规定，只有群主能发）
 //
 // 为什么放在服务器而不是云函数：企微只认「企业可信IP」，成都服务器 118.24.61.135 已加白名单，云函数出口 IP 不固定。
-// 配置都在 server/.env：WECOM_CORP_ID / WECOM_SECRET / WECOM_SENDER / WECOM_CHAT_ID，小程序卡片和短链用 MINI_APPID / MINI_SECRET。
+// 配置在 server/.env：WECOM_CORP_ID / WECOM_SECRET / WECOM_AGENT_ID / WECOM_CHAT_ID（多群逗号分隔）/
+// WECOM_CONFIRM_USERS / PUSH_CONFIRM_BASE / PUSH_CONFIRM_SECRET；小程序短链用 admin/.env 的 MINI_APPID / MINI_SECRET。
 
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const db = require('./db')
+const { classifyForPush } = require('./push-risk')
+const pushConfirm = require('./push-confirm')
+const exposureFold = require('./exposure-fold')
 
-const DIGEST_SIZE = 10
+const PER_MESSAGE = 6
+const MAX_MESSAGES_PER_ROUND = 2
+const PUSH_INTERVAL_MS = 60 * 60 * 1000
 const TICK_MS = 2 * 60 * 1000
+const RETRY_PAUSE_MS = 30 * 60 * 1000
+const STATE_ID = 'wecom_push_state'
 const COVER_FILE = path.join(__dirname, '../../images/share-card.jpg')
 const WECOM_HOST = 'https://qyapi.weixin.qq.com'
 const WX_HOST = 'https://api.weixin.qq.com'
 
 let running = false
-// 推送失败（如发送人不是群主、token 失效）后暂停 30 分钟再试，帖子放回队列不丢
 let pausedUntil = 0
-const RETRY_PAUSE_MS = 30 * 60 * 1000
 let coverCache = { id: '', at: 0 }
+const ownerCache = new Map()
 
 function uid(prefix) {
   return `${prefix}${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`
@@ -45,6 +54,15 @@ async function wecomToken() {
   const data = await getJson(`${WECOM_HOST}/cgi-bin/gettoken?corpid=${process.env.WECOM_CORP_ID}&corpsecret=${process.env.WECOM_SECRET}`)
   if (data.errcode) throw new Error(`企微 token 失败：${data.errcode} ${data.errmsg}`)
   return data.access_token
+}
+
+// 去掉被截成半个的表情（孤立代理字符），否则企微整条报 40058
+function cleanText(text) {
+  return String(text || '').replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, '')
+}
+
+function clip(text, max) {
+  return Array.from(cleanText(text)).slice(0, max).join('')
 }
 
 /** 小程序卡片封面：企微临时素材 3 天有效，这里 2 天内复用同一个 */
@@ -72,7 +90,7 @@ async function shortLinks(items) {
     for (const item of items) {
       const res = await postJson(`${WX_HOST}/wxa/genwxashortlink?access_token=${tk.access_token}`, {
         page_url: item.pagepath,
-        page_title: String(item.title || '查看').replace(/\s+/g, '').slice(0, 12) || '查看',
+        page_title: clip(String(item.title || '查看').replace(/\s+/g, ''), 12) || '查看',
         is_permanent: false
       })
       if (res.link) out[item.contentId] = res.link
@@ -83,133 +101,173 @@ async function shortLinks(items) {
   }
 }
 
-// 去掉被截成半个的表情（孤立代理字符），否则企微整条报 40058
-function cleanText(text) {
-  return String(text || '').replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, '')
-}
-
-function clip(text, max) {
-  return Array.from(cleanText(text)).slice(0, max).join('')
-}
-
-/** 群消息正文：标题 + 摘要 + 短链，不出现小程序内部路径 */
-function buildText(digest, links) {
-  const lines = (digest.items || []).map((item, index) => {
+/** 群消息正文：只有编号列表，不加前后缀；编号在同一轮的两条消息里连续 */
+function buildText(items, links, startIndex = 1) {
+  return clip(items.map((item, index) => {
     const summary = item.summary && item.summary !== item.title ? `\n${clip(item.summary, 40)}` : ''
     const link = links[item.contentId] ? `\n${links[item.contentId]}` : ''
-    return `${index + 1}. 【${cleanText(item.channel) || '校园话题'}】${cleanText(item.title)}${summary}${link}`
-  })
-  const text = [
-    `黎安话事 · 最新 ${lines.length} 条`,
-    '',
-    lines.join('\n\n'),
-    '',
-    '打开小程序「黎安话事」看全文、参与评论'
-  ].join('\n')
-  return clip(text, 3900)
+    return `${startIndex + index}. ${cleanText(item.title)}${summary}${link}`
+  }).join('\n\n'), 3900)
 }
 
+/** 要推的客户群：后台「推送目标」里启用的群，没有就用 WECOM_CHAT_ID（可逗号分隔多个） */
 async function targetChatIds() {
   const groups = await db.allDocs('distribute_targets').catch(() => [])
   const ids = groups
     .filter((item) => item.enabled !== false && item.receiveDigest && item.chatId)
     .map((item) => item.chatId)
   if (ids.length) return ids
-  return process.env.WECOM_CHAT_ID ? [process.env.WECOM_CHAT_ID] : []
+  return String(process.env.WECOM_CHAT_ID || '').split(',').map((s) => s.trim()).filter(Boolean)
 }
 
-async function createGroupMessage(token, digest, chatIds, links) {
-  const payload = {
-    chat_type: 'group',
-    chat_id_list: chatIds,
-    sender: process.env.WECOM_SENDER,
-    text: { content: buildText(digest, links) }
+/** 客户群群发的发送人必须是群主：按群查群主，同一个群主的群合成一条群发 */
+async function groupsByOwner(token, chatIds) {
+  const out = {}
+  for (const chatId of chatIds) {
+    let owner = ownerCache.get(chatId)
+    if (!owner) {
+      const res = await postJson(`${WECOM_HOST}/cgi-bin/externalcontact/groupchat/get?access_token=${token}`, { chat_id: chatId })
+      owner = (res.group_chat && res.group_chat.owner) || ''
+      if (owner) ownerCache.set(chatId, owner)
+    }
+    if (!owner) continue
+    out[owner] = (out[owner] || []).concat(chatId)
   }
+  return out
+}
+
+async function createGroupMessage(token, payload, digestId, title) {
+  const url = `${WECOM_HOST}/cgi-bin/externalcontact/add_msg_template?access_token=${token}`
   const cover = await coverMediaId(token).catch(() => '')
   if (cover && process.env.MINI_APPID) {
-    const withCard = await postJson(`${WECOM_HOST}/cgi-bin/externalcontact/add_msg_template?access_token=${token}`, {
+    const withCard = await postJson(url, {
       ...payload,
       attachments: [{
         msgtype: 'miniprogram',
         miniprogram: {
-          title: clip(digest.title, 20),
+          title: clip(title, 20),
           pic_media_id: cover,
           appid: process.env.MINI_APPID,
-          page: `pages/digest/digest.html?id=${digest.id}`
+          page: `pages/digest/digest.html?id=${digestId}`
         }
       }]
     })
     if (!withCard.errcode) return { ...withCard, card: true }
-    // 小程序没关联企微等原因导致卡片发不了，退回纯文字，至少把内容推出去
-    const textOnly = await postJson(`${WECOM_HOST}/cgi-bin/externalcontact/add_msg_template?access_token=${token}`, payload)
+    // 小程序没关联企微（90208）等原因发不了卡片，退回纯文字
+    const textOnly = await postJson(url, payload)
     return { ...textOnly, card: false, cardError: `${withCard.errcode} ${withCard.errmsg}` }
   }
-  const res = await postJson(`${WECOM_HOST}/cgi-bin/externalcontact/add_msg_template?access_token=${token}`, payload)
-  return { ...res, card: false }
+  return { ...(await postJson(url, payload)), card: false }
 }
 
-/** 队列满 10 条 → 生成汇总并建群发。返回本轮做了什么，方便日志和手动触发 */
-async function tick({ force = false } = {}) {
-  if (running) return { skipped: 'running' }
-  if (!force && Date.now() < pausedUntil) return { skipped: 'paused' }
-  running = true
-  try {
-    const queued = (await db.allDocs('digest_queue')).sort((a, b) => ((a.queuedAt || 0) - (b.queuedAt || 0)) || String(a.id).localeCompare(String(b.id)))
-    if (!queued.length || (!force && queued.length < DIGEST_SIZE)) return { queued: queued.length }
-    const picked = queued.slice(0, DIGEST_SIZE)
-    const items = picked.map(({ _id, ...rest }) => rest)
+async function loadState() {
+  return (await db.getDoc('meta', STATE_ID).catch(() => null)) || { lastPushAt: 0 }
+}
+
+/** 推送前分级：风险出队、争议等确认、可推的返回 */
+async function sortQueue(token, queued) {
+  const ready = []
+  for (const item of queued) {
+    if (item.confirm === 'approved') { ready.push(item); continue }
+    if (item.confirm === 'pending') continue
+    if (item.confirm === 'rejected') { await db.removeDoc('digest_queue', item.id).catch(() => {}); continue }
+    const post = await db.getDoc(item.contentType === 'wall' ? 'wall_posts' : 'forum_posts', item.contentId).catch(() => null)
+    const verdict = classifyForPush(post)
+    if (verdict.level === 'ok') { ready.push(item); continue }
+    if (verdict.level === 'risk') {
+      await db.removeDoc('digest_queue', item.id).catch(() => {})
+      await db.setDoc('distribute_logs', uid('dl_'), {
+        contentType: 'push_skip', contentId: item.contentId, title: item.title,
+        status: 'skipped_risk', reasons: verdict.reasons, createdAt: Date.now()
+      }).catch(() => {})
+      continue
+    }
+    const fullText = clip(`${(post && post.title) || ''}\n${(post && post.content) || ''}`.trim(), 600)
+    const next = { ...item, confirm: 'pending', confirmReasons: verdict.reasons, fullText, notifiedAt: Date.now() }
+    await db.setDoc('digest_queue', item.id, next)
+    const sent = await pushConfirm.notifyConfirmers(token, next, verdict.reasons).catch((err) => ({ ok: false, error: err.message }))
+    if (!sent.ok) console.warn(`[wecom-auto] 确认消息没发出：${sent.error}（这条留在队列，可到后台处理）`)
+  }
+  return ready
+}
+
+function stripQueueFields(item) {
+  const { _id, confirm, confirmReasons, fullText, notifiedAt, confirmedAt, confirmedLabel, ...rest } = item
+  return rest
+}
+
+async function pushRound(token, ready) {
+  const picked = ready.slice(0, PER_MESSAGE * MAX_MESSAGES_PER_ROUND)
+  const chatIds = await targetChatIds()
+  if (!chatIds.length) throw new Error('没有绑定要推送的客户群（WECOM_CHAT_ID）')
+  const owners = await groupsByOwner(token, chatIds)
+  if (!Object.keys(owners).length) throw new Error('查不到客户群的群主')
+  const links = await shortLinks(picked)
+  const results = []
+  for (let start = 0; start < picked.length; start += PER_MESSAGE) {
+    const chunk = picked.slice(start, start + PER_MESSAGE)
+    const items = chunk.map(stripQueueFields)
     const digest = {
       id: uid('dg_'),
       items,
-      title: `黎安话事 · 最新 ${items.length} 条`,
-      summary: items.map((item, index) => `${index + 1}.${item.title}`).join(' ').slice(0, 120),
+      title: `黎安话事 · ${items.length} 条新帖`,
+      summary: items.map((item, i) => `${start + i + 1}.${item.title}`).join(' ').slice(0, 120),
       source: 'wecom_auto',
       createdAt: Date.now()
     }
     digest.pagepath = `pages/digest/digest?id=${digest.id}`
     digest.sharePath = `/pages/digest/digest?id=${digest.id}`
     await db.setDoc('digests', digest.id, digest)
-    // 先出汇总再删队列：中途失败最多重复推一次，不会丢帖
-    await Promise.all(picked.map((item) => db.removeDoc('digest_queue', item.id || item._id).catch(() => {})))
+    const text = buildText(items, links, start + 1)
+    const sends = []
+    for (const [sender, ids] of Object.entries(owners)) {
+      const payload = { chat_type: 'group', chat_id_list: ids, sender, text: { content: text } }
+      sends.push({ sender, chatIds: ids, result: await createGroupMessage(token, payload, digest.id, digest.title) })
+    }
+    const ok = sends.some((s) => !s.result.errcode)
+    await db.setDoc('digests', digest.id, { ...digest, wecomStatus: ok ? 'confirm' : 'failed', wecom: { sends } })
+    await db.setDoc('distribute_logs', uid('dl_'), {
+      groupType: 'external', contentType: 'digest', contentId: digest.id, title: digest.title,
+      summary: digest.summary, items, itemCount: items.length,
+      status: ok ? 'confirm' : 'failed', wecom: { sends }, createdAt: Date.now()
+    })
+    // 只有建成群发的才出队；失败的留在队列下次再推
+    if (ok) await Promise.all(chunk.map((item) => db.removeDoc('digest_queue', item.id).catch(() => {})))
+    results.push({ digest: digest.id, count: items.length, ok, sends })
+  }
+  return results
+}
 
-    let wecom
-    try {
-      const chatIds = await targetChatIds()
-      if (!chatIds.length) throw new Error('没有绑定要推送的客户群（WECOM_CHAT_ID）')
-      const token = await wecomToken()
-      const links = await shortLinks(items)
-      wecom = { chatIds, result: await createGroupMessage(token, digest, chatIds, links) }
-    } catch (err) {
-      wecom = { error: err.message || String(err) }
-    }
-    const ok = !!(wecom.result && !wecom.result.errcode)
-    const log = {
-      id: uid('dl_'),
-      groupType: 'external',
-      groupName: process.env.WECOM_GROUP_NAME || '',
-      contentType: 'digest',
-      contentId: digest.id,
-      title: digest.title,
-      summary: digest.summary,
-      pagepath: digest.pagepath,
-      items,
-      itemCount: items.length,
-      status: ok ? 'confirm' : 'failed',
-      wecom,
-      createdAt: Date.now()
-    }
-    await db.setDoc('distribute_logs', log.id, log)
-    if (!ok) {
-      // 帖子放回队列，下次重试；同一帖固定 dq_<帖子id>，不会重复
-      await Promise.all(items.map((item) => db.setDoc('digest_queue', item.id, item).catch(() => {})))
-      pausedUntil = Date.now() + RETRY_PAUSE_MS
-    } else {
+/** 每 2 分钟一次：先合并曝光计数，再看是否到了推送时间 */
+async function tick({ force = false } = {}) {
+  if (running) return { skipped: 'running' }
+  running = true
+  try {
+    await exposureFold.fold().catch((err) => console.warn('[exposure-fold]', err && err.message))
+    if (!force && Date.now() < pausedUntil) return { skipped: 'paused' }
+    const state = await loadState()
+    if (!force && Date.now() - (state.lastPushAt || 0) < PUSH_INTERVAL_MS) return { skipped: 'not_due' }
+    const queued = (await db.allDocs('digest_queue'))
+      .sort((a, b) => ((a.queuedAt || 0) - (b.queuedAt || 0)) || String(a.id).localeCompare(String(b.id)))
+    if (!queued.length) return { queued: 0 }
+    const token = await wecomToken()
+    const ready = await sortQueue(token, queued)
+    if (!ready.length) return { queued: queued.length, ready: 0 }
+    const results = await pushRound(token, ready)
+    const ok = results.some((r) => r.ok)
+    if (ok) {
       pausedUntil = 0
+      await db.setDoc('meta', STATE_ID, { id: STATE_ID, lastPushAt: Date.now() })
+    } else {
+      pausedUntil = Date.now() + RETRY_PAUSE_MS
     }
-    await db.setDoc('digests', digest.id, { ...digest, wecomStatus: log.status, wecom })
-    console.log(`[wecom-auto] ${digest.id} ${items.length} 条 → ${ok ? '已建群发，等发送人确认' : `失败：${wecom.error || JSON.stringify(wecom.result)}`}`)
-    return { digest: digest.id, ok, wecom }
+    results.forEach((r) => {
+      const detail = r.ok ? '已建群发，等群主确认发送' : `失败：${JSON.stringify(r.sends.map((s) => s.result))}`
+      console.log(`[wecom-auto] ${r.digest} ${r.count} 条 → ${detail}`)
+    })
+    return { ok, results }
   } catch (err) {
+    pausedUntil = Date.now() + RETRY_PAUSE_MS
     console.error('[wecom-auto]', err && err.message)
     return { error: err && err.message }
   } finally {
@@ -219,14 +277,14 @@ async function tick({ force = false } = {}) {
 
 function start() {
   if (process.env.WECOM_AUTO_SEND !== '1') return false
-  if (!process.env.WECOM_CORP_ID || !process.env.WECOM_SECRET || !process.env.WECOM_SENDER) {
+  if (!process.env.WECOM_CORP_ID || !process.env.WECOM_SECRET) {
     console.warn('[wecom-auto] 企微参数没配齐，自动推送未启动')
     return false
   }
   setInterval(() => { tick() }, TICK_MS)
   setTimeout(() => { tick() }, 15000)
-  console.log('[wecom-auto] 企微自动推送已启动：每 2 分钟检查一次，满 10 条推送')
+  console.log('[wecom-auto] 企微自动推送已启动：每小时一轮，每条最多 6 帖')
   return true
 }
 
-module.exports = { start, tick, buildText, DIGEST_SIZE }
+module.exports = { start, tick, buildText, PER_MESSAGE }

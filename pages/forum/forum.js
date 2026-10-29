@@ -1,4 +1,5 @@
 const store = require('../../utils/store')
+const { createExposureTracker } = require('../../utils/exposure')
 const repo = require('../../utils/repo')
 const auth = require('../../utils/auth')
 const track = require('../../utils/track')
@@ -63,6 +64,8 @@ Page({
 
   onLoad(query) {
     this.setData({ masthead: readNavMetrics() })
+    // 「围观」按曝光算：卡片划进屏幕就记一次
+    this._exposure = createExposureTracker(this, '.feed-item')
     this.fromShare = (query && query.from) || ''
     try { share.enableMenus() } catch (e) { /* ignore */ }
     try { this.consumeHomeIntent() } catch (e) { /* ignore */ }
@@ -77,8 +80,17 @@ Page({
     this.refresh().catch(() => {})
   },
 
+  onHide() {
+    if (this._exposure) this._exposure.pause()
+  },
+
+  onUnload() {
+    if (this._exposure) this._exposure.destroy()
+  },
+
   onShow() {
     try { share.enableMenus() } catch (e) { /* ignore */ }
+    if (this._exposure && (this.data.posts || []).length) this._exposure.observe()
     const intentChanged = this.consumeHomeIntent()
     if (!this._ready) {
       this._ready = true
@@ -279,6 +291,8 @@ Page({
       loadingMore: false,
       hasMore: !!pack.hasMore,
       loadError: ''
+    }, () => {
+      if (this._exposure) this._exposure.observe()
     })
   },
 
@@ -292,6 +306,8 @@ Page({
       posts: (this.data.posts || []).concat(extra),
       loadingMore: false,
       hasMore: !!pack.hasMore
+    }, () => {
+      if (this._exposure) this._exposure.observe()
     })
   },
 

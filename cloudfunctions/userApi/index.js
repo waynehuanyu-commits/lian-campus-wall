@@ -3088,6 +3088,37 @@ const handlers = {
     return { ok: true }
   },
 
+  // 「围观」按曝光算：首页卡片划进屏幕就算一次（前端同一页面内同一帖只报一次，攒一批再报）。
+  // 不直接改帖子，按 10 分钟一个桶记进 meta/exposure_<桶号>.counts，一批只写 1 次库；
+  // 成都服务器 admin/lib/exposure-fold.js 把结束的桶合进 viewCount。改格式两边要一起改。
+  async bumpExposure(payload) {
+    const seen = new Set()
+    const counts = {}
+    ;(Array.isArray(payload.items) ? payload.items : []).slice(0, 60).forEach((item) => {
+      const type = item && item.type === 'wall' ? 'wall' : 'forum'
+      const id = String((item && item.id) || '')
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id) || seen.has(`${type}__${id}`)) return
+      seen.add(`${type}__${id}`)
+      counts[`${type}__${id}`] = 1
+    })
+    const keys = Object.keys(counts)
+    if (!keys.length) return { ok: true, count: 0 }
+    const bucket = Math.floor(Date.now() / (10 * 60 * 1000))
+    const ref = db.collection('meta').doc(`exposure_${bucket}`)
+    try {
+      const inc = {}
+      keys.forEach((key) => { inc[key] = _.inc(1) })
+      const res = await ref.update({ data: { counts: inc } })
+      if (!res || !res.stats || !res.stats.updated) {
+        await ref.set({ data: { kind: 'exposure_buffer', bucket, counts, createdAt: Date.now() } })
+      }
+    } catch (err) {
+      // 桶还不存在时 update 会报错，建桶；并发建桶极少，丢几次曝光可以接受
+      await ref.set({ data: { kind: 'exposure_buffer', bucket, counts, createdAt: Date.now() } }).catch(() => {})
+    }
+    return { ok: true, count: keys.length }
+  },
+
   async createForumPost(rawPayload, user) {
     // 分身发布：对外显示随机分身昵称、不能进主页；后台仍记录真实作者
     const payload = { ...(rawPayload || {}), anonymous: !!(rawPayload && rawPayload.anonymous) }
@@ -4904,6 +4935,7 @@ const GUEST_OK = new Set([
   'listHome',
   'getPost',
   'bumpView',
+  'bumpExposure',
   'listComments',
   'getWeeklyHot',
   'getMineCover',
