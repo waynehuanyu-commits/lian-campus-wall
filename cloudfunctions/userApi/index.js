@@ -40,6 +40,50 @@ function meterQuery(target) {
 const rawCollection = db.collection.bind(db)
 db.collection = (name) => meterQuery(rawCollection(name))
 
+// 环境没开日志服务，计量结果在内存里按接口汇总，每个实例每 10 分钟写一份到 meta/db_meter_<日期>_<实例>（一天几十次写入）
+const METER_FLUSH_MS = 10 * 60 * 1000
+const meterInstance = crypto.randomBytes(4).toString('hex')
+let meterTotals = {}
+let meterFlushedAt = Date.now()
+
+function recordMeter(action, count, ms) {
+  const key = action || 'unknown'
+  const row = meterTotals[key] || (meterTotals[key] = { calls: 0, db: 0, ms: 0, maxDb: 0 })
+  row.calls += 1
+  row.db += count
+  row.ms += ms
+  if (count > row.maxDb) row.maxDb = count
+}
+
+async function flushMeter(force) {
+  const now = Date.now()
+  if (!force && now - meterFlushedAt < METER_FLUSH_MS) return
+  if (!Object.keys(meterTotals).length) return
+  const totals = meterTotals
+  meterTotals = {}
+  meterFlushedAt = now
+  const day = new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10)
+  const docId = `db_meter_${day}_${meterInstance}`
+  try {
+    const ref = rawCollection('meta').doc(docId)
+    let prev = null
+    try {
+      prev = (await ref.get()).data
+    } catch (err) {
+      prev = null
+    }
+    const merged = { ...((prev && prev.actions) || {}) }
+    Object.keys(totals).forEach((key) => {
+      const a = merged[key] || { calls: 0, db: 0, ms: 0, maxDb: 0 }
+      const b = totals[key]
+      merged[key] = { calls: a.calls + b.calls, db: a.db + b.db, ms: a.ms + b.ms, maxDb: Math.max(a.maxDb, b.maxDb) }
+    })
+    await ref.set({ data: { id: docId, kind: 'db_meter', day, instance: meterInstance, actions: merged, updatedAt: now } })
+  } catch (err) {
+    // 计量写失败不影响业务
+  }
+}
+
 const DIGEST_SIZE = 10
 
 /** 云存储 fileID → 临时 HTTPS（云函数有管理端权限，比小程序端更稳） */
@@ -4955,7 +4999,10 @@ exports.main = (event) => {
   const meter = { count: 0, start: Date.now() }
   return dbMeter.run(meter, () => handleEvent(event)).finally(() => {
     const action = (event && event.action) || ''
-    console.log(`[db-meter] ${action} ${meter.count} ${Date.now() - meter.start}ms`)
+    const ms = Date.now() - meter.start
+    console.log(`[db-meter] ${action} ${meter.count} ${ms}ms`)
+    recordMeter(action, meter.count, ms)
+    return flushMeter(false)
   })
 }
 
