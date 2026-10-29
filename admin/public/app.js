@@ -1133,6 +1133,7 @@ async function render() {
           <div><span class="muted">上次检查</span><strong>${fmt(ps.lastTickAt)}</strong></div>
           <div><span class="muted">上次推送</span><strong>${fmt(ps.lastPushAt)}</strong></div>
           <div><span class="muted">下个固定时段</span><strong>${fmt(ps.nextSlotAt)}</strong></div>
+          <div><span class="muted">待群主点发送</span><strong>${(ps.awaiting || []).length ? `${ps.awaiting.length} 条群发 · 最早 ${fmt(Math.min(...ps.awaiting.map((t) => t.createdAt)))}` : '无'}</strong></div>
           <div><span class="muted">排队中</span><strong>${ps.queue.total} 条${ps.queue.urgent ? ` · 急事 ${ps.queue.urgent}` : ''}${ps.queue.pendingConfirm ? ` · 待确认 ${ps.queue.pendingConfirm}` : ''}</strong></div>
         </div>
         <div class="actions">

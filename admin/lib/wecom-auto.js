@@ -50,6 +50,11 @@ const live = { started: false, startedAt: 0, lastTickAt: 0, lastTick: null, last
 const CONTROL_ID = 'wecom_push_control'
 let controlCache = { enabled: true, at: 0 }
 let coverCache = { id: '', at: 0 }
+// 已建好、还没确认发送的群发任务。「点发送」只能由群主账号在企业微信客户端完成，系统代点不了，
+// 所以这里做的是：建任务后立即多渠道提醒，15 分钟还没发送再催（企微应用消息 + 可选飞书/通用 webhook）
+const pendingTasks = []
+const REMIND_AFTER_MS = 15 * MIN
+const REMIND_GAP_MS = 30 * MIN
 const ownerCache = new Map()
 
 function uid(prefix) {
@@ -192,6 +197,58 @@ async function setEnabled(enabled, operator = '') {
   return doc
 }
 
+/** 提醒渠道，默认全关（只有群主账号一个人点发送，企微「群发助手」本身会提醒）。
+ * 想启用：服务器 server/.env 里配 WECOM_NOTIFY_USERS（企微 userid，逗号分隔）收应用消息，和 / 或 PUSH_NOTIFY_WEBHOOK（飞书群机器人地址） */
+async function sendNotice(token, text) {
+  const out = []
+  const users = String(process.env.WECOM_NOTIFY_USERS || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (users.length && process.env.WECOM_AGENT_ID) {
+    const r = await postJson(`${WECOM_HOST}/cgi-bin/message/send?access_token=${token}`, {
+      touser: users.join('|'), msgtype: 'text', agentid: Number(process.env.WECOM_AGENT_ID), text: { content: text }
+    }).catch((e) => ({ errcode: -1, errmsg: e.message }))
+    out.push({ channel: 'wecom', ok: !r.errcode, err: r.errmsg })
+  }
+  if (process.env.PUSH_NOTIFY_WEBHOOK) {
+    const r = await postJson(process.env.PUSH_NOTIFY_WEBHOOK, { msg_type: 'text', content: { text } }).catch((e) => ({ code: -1, msg: e.message }))
+    out.push({ channel: 'webhook', ok: r.code === 0 || r.StatusCode === 0, err: r.msg })
+  }
+  return out
+}
+
+/** 一轮推送建好群发后：登记待确认 + 立即提醒 */
+async function registerPending(token, results) {
+  const made = []
+  for (const r of results) {
+    if (!r.ok) continue
+    for (const s of r.sends) {
+      if (s.result && s.result.msgid) made.push({ digestId: r.digest, msgid: s.result.msgid, createdAt: Date.now(), remindedAt: 0, count: r.count })
+    }
+  }
+  if (!made.length) return
+  pendingTasks.push(...made)
+  if (!process.env.WECOM_NOTIFY_USERS && !process.env.PUSH_NOTIFY_WEBHOOK) return
+  const posts = results.filter((r) => r.ok).reduce((n, r) => n + r.count, 0)
+  await sendNotice(token, `【待发送】有 ${posts} 条帖子等群主点发送（${made.length} 条群发）。请群主账号打开企业微信「群发助手」点发送，发出后才会进群。`).catch(() => {})
+}
+
+/** 已建 15 分钟还没人点发送的，查企微确认没发就再提醒；已发送的移出，超过 6 小时的不再追 */
+async function remindPending(now) {
+  for (let i = pendingTasks.length - 1; i >= 0; i -= 1) if (now - pendingTasks[i].createdAt > 6 * 3600 * 1000) pendingTasks.splice(i, 1)
+  const due = pendingTasks.filter((t) => now - t.createdAt > REMIND_AFTER_MS && now - t.remindedAt > REMIND_GAP_MS)
+  if (!due.length || (!process.env.WECOM_NOTIFY_USERS && !process.env.PUSH_NOTIFY_WEBHOOK)) return
+  const token = await wecomToken()
+  const unsent = []
+  for (const t of due) {
+    const res = await postJson(`${WECOM_HOST}/cgi-bin/externalcontact/get_groupmsg_task?access_token=${token}`, { msgid: t.msgid, limit: 5 }).catch(() => ({}))
+    if ((res.task_list || []).some((x) => x.status === 2)) pendingTasks.splice(pendingTasks.indexOf(t), 1)
+    else unsent.push(t)
+  }
+  if (!unsent.length) return
+  const mins = Math.round((now - Math.min(...unsent.map((t) => t.createdAt))) / MIN)
+  await sendNotice(token, `【还没发送】有 ${unsent.reduce((n, t) => n + t.count, 0)} 条帖子的群发已等了 ${mins} 分钟，群主账号还没点发送。请去企业微信「群发助手」处理。`).catch(() => {})
+  unsent.forEach((t) => { t.remindedAt = now })
+}
+
 async function loadState() {
   return (await db.getDoc('meta', STATE_ID).catch(() => null)) || { lastPushAt: 0 }
 }
@@ -287,6 +344,7 @@ async function pushRound(token, ready) {
     if (ok) await Promise.all(chunk.map((item) => db.removeDoc('digest_queue', item.id).catch(() => {})))
     results.push({ digest: digest.id, count: items.length, ok, sends })
   }
+  await registerPending(token, results)
   return results
 }
 
@@ -341,6 +399,7 @@ async function tick(options = {}) {
       lastTickAt: live.lastTickAt,
       lastSkip: (result && result.skipped) || '',
       lastError: (result && result.error) || '',
+      pending: pendingTasks.map((t) => ({ createdAt: t.createdAt, count: t.count })),
       pid: process.pid
     }).catch(() => {})
   }
@@ -352,6 +411,7 @@ async function tickInner({ force = false, now = Date.now() } = {}) {
   running = true
   try {
     await exposureFold.fold(now).catch((err) => console.warn('[exposure-fold]', err && err.message))
+    await remindPending(now).catch((err) => console.warn('[remind]', err && err.message))
     if (!force && !(await isEnabled(now))) return { skipped: 'disabled' }
     if (!force && now < pausedUntil) return { skipped: 'paused' }
     if (!force && isQuiet(now)) return { skipped: 'quiet' }
@@ -498,6 +558,7 @@ async function getStatus(now = Date.now()) {
     startedAt: live.startedAt || (beat && beat.startedAt) || 0,
     lastTickAt,
     lastError: (beat && beat.lastError) || '',
+    awaiting: (beat && beat.pending) || [],
     lastPushAt: state.lastPushAt || 0,
     nextSlotAt: nextSlotAt(now),
     queue: {
