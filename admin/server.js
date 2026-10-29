@@ -540,6 +540,26 @@ const routes = {
     json(res, 200, await service.updateGroup(body.id, body))
   },
 
+  // 企微推送控制台：在线状态、开关、立即推送（状态来自跑推送的这个进程）
+  'GET /api/wecom/push-status': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    json(res, 200, { ok: true, status: await wecomAuto.getStatus() })
+  },
+
+  'POST /api/wecom/push-toggle': async (req, res) => {
+    const session = requireAdmin(req, res)
+    if (!session) return
+    const body = await readBody(req)
+    await wecomAuto.setEnabled(!!body.enabled, operatorOf(session))
+    json(res, 200, { ok: true, status: await wecomAuto.getStatus() })
+  },
+
+  'POST /api/wecom/push-now': async (req, res) => {
+    if (!requireAdmin(req, res)) return
+    const result = await wecomAuto.tick({ force: true })
+    json(res, 200, { ok: !result.error, result, status: await wecomAuto.getStatus() })
+  },
+
   'POST /api/groups/remove': async (req, res) => {
     if (!requireAdmin(req, res)) return
     const body = await readBody(req)

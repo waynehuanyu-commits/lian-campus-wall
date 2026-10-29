@@ -1113,7 +1113,37 @@ async function render() {
     const pulled = data.wecomGroups
     const inTargets = new Set(targets.map((item) => item.chatId).filter(Boolean))
     const pushOn = (item) => item.enabled !== false && item.receiveDigest && item.chatId
-    panel.innerHTML = `
+    const ps = data.pushStatus
+    const fmt = (t) => (t ? formatTime(t) : '—')
+    const LOG_LABEL = { confirm: '已建群发，等群主点发送', failed: '失败', skipped_risk: '风险内容，未推送' }
+    let statusLine = '推送进程没有运行（服务器上的推送开关没开），请联系技术排查'
+    let statusClass = 'danger'
+    if (ps && ps.running) {
+      if (!ps.online) { statusLine = '推送进程失联：超过 5 分钟没有检查队列'; statusClass = 'danger' }
+      else if (!ps.enabled) { statusLine = '已暂停：不会自动推送，帖子照常排队'; statusClass = 'warn' }
+      else if (ps.pausedUntil) { statusLine = `上次推送失败，${fmt(ps.pausedUntil)} 自动重试`; statusClass = 'warn' }
+      else if (ps.quiet) { statusLine = '在线 · 夜间不推送（00:40–08:00），早上 8 点推出夜里攒的帖子'; statusClass = 'ok' }
+      else { statusLine = '在线 · 正常运行'; statusClass = 'ok' }
+    }
+    const statusCard = ps === null ? '<div class="card"><h3>推送状态</h3><p class="muted">状态读取失败，点刷新再试。</p><button id="push-refresh" type="button">刷新</button></div>' : `
+      <div class="card">
+        <div class="row"><h3>推送状态</h3><span class="push-dot ${statusClass}">${statusClass === 'ok' ? '在线' : (statusClass === 'warn' ? '暂停' : '离线')}</span></div>
+        <p class="muted">${esc(statusLine)}</p>
+        <div class="push-grid">
+          <div><span class="muted">上次检查</span><strong>${fmt(ps.lastTickAt)}</strong></div>
+          <div><span class="muted">上次推送</span><strong>${fmt(ps.lastPushAt)}</strong></div>
+          <div><span class="muted">下个固定时段</span><strong>${fmt(ps.nextSlotAt)}</strong></div>
+          <div><span class="muted">排队中</span><strong>${ps.queue.total} 条${ps.queue.urgent ? ` · 急事 ${ps.queue.urgent}` : ''}${ps.queue.pendingConfirm ? ` · 待确认 ${ps.queue.pendingConfirm}` : ''}</strong></div>
+        </div>
+        <div class="actions">
+          <button id="push-toggle" type="button">${ps.enabled ? '暂停自动推送' : '恢复自动推送'}</button>
+          <button id="push-now" type="button">立即推送一次</button>
+          <button id="push-refresh" type="button">刷新</button>
+        </div>
+        ${ps.logs.length ? `<div class="push-logs">${ps.logs.map((log) => `
+          <div class="row"><span>${esc(fmt(log.at))} · ${esc(LOG_LABEL[log.status] || log.status)}${log.count ? ` · ${log.count} 帖` : ''}</span><span class="muted">${esc(log.status === 'skipped_risk' ? (log.reasons || []).join('、') : (log.error || ''))}</span></div>`).join('')}</div>` : '<p class="muted">还没有推送记录。</p>'}
+      </div>`
+    panel.innerHTML = statusCard + `
       <div class="card">
         <h3>企微自动推送</h3>
         <p class="muted">${wecom.ready ? '企微已接通。' : `企微还没配齐：${esc((wecom.missing || []).join('、'))}。`}每天 08:00–00:30 推送：固定时段 08:00 / 12:10 / 13:50 / 17:20 / 20:00 / 22:30 / 00:30；攒满 8 条提前推；急事 10 分钟内插队。每次推送都要群主在自己的企业微信里点「发送」。</p>
@@ -1139,6 +1169,27 @@ async function render() {
             ${inTargets.has(g.chatId) ? '<span class="muted">已在名单</span>' : `<button data-add="${esc(g.chatId)}" data-name="${esc(g.name)}" data-owner="${esc(g.owner)}" data-owner-name="${esc(g.ownerName || '')}">加入推送</button>`}
           </div>`).join('') : '<p class="muted">企微里没有找到客户群。</p>') : ''}
       </div>`
+    const refreshBtn = panel.querySelector('#push-refresh')
+    if (refreshBtn) refreshBtn.onclick = () => reload()
+    const toggleBtn = panel.querySelector('#push-toggle')
+    if (toggleBtn) toggleBtn.onclick = async () => {
+      const next = !(ps && ps.enabled)
+      if (!next && !confirm('暂停后不会自动推送到企微群，帖子照常排队，恢复后会补推。确定暂停？')) return
+      const result = await api('/api/wecom/push-toggle', { method: 'POST', body: JSON.stringify({ enabled: next }) })
+      if (!result.ok) return alert(result.message || '操作失败')
+      await reload()
+    }
+    const nowBtn = panel.querySelector('#push-now')
+    if (nowBtn) nowBtn.onclick = async () => {
+      if (!confirm('现在就把队列里可推的帖子推到企微群？群主需要在企业微信里点「发送」。')) return
+      nowBtn.disabled = true
+      nowBtn.textContent = '推送中…'
+      const result = await api('/api/wecom/push-now', { method: 'POST', body: '{}' })
+      const r = result.result || {}
+      const msg = r.ok ? `已建 ${(r.results || []).length} 条群发，去企业微信点「发送」` : (r.error ? `失败：${r.error}` : (r.queued === 0 ? '队列是空的，没有可推的帖子' : '没有可推的帖子（可能都在等确认）'))
+      alert(msg)
+      await reload()
+    }
     panel.querySelector('#pull-groups').onclick = async (event) => {
       event.target.disabled = true
       event.target.textContent = '拉取中…'
@@ -2015,10 +2066,11 @@ async function loadNav(nav) {
     return
   }
   if (nav === 'groups') {
-    const result = await api('/api/groups')
+    const [result, push] = await Promise.all([api('/api/groups'), api('/api/wecom/push-status')])
     if (!result.ok) return
     state.data.groups = result.groups || []
     state.data.wecom = result.wecom || {}
+    state.data.pushStatus = (push && push.ok && push.status) || null
     if (state.nav === 'groups') render()
     return
   }

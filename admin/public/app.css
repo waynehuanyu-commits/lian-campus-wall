@@ -1334,3 +1334,14 @@ aside nav button {
 }
 
 .mod-drawer-panel { width: min(620px, 100%); display: grid; gap: 10px; align-content: start; }
+
+/* 企微推送状态 */
+.push-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.push-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.push-dot.ok { color: #16a34a; }
+.push-dot.warn { color: #d97706; }
+.push-dot.danger { color: #dc2626; }
+.push-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+.push-grid > div { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: rgba(15, 23, 42, 0.04); }
+.push-logs { margin-top: 12px; border-top: 1px solid rgba(15, 23, 42, 0.08); }
+.push-logs .row { padding: 8px 0; border-bottom: 1px solid rgba(15, 23, 42, 0.05); font-size: 13px; gap: 12px; }

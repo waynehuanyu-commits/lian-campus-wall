@@ -41,6 +41,11 @@ const WX_HOST = 'https://api.weixin.qq.com'
 
 let running = false
 let pausedUntil = 0
+// 运行状态（只在跑推送的这个进程里有；后台「企微群发」页通过 getStatus 读）
+const live = { started: false, startedAt: 0, lastTickAt: 0, lastTick: null, lastPush: null }
+// 总开关存在 meta/wecom_push_control，后台可暂停 / 恢复；1 分钟内复用，少读库
+const CONTROL_ID = 'wecom_push_control'
+let controlCache = { enabled: true, at: 0 }
 let coverCache = { id: '', at: 0 }
 const ownerCache = new Map()
 
@@ -168,6 +173,20 @@ async function createGroupMessage(token, payload, digestId, title) {
     return { ...textOnly, card: false, cardError: `${withCard.errcode} ${withCard.errmsg}` }
   }
   return { ...(await postJson(url, payload)), card: false }
+}
+
+async function isEnabled(now = Date.now()) {
+  if (now - controlCache.at < 60 * 1000) return controlCache.enabled
+  const doc = await db.getDoc('meta', CONTROL_ID).catch(() => null)
+  controlCache = { enabled: !doc || doc.enabled !== false, at: now }
+  return controlCache.enabled
+}
+
+async function setEnabled(enabled, operator = '') {
+  const doc = { id: CONTROL_ID, enabled: !!enabled, updatedAt: Date.now(), updatedBy: operator }
+  await db.setDoc('meta', CONTROL_ID, doc)
+  controlCache = { enabled: !!enabled, at: Date.now() }
+  return doc
 }
 
 async function loadState() {
@@ -305,12 +324,21 @@ function pushReason(state, ready, now) {
   return ''
 }
 
-/** 每 2 分钟一次：先合并曝光计数，再看要不要推 */
-async function tick({ force = false, now = Date.now() } = {}) {
+/** 每 2 分钟一次：先合并曝光计数，再看要不要推；结果记进 live 供后台查看 */
+async function tick(options = {}) {
+  const result = await tickInner(options)
+  live.lastTickAt = options.now || Date.now()
+  live.lastTick = result
+  if (result && result.results) live.lastPush = { at: live.lastTickAt, ...result }
+  return result
+}
+
+async function tickInner({ force = false, now = Date.now() } = {}) {
   if (running) return { skipped: 'running' }
   running = true
   try {
     await exposureFold.fold(now).catch((err) => console.warn('[exposure-fold]', err && err.message))
+    if (!force && !(await isEnabled(now))) return { skipped: 'disabled' }
     if (!force && now < pausedUntil) return { skipped: 'paused' }
     if (!force && isQuiet(now)) return { skipped: 'quiet' }
     const state = await loadState()
@@ -364,10 +392,66 @@ function start() {
     console.warn('[wecom-auto] 企微参数没配齐，自动推送未启动')
     return false
   }
+  live.started = true
+  live.startedAt = Date.now()
   setInterval(() => { tick() }, TICK_MS)
   setTimeout(() => { tick() }, 15000)
   console.log('[wecom-auto] 企微自动推送已启动：固定时段 + 满 8 条提前 + 急事插队，08:00–00:30')
   return true
 }
 
-module.exports = { start, tick, buildText, pushReason, latestSlotAt, isQuiet, PER_MESSAGE }
+/** 下一个固定时段（毫秒）；夜间返回早上 8 点 */
+function nextSlotAt(now = Date.now()) {
+  const dayStart = Math.floor((now + 8 * 3600 * 1000) / (24 * 3600 * 1000)) * 24 * 3600 * 1000 - 8 * 3600 * 1000
+  const all = []
+  for (const offset of [0, 1]) {
+    for (const slot of SLOTS) {
+      const [h, m] = slot.split(':').map(Number)
+      all.push(dayStart + offset * 24 * 3600 * 1000 + (h * 60 + m) * MIN)
+    }
+  }
+  return all.filter((at) => at > now).sort((a, b) => a - b)[0]
+}
+
+/** 后台「企微群发」页用的状态汇总 */
+async function getStatus(now = Date.now()) {
+  const [state, queue, logs, enabled] = await Promise.all([
+    loadState(),
+    db.allDocs('digest_queue').catch(() => []),
+    db.recentDocs('distribute_logs', 12).catch(() => []),
+    isEnabled(now)
+  ])
+  const online = live.started && now - live.lastTickAt < TICK_MS * 2 + 30000
+  return {
+    running: live.started,
+    online,
+    enabled,
+    pausedUntil: pausedUntil > now ? pausedUntil : 0,
+    quiet: isQuiet(now),
+    startedAt: live.startedAt,
+    lastTickAt: live.lastTickAt,
+    lastPushAt: state.lastPushAt || 0,
+    nextSlotAt: nextSlotAt(now),
+    queue: {
+      total: queue.length,
+      pendingConfirm: queue.filter((item) => item.confirm === 'pending').length,
+      urgent: queue.filter((item) => item.urgent).length
+    },
+    logs: logs
+      .filter((item) => item.contentType === 'digest' || item.contentType === 'push_skip')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 8)
+      .map((item) => ({
+        at: item.createdAt || 0,
+        status: item.status,
+        title: item.title,
+        count: item.itemCount || 0,
+        reasons: item.reasons || [],
+        error: item.status === 'failed'
+          ? JSON.stringify((item.wecom && (item.wecom.sends || []).map((s) => s.result && s.result.errmsg)) || item.wecom && item.wecom.error || '').slice(0, 120)
+          : ''
+      }))
+  }
+}
+
+module.exports = { start, tick, buildText, pushReason, latestSlotAt, isQuiet, nextSlotAt, getStatus, setEnabled, isEnabled, PER_MESSAGE }
