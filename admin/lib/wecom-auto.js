@@ -2,8 +2,11 @@
 // 8788 那个手动进程不设，避免同一批推两次）。
 //
 // 链路：发帖 / 人工审核通过 → digest_queue（每帖一条 dq_<帖子id>，见 utils/home-feed.js digestQueueItem）
-//      → 本模块每 2 分钟看一次；距上次推送满 1 小时、且有可推的帖子，就推一轮：
-//        每条群消息最多 6 帖，超过 6 帖分两条发，一轮最多 12 帖，剩下的下一小时再推
+//      → 本模块每 2 分钟看一次，三种情况会推（都只在 08:00–00:30 之间，夜里攒的留到早上 8 点）：
+//        1) 固定时段 08:00 / 12:10 / 13:50 / 17:20 / 20:00 / 22:30 / 00:30，有几条推几条
+//        2) 两个时段之间攒够 8 条、且距上次推送满 1 小时，提前推
+//        3) 有急事帖（push-risk.js isUrgent），10 分钟内推出去，急事推送之间至少隔 30 分钟
+//        每次把可推的全部推完：每条群消息最多 8 帖，多了分几条连着发，编号连续，急事排前面标【急】
 //      → 推送前按 push-risk.js 分级：风险内容不推；争议内容先发企微消息给确认人，确认后进下一轮
 //      → 每个客户群由它的群主在企业微信里点「发送」才进群（企微对外部客户群的硬规定，只有群主能发）
 //
@@ -15,13 +18,20 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const db = require('./db')
-const { classifyForPush } = require('./push-risk')
+const { classifyForPush, isUrgent } = require('./push-risk')
 const pushConfirm = require('./push-confirm')
 const exposureFold = require('./exposure-fold')
 
-const PER_MESSAGE = 6
-const MAX_MESSAGES_PER_ROUND = 2
-const PUSH_INTERVAL_MS = 60 * 60 * 1000
+const PER_MESSAGE = 8
+// 北京时间的固定时段；00:30 算前一天晚上的最后一轮
+const SLOTS = ['08:00', '12:10', '13:50', '17:20', '20:00', '22:30', '24:30']
+// 00:30 那一轮留 10 分钟窗口（每 2 分钟才检查一次），00:40 起到 08:00 不推
+const QUIET_START = 40
+const QUIET_END = 8 * 60 // 08:00 之前
+const VOLUME_TRIGGER = 8
+const VOLUME_GAP_MS = 60 * 60 * 1000
+const URGENT_GAP_MS = 30 * 60 * 1000
+const MIN = 60 * 1000
 const TICK_MS = 2 * 60 * 1000
 const RETRY_PAUSE_MS = 30 * 60 * 1000
 const STATE_ID = 'wecom_push_state'
@@ -104,9 +114,9 @@ async function shortLinks(items) {
 /** 群消息正文：只有编号列表，不加前后缀；编号在同一轮的两条消息里连续 */
 function buildText(items, links, startIndex = 1) {
   return clip(items.map((item, index) => {
-    const summary = item.summary && item.summary !== item.title ? `\n${clip(item.summary, 40)}` : ''
+    const summary = item.summary && item.summary !== item.title && !item.summary.startsWith(item.title) ? `\n${clip(item.summary, 24)}` : ''
     const link = links[item.contentId] ? `\n${links[item.contentId]}` : ''
-    return `${startIndex + index}. ${cleanText(item.title)}${summary}${link}`
+    return `${startIndex + index}. ${item.urgent ? '【急】' : ''}${cleanText(item.title)}${summary}${link}`
   }).join('\n\n'), 3900)
 }
 
@@ -168,12 +178,18 @@ async function loadState() {
 async function sortQueue(token, queued) {
   const ready = []
   for (const item of queued) {
-    if (item.confirm === 'approved') { ready.push(item); continue }
+    if (item.confirm === 'approved' || item.pushChecked) { ready.push(item); continue }
     if (item.confirm === 'pending') continue
     if (item.confirm === 'rejected') { await db.removeDoc('digest_queue', item.id).catch(() => {}); continue }
     const post = await db.getDoc(item.contentType === 'wall' ? 'wall_posts' : 'forum_posts', item.contentId).catch(() => null)
     const verdict = classifyForPush(post)
-    if (verdict.level === 'ok') { ready.push(item); continue }
+    if (verdict.level === 'ok') {
+      // 分级结果记在队列项上，之后每 2 分钟检查时不用再读帖子（省数据库请求）
+      const checked = { ...item, pushChecked: true, urgent: isUrgent(post) }
+      await db.setDoc('digest_queue', item.id, checked).catch(() => {})
+      ready.push(checked)
+      continue
+    }
     if (verdict.level === 'risk') {
       await db.removeDoc('digest_queue', item.id).catch(() => {})
       await db.setDoc('distribute_logs', uid('dl_'), {
@@ -183,7 +199,7 @@ async function sortQueue(token, queued) {
       continue
     }
     const fullText = clip(`${(post && post.title) || ''}\n${(post && post.content) || ''}`.trim(), 600)
-    const next = { ...item, confirm: 'pending', confirmReasons: verdict.reasons, fullText, notifiedAt: Date.now() }
+    const next = { ...item, confirm: 'pending', urgent: isUrgent(post), confirmReasons: verdict.reasons, fullText, notifiedAt: Date.now() }
     await db.setDoc('digest_queue', item.id, next)
     const sent = await pushConfirm.notifyConfirmers(token, next, verdict.reasons).catch((err) => ({ ok: false, error: err.message }))
     if (!sent.ok) console.warn(`[wecom-auto] 确认消息没发出：${sent.error}（这条留在队列，可到后台处理）`)
@@ -191,13 +207,27 @@ async function sortQueue(token, queued) {
   return ready
 }
 
+/** 真要推之前再看一眼帖子：入队后被删、被下架、被举报的不推，退回队列重新分级 */
+async function recheckBeforePush(ready) {
+  const out = []
+  for (const item of ready) {
+    if (item.confirm === 'approved') { out.push(item); continue }
+    const post = await db.getDoc(item.contentType === 'wall' ? 'wall_posts' : 'forum_posts', item.contentId).catch(() => null)
+    if (classifyForPush(post).level === 'ok') { out.push(item); continue }
+    const { pushChecked, ...rest } = item
+    await db.setDoc('digest_queue', item.id, rest).catch(() => {})
+  }
+  return out
+}
+
 function stripQueueFields(item) {
-  const { _id, confirm, confirmReasons, fullText, notifiedAt, confirmedAt, confirmedLabel, ...rest } = item
+  const { _id, confirm, confirmReasons, fullText, notifiedAt, confirmedAt, confirmedLabel, pushChecked, ...rest } = item
   return rest
 }
 
 async function pushRound(token, ready) {
-  const picked = ready.slice(0, PER_MESSAGE * MAX_MESSAGES_PER_ROUND)
+  // 全部推完，急事排前面
+  const picked = ready.filter((item) => item.urgent).concat(ready.filter((item) => !item.urgent))
   const chatIds = await targetChatIds()
   if (!chatIds.length) throw new Error('没有绑定要推送的客户群（WECOM_CHAT_ID）')
   const owners = await groupsByOwner(token, chatIds)
@@ -238,36 +268,89 @@ async function pushRound(token, ready) {
   return results
 }
 
-/** 每 2 分钟一次：先合并曝光计数，再看是否到了推送时间 */
-async function tick({ force = false } = {}) {
+// 北京时间（服务器时区不一定是东八区）
+function beijingMinutes(now) {
+  const d = new Date(now + 8 * 3600 * 1000)
+  return d.getUTCHours() * 60 + d.getUTCMinutes()
+}
+
+function isQuiet(now) {
+  const m = beijingMinutes(now)
+  return m >= QUIET_START && m < QUIET_END
+}
+
+/** 最近一个已经到点的固定时段的时间戳（毫秒） */
+function latestSlotAt(now) {
+  const dayStart = Math.floor((now + 8 * 3600 * 1000) / (24 * 3600 * 1000)) * 24 * 3600 * 1000 - 8 * 3600 * 1000
+  let latest = 0
+  for (const offset of [0, -1]) {
+    for (const slot of SLOTS) {
+      const [h, m] = slot.split(':').map(Number)
+      const at = dayStart + offset * 24 * 3600 * 1000 + (h * 60 + m) * MIN
+      if (at <= now && at > latest) latest = at
+    }
+  }
+  return latest
+}
+
+/** 这次该不该推、为什么；ready 是已过风险分级的可推帖子 */
+function pushReason(state, ready, now) {
+  if (!ready.length || isQuiet(now)) return ''
+  const slotAt = latestSlotAt(now)
+  if (slotAt > (state.lastSlotAt || 0)) return 'slot'
+  // 00:30 之后只补最后一轮，不再提前推或插队
+  if (beijingMinutes(now) >= 30 && beijingMinutes(now) < QUIET_START) return ''
+  if (ready.some((item) => item.urgent) && now - (state.lastUrgentAt || 0) >= URGENT_GAP_MS) return 'urgent'
+  if (ready.length >= VOLUME_TRIGGER && now - (state.lastPushAt || 0) >= VOLUME_GAP_MS) return 'volume'
+  return ''
+}
+
+/** 每 2 分钟一次：先合并曝光计数，再看要不要推 */
+async function tick({ force = false, now = Date.now() } = {}) {
   if (running) return { skipped: 'running' }
   running = true
   try {
-    await exposureFold.fold().catch((err) => console.warn('[exposure-fold]', err && err.message))
-    if (!force && Date.now() < pausedUntil) return { skipped: 'paused' }
+    await exposureFold.fold(now).catch((err) => console.warn('[exposure-fold]', err && err.message))
+    if (!force && now < pausedUntil) return { skipped: 'paused' }
+    if (!force && isQuiet(now)) return { skipped: 'quiet' }
     const state = await loadState()
-    if (!force && Date.now() - (state.lastPushAt || 0) < PUSH_INTERVAL_MS) return { skipped: 'not_due' }
     const queued = (await db.allDocs('digest_queue'))
       .sort((a, b) => ((a.queuedAt || 0) - (b.queuedAt || 0)) || String(a.id).localeCompare(String(b.id)))
-    if (!queued.length) return { queued: 0 }
+    const slotAt = latestSlotAt(now)
+    if (!queued.length) {
+      // 到点但没帖子：记下这一轮已经过了，免得帖子晚到几分钟时被当成到点轮
+      if (slotAt > (state.lastSlotAt || 0)) await db.setDoc('meta', STATE_ID, { ...state, id: STATE_ID, lastSlotAt: slotAt })
+      return { queued: 0 }
+    }
     const token = await wecomToken()
     const ready = await sortQueue(token, queued)
-    if (!ready.length) return { queued: queued.length, ready: 0 }
-    const results = await pushRound(token, ready)
+    const reason = force ? 'force' : pushReason(state, ready, now)
+    if (!reason) {
+      if (!ready.length && slotAt > (state.lastSlotAt || 0)) await db.setDoc('meta', STATE_ID, { ...state, id: STATE_ID, lastSlotAt: slotAt })
+      return { queued: queued.length, ready: ready.length, skipped: 'not_due' }
+    }
+    const confirmed = await recheckBeforePush(ready)
+    if (!confirmed.length) return { queued: queued.length, ready: 0 }
+    const results = await pushRound(token, confirmed)
     const ok = results.some((r) => r.ok)
     if (ok) {
       pausedUntil = 0
-      await db.setDoc('meta', STATE_ID, { id: STATE_ID, lastPushAt: Date.now() })
+      await db.setDoc('meta', STATE_ID, {
+        id: STATE_ID,
+        lastPushAt: now,
+        lastSlotAt: Math.max(state.lastSlotAt || 0, slotAt),
+        lastUrgentAt: ready.some((item) => item.urgent) ? now : (state.lastUrgentAt || 0)
+      })
     } else {
-      pausedUntil = Date.now() + RETRY_PAUSE_MS
+      pausedUntil = now + RETRY_PAUSE_MS
     }
     results.forEach((r) => {
       const detail = r.ok ? '已建群发，等群主确认发送' : `失败：${JSON.stringify(r.sends.map((s) => s.result))}`
-      console.log(`[wecom-auto] ${r.digest} ${r.count} 条 → ${detail}`)
+      console.log(`[wecom-auto] (${reason}) ${r.digest} ${r.count} 条 → ${detail}`)
     })
-    return { ok, results }
+    return { ok, reason, results }
   } catch (err) {
-    pausedUntil = Date.now() + RETRY_PAUSE_MS
+    pausedUntil = now + RETRY_PAUSE_MS
     console.error('[wecom-auto]', err && err.message)
     return { error: err && err.message }
   } finally {
@@ -283,8 +366,8 @@ function start() {
   }
   setInterval(() => { tick() }, TICK_MS)
   setTimeout(() => { tick() }, 15000)
-  console.log('[wecom-auto] 企微自动推送已启动：每小时一轮，每条最多 6 帖')
+  console.log('[wecom-auto] 企微自动推送已启动：固定时段 + 满 8 条提前 + 急事插队，08:00–00:30')
   return true
 }
 
-module.exports = { start, tick, buildText, PER_MESSAGE }
+module.exports = { start, tick, buildText, pushReason, latestSlotAt, isQuiet, PER_MESSAGE }

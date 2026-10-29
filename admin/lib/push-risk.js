@@ -72,4 +72,16 @@ function classifyForPush(post) {
   return { level: 'ok', reasons: [] }
 }
 
-module.exports = { classifyForPush }
+// 急事：时间紧、找东西、求助类，推送时插队（10 分钟内发出，急事之间至少隔 30 分钟），消息里标【急】
+const URGENT_WORDS = /急|紧急|马上|立刻|尽快|今晚|今早|丢了|丢失|遗失|捡到|谁看到|有没有人看到|求助|找人|寻人|寻物|借一下|谁有/
+const URGENT_TOPICS = new Set(['失物招领', '求物求助', '求助'])
+
+function isUrgent(post) {
+  if (!post) return false
+  const text = `${post.title || ''}\n${post.content || ''}\n${post.departTime || ''}`
+  const topic = String(post.tag || post.category || '')
+  if (URGENT_TOPICS.has(topic)) return true
+  return URGENT_WORDS.test(text)
+}
+
+module.exports = { classifyForPush, isUrgent }
