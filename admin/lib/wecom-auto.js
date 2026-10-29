@@ -41,7 +41,9 @@ const WX_HOST = 'https://api.weixin.qq.com'
 
 let running = false
 let pausedUntil = 0
-// 运行状态（只在跑推送的这个进程里有；后台「企微群发」页通过 getStatus 读）
+// 运行状态：推送进程每次检查后写进 meta/wecom_push_live（心跳），
+// 这样后台不管从哪个入口 / 哪个进程打开，看到的都是推送进程的真实状态
+const LIVE_ID = 'wecom_push_live'
 const live = { started: false, startedAt: 0, lastTickAt: 0, lastTick: null, lastPush: null }
 // 总开关存在 meta/wecom_push_control，后台可暂停 / 恢复；1 分钟内复用，少读库
 const CONTROL_ID = 'wecom_push_control'
@@ -330,6 +332,17 @@ async function tick(options = {}) {
   live.lastTickAt = options.now || Date.now()
   live.lastTick = result
   if (result && result.results) live.lastPush = { at: live.lastTickAt, ...result }
+  // 心跳：每 2 分钟 1 次写库
+  if (live.started) {
+    await db.setDoc('meta', LIVE_ID, {
+      id: LIVE_ID,
+      startedAt: live.startedAt,
+      lastTickAt: live.lastTickAt,
+      lastSkip: (result && result.skipped) || '',
+      lastError: (result && result.error) || '',
+      pid: process.pid
+    }).catch(() => {})
+  }
   return result
 }
 
@@ -415,21 +428,24 @@ function nextSlotAt(now = Date.now()) {
 
 /** 后台「企微群发」页用的状态汇总 */
 async function getStatus(now = Date.now()) {
-  const [state, queue, logs, enabled] = await Promise.all([
+  const [state, queue, logs, enabled, beat] = await Promise.all([
     loadState(),
     db.allDocs('digest_queue').catch(() => []),
     db.recentDocs('distribute_logs', 12).catch(() => []),
-    isEnabled(now)
+    isEnabled(now),
+    db.getDoc('meta', LIVE_ID).catch(() => null)
   ])
-  const online = live.started && now - live.lastTickAt < TICK_MS * 2 + 30000
+  const lastTickAt = Math.max(live.lastTickAt || 0, (beat && beat.lastTickAt) || 0)
+  const online = now - lastTickAt < TICK_MS * 2 + 30000
   return {
-    running: live.started,
+    running: live.started || !!(beat && beat.lastTickAt),
     online,
     enabled,
     pausedUntil: pausedUntil > now ? pausedUntil : 0,
     quiet: isQuiet(now),
-    startedAt: live.startedAt,
-    lastTickAt: live.lastTickAt,
+    startedAt: live.startedAt || (beat && beat.startedAt) || 0,
+    lastTickAt,
+    lastError: (beat && beat.lastError) || '',
     lastPushAt: state.lastPushAt || 0,
     nextSlotAt: nextSlotAt(now),
     queue: {
