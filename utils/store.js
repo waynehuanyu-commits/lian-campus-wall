@@ -3729,8 +3729,10 @@ function shapeGuide(row, withBody) {
 function listGuides(payload = {}) {
   const category = GUIDE_CATEGORIES.indexOf(payload.category) >= 0 ? payload.category : ''
   const page = Math.max(0, Math.floor(Number(payload.page) || 0))
+  const keyword = String(payload.keyword || '').trim().toLowerCase()
   const rows = getGuides()
     .filter((row) => row.reviewStatus === 'approved' && (!category || row.category === category))
+    .filter((row) => !keyword || [row.title, row.summary, row.content].some((text) => String(text || '').toLowerCase().includes(keyword)))
     .filter((row) => guideKind(row) !== 'pick' || pickSource(row))
     .sort((a, b) => (b.sortAt || b.publishedAt || 0) - (a.sortAt || a.publishedAt || 0))
   const slice = rows.slice(page * GUIDE_PAGE_SIZE, (page + 1) * GUIDE_PAGE_SIZE)

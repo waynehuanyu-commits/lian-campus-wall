@@ -254,3 +254,4 @@
 </view>
 <privacy-popup />
 <report-sheet id="report-sheet" />
+<user-card id="user-card" />

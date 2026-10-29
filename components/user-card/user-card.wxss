@@ -1,0 +1,157 @@
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(10, 20, 45, 0.38);
+  animation: fade-in 160ms ease-out both;
+}
+
+.panel {
+  width: 100%;
+  padding: 16rpx 40rpx calc(28rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  border-radius: 36rpx 36rpx 0 0;
+  background: #ffffff;
+  animation: slide-up 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.handle {
+  width: 72rpx;
+  height: 8rpx;
+  margin: 0 auto 32rpx;
+  border-radius: 8rpx;
+  background: rgba(18, 26, 44, 0.12);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #eef2f8;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #121a2c;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.pill {
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: #e9efff;
+  color: #0a5cff;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.pill.ok {
+  background: #f3fbc4;
+  color: #0a2a7a;
+}
+
+.bio {
+  margin-top: 28rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #3b4458;
+}
+
+.privacy {
+  margin-top: 24rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f6f8fc;
+  font-size: 24rpx;
+  color: #858d9c;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20rpx;
+}
+
+.report {
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #858d9c;
+}
+
+.report-on {
+  background: rgba(18, 26, 44, 0.05);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  padding-bottom: 40rpx;
+}
+
+.sk-avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  background: #eef2f8;
+}
+
+.sk-lines {
+  flex: 1;
+}
+
+.sk-line {
+  height: 28rpx;
+  border-radius: 8rpx;
+  background: #eef2f8;
+}
+
+.sk-line + .sk-line {
+  margin-top: 16rpx;
+}
+
+.sk-line.short {
+  width: 50%;
+}
+
+.error {
+  padding: 40rpx 0 56rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #858d9c;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}

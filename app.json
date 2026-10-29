@@ -70,6 +70,7 @@
   "__usePrivacyCheck__": true,
   "usingComponents": {
     "privacy-popup": "/components/privacy-popup/privacy-popup",
-    "report-sheet": "/components/report-sheet/report-sheet"
+    "report-sheet": "/components/report-sheet/report-sheet",
+    "user-card": "/components/user-card/user-card"
   }
 }

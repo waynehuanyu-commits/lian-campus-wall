@@ -1,0 +1,6 @@
+{
+  "component": true,
+  "usingComponents": {
+    "report-sheet": "/components/report-sheet/report-sheet"
+  }
+}

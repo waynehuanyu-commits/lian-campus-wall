@@ -4228,12 +4228,7 @@ const handlers = {
       }
     }
     const profileId = target.id || target._id || userId
-    const [forumRes, wallRes] = await Promise.all([
-      db.collection('forum_posts').where({ authorId: profileId }).limit(50).get().catch(() => ({ data: [] })),
-      db.collection('wall_posts').where({ authorId: profileId }).limit(50).get().catch(() => ({ data: [] }))
-    ])
-    const forum = (forumRes.data || []).filter((item) => !item.anonymous)
-    const wall = (wallRes.data || []).filter((item) => !item.anonymous)
+    // 隐私：不再统计和展示他人的发布、获赞、评论数（旧版前端读到 0）
     const schoolText = target.schoolLocked && target.showSchoolTag
       ? formatSchool(target)
       : ''
@@ -4250,11 +4245,7 @@ const handlers = {
         showSchoolTag: !!target.showSchoolTag,
         studentAuthApproved: target.studentAuthStatus === 'approved'
       },
-      stats: {
-        postCount: forum.length + wall.length,
-        receivedLikes: [...forum, ...wall].reduce((sum, item) => sum + (item.likeCount || 0), 0),
-        receivedComments: [...forum, ...wall].reduce((sum, item) => sum + (item.commentCount || 0), 0)
-      }
+      stats: { postCount: 0, receivedLikes: 0, receivedComments: 0 }
     }
   },
 
@@ -4262,8 +4253,10 @@ const handlers = {
     const userId = String((payload && payload.userId) || '').trim()
     const type = payload.type === 'wall' ? 'wall' : 'forum'
     if (!userId) return { ok: true, posts: [] }
-    const collection = type === 'wall' ? 'wall_posts' : 'forum_posts'
     const viewerId = user && user.id && user.id !== 'guest_readonly' ? user.id : ''
+    // 隐私：只允许看自己的发布记录，别人的主页不再返回帖子
+    if (!viewerId || viewerId !== userId) return { ok: true, posts: [] }
+    const collection = type === 'wall' ? 'wall_posts' : 'forum_posts'
     const [authoredRes, liked] = await Promise.all([
       db.collection(collection).where({ authorId: userId }).limit(50).get().catch(() => ({ data: [] })),
       viewerId ? likedIds(viewerId, type).catch(() => []) : Promise.resolve([])
@@ -4346,7 +4339,14 @@ const handlers = {
     const categories = await getGuideCategories()
     const category = categories.includes(payload.category) ? payload.category : ''
     const page = Math.max(0, Math.floor(Number(payload.page) || 0))
-    const where = category ? { reviewStatus: 'approved', category } : { reviewStatus: 'approved' }
+    const base = category ? { reviewStatus: 'approved', category } : { reviewStatus: 'approved' }
+    // 搜索：标题、副标题、正文里包含关键词即可，和分类筛选叠加，排序不变
+    const keyword = String(payload.keyword || '').trim().slice(0, 30)
+    let where = base
+    if (keyword) {
+      const reg = db.RegExp({ regexp: keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), options: 'i' })
+      where = _.and([base, _.or([{ title: reg }, { summary: reg }, { content: reg }])])
+    }
     let rows = []
     try {
       const res = await db.collection('guides')

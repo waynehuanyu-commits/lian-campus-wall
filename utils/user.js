@@ -27,6 +27,14 @@ function openProfile(options = {}) {
     wx.switchTab({ url: '/pages/mine/mine' })
     return true
   }
+  // 优先在当前页弹出资料卡（不展示对方发过的内容）；页面没挂卡片时退回资料页
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+  const page = pages[pages.length - 1]
+  const card = page && typeof page.selectComponent === 'function' ? page.selectComponent('#user-card') : null
+  if (card) {
+    card.open(userId)
+    return true
+  }
   wx.navigateTo({ url: `/pages/user-profile/user-profile?id=${encodeURIComponent(userId)}` })
   return true
 }

@@ -1,0 +1,31 @@
+<view wx:if="{{show}}" class="mask" catchtouchmove="noop" bindtap="close">
+  <view class="panel" catchtap="noop">
+    <view class="handle"></view>
+    <view wx:if="{{loading}}" class="loading">
+      <view class="sk-avatar"></view>
+      <view class="sk-lines">
+        <view class="sk-line"></view>
+        <view class="sk-line short"></view>
+      </view>
+    </view>
+    <view wx:elif="{{error}}" class="error">{{error}}</view>
+    <block wx:else>
+      <view class="head">
+        <image class="avatar" src="{{profile.avatar}}" mode="aspectFill" />
+        <view class="main">
+          <view class="name">{{profile.nickname}}</view>
+          <view class="pills">
+            <view wx:if="{{profile.studentAuthApproved}}" class="pill ok">学生已认证</view>
+            <view wx:if="{{profile.schoolText}}" class="pill">{{profile.schoolText}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{profile.bio}}" class="bio">{{profile.bio}}</view>
+      <view class="privacy">为保护隐私，不展示对方发布过的内容</view>
+      <view class="actions">
+        <view class="report" hover-class="report-on" bindtap="onReport">举报</view>
+      </view>
+    </block>
+  </view>
+</view>
+<report-sheet id="report-sheet" />

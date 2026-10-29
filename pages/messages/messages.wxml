@@ -68,3 +68,4 @@
 
   <campus-qr-card />
 </view>
+<user-card id="user-card" />

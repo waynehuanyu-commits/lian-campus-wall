@@ -6,6 +6,23 @@
     </view>
   </view>
 
+  <view class="gd-search">
+    <view class="search-bar">
+      <view class="search-ic"></view>
+      <input
+        class="gd-search-input"
+        confirm-type="search"
+        maxlength="30"
+        placeholder="搜索攻略"
+        placeholder-class="gd-search-ph"
+        value="{{keywordInput}}"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <view wx:if="{{keywordInput}}" class="gd-search-clear" catchtap="clearSearch"></view>
+    </view>
+  </view>
+
   <view class="gd-tabs" style="top: {{masthead.top + masthead.height}}px;">
     <scroll-view class="gd-tabs-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="gd-tabs-line">
@@ -35,7 +52,8 @@
     </view>
 
     <view wx:elif="{{!items.length}}" class="empty">
-      <view class="empty-title">这个分类还没有攻略</view>
+      <view class="empty-title">{{keyword ? '没有找到「' + keyword + '」相关的攻略' : '这个分类还没有攻略'}}</view>
+      <view wx:if="{{keyword}}" class="gd-empty-action" bindtap="clearSearch">清除搜索</view>
     </view>
 
     <block wx:else>

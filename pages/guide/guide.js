@@ -12,6 +12,8 @@ Page({
     masthead: { top: 20, height: 44, capsule: 100 },
     categories: [ALL].concat(store.GUIDE_CATEGORIES),
     active: ALL,
+    keyword: '',
+    keywordInput: '',
     items: [],
     page: 0,
     hasMore: false,
@@ -46,7 +48,8 @@ Page({
     const page = reset ? 0 : this.data.page + 1
     this.setData(reset ? { loading: true, error: '' } : { loadingMore: true })
     const active = this.data.active
-    const result = await repo.listGuides({ category: active === ALL ? '' : active, page })
+    const keyword = this.data.keyword
+    const result = await repo.listGuides({ category: active === ALL ? '' : active, keyword, page })
     if (seq !== this._seq) return
     if (!result || result.ok === false) {
       this.setData({
@@ -76,6 +79,22 @@ Page({
       loadingMore: false,
       error: ''
     })
+  },
+
+  onSearchInput(e) {
+    this.setData({ keywordInput: e.detail.value })
+  },
+
+  onSearchConfirm() {
+    const keyword = String(this.data.keywordInput || '').trim()
+    if (keyword === this.data.keyword) return
+    if (keyword) track.search({ surface: 'guide', keyword, category: this.data.active })
+    this.setData({ keyword, items: [] }, () => this.load(true))
+  },
+
+  clearSearch() {
+    if (!this.data.keyword && !this.data.keywordInput) return
+    this.setData({ keyword: '', keywordInput: '', items: [] }, () => this.load(true))
   },
 
   onTabTap(e) {

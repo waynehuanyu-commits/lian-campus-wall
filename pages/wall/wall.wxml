@@ -1,1 +1,2 @@
 <view class="page"></view>
+<user-card id="user-card" />

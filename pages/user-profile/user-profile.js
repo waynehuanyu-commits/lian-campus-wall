@@ -1,7 +1,6 @@
 const repo = require('../../utils/repo')
 const defaultProfile = require('../../utils/default-profile')
 const track = require('../../utils/track')
-const { formatTime } = require('../../utils/util')
 const { readNavMetrics } = require('../../utils/nav-bar')
 const coverStore = require('../../utils/cover')
 
@@ -11,13 +10,6 @@ Page({
     cover: coverStore.DEFAULT_COVER,
     userId: '',
     profile: null,
-    stats: { postCount: 0, receivedLikes: 0, receivedComments: 0 },
-    tabs: [
-      { id: 'forum', name: '学习分享' },
-      { id: 'wall', name: '互助广场' }
-    ],
-    tab: 'forum',
-    list: [],
     loading: true,
     error: '',
     moreOpen: false
@@ -54,11 +46,7 @@ Page({
       this.setData({ profile: null, loading: false, error: '用户不存在' })
       return
     }
-    // 帖子列表不依赖资料结果，一起发出去，省一次往返
-    const [result, rows] = await Promise.all([
-      repo.getPublicProfile(this.userId),
-      repo.listUserPosts(this.userId, this.data.tab).catch(() => [])
-    ])
+    const result = await repo.getPublicProfile(this.userId)
     if (!result || !result.ok) {
       this.setData({ profile: null, loading: false, error: (result && result.message) || '用户不存在' })
       return
@@ -74,36 +62,10 @@ Page({
         ...profile,
         nickname: defaultProfile.resolveProfileNickname(profile.nickname, profile.id || this.userId)
       },
-      stats: result.stats || { postCount: 0, receivedLikes: 0, receivedComments: 0 },
-      list: this.decorateList(rows, this.data.tab),
       loading: false,
       error: ''
     })
   },
-
-  decorateList(rows, tab) {
-    return (rows || []).map((item) => ({
-      ...item,
-      type: tab,
-      badge: tab === 'wall' ? item.tag : item.category,
-      title: tab === 'wall' ? item.headline : item.title,
-      timeText: formatTime(item.createdAt)
-    }))
-  },
-
-  onTabTap(e) {
-    const tab = e.currentTarget.dataset.id
-    if (tab === this.data.tab) return
-    this.setData({ tab }, () => this.loadList())
-  },
-
-  async loadList() {
-    const { tab } = this.data
-    const rows = await repo.listUserPosts(this.userId, tab)
-    if (tab !== this.data.tab) return
-    this.setData({ list: this.decorateList(rows, tab) })
-  },
-
 
   openMore() {
     this.setData({ moreOpen: true })
@@ -132,10 +94,6 @@ Page({
       targetId,
       onSubmit: (payload) => repo.submitReport(payload)
     })
-  },
-
-  goDetail(e) {
-    const { id, type } = e.currentTarget.dataset
-    require('../../utils/post-nav').openPostDetail(type === 'forum' ? 'forum' : 'wall', id)
   }
+
 })

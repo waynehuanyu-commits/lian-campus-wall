@@ -200,5 +200,4 @@
     <text class="fab-text">发帖</text>
   </view>
 </view>
-
-
+<user-card id="user-card" />
