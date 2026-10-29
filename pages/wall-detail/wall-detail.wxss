@@ -22,7 +22,7 @@
 }
 
 .status-done {
-  color: #1d4ed8;
+  color: #173FB5;
   background: #e8eefc;
 }
 
@@ -60,7 +60,7 @@
 }
 
 .status-action.active {
-  color: #1d4ed8;
+  color: #173FB5;
   border-color: #93c5fd;
   background: #eff6ff;
   font-weight: 650;
@@ -137,7 +137,7 @@
   margin-top: 24rpx;
   height: 88rpx;
   border-radius: 20rpx;
-  background: #2f7dff;
+  background: #1F66E5;
   color: #fff;
   font-size: 30rpx;
   font-weight: 650;
@@ -151,8 +151,8 @@
 }
 
 .sheet-btn-secondary {
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: #E5ECFA;
+  color: #173FB5;
 }
 
 .sheet-cancel {
@@ -182,7 +182,7 @@
 
 .feedback-chip.on {
   background: #e8f0ff;
-  color: #1d4ed8;
+  color: #173FB5;
   font-weight: 650;
 }
 

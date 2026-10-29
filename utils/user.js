@@ -13,7 +13,7 @@ function openProfile(options = {}) {
       content: '对方使用了分身，无法查看个人信息。',
       showCancel: false,
       confirmText: '知道了',
-      confirmColor: '#2F7DFF'
+      confirmColor: '#1F66E5'
     })
     return false
   }

@@ -87,7 +87,7 @@
     <block wx:if="{{!isGuest && user.schoolLocked}}">
       <view class="setting-item">
         <view class="setting-title">展示学校标签</view>
-        <switch checked="{{user.showSchoolTag}}" color="#0A5CFF" bindchange="onShowSchoolTagChange" />
+        <switch checked="{{user.showSchoolTag}}" color="#084BD8" bindchange="onShowSchoolTagChange" />
       </view>
       <view class="setting-item" bindtap="goSchool" hover-class="nav-item-hover">
         <view class="setting-title">学生认证</view>

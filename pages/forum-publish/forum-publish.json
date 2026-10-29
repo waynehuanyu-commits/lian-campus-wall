@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "发布帖子",
-  "navigationBarBackgroundColor": "#E6EEFF",
+  "navigationBarBackgroundColor": "#DCE6FB",
   "backgroundColor": "#F2F5FA",
   "usingComponents": {
     "privacy-popup": "/components/privacy-popup/privacy-popup"

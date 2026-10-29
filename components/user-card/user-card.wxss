@@ -52,7 +52,7 @@
 .name {
   font-size: 36rpx;
   font-weight: 700;
-  color: #121a2c;
+  color: #0E1830;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -68,7 +68,7 @@
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
   background: #e9efff;
-  color: #0a5cff;
+  color: #084BD8;
   font-size: 22rpx;
   font-weight: 600;
 }
@@ -91,7 +91,7 @@
   border-radius: 16rpx;
   background: #f6f8fc;
   font-size: 24rpx;
-  color: #858d9c;
+  color: #7A8294;
 }
 
 .actions {
@@ -104,7 +104,7 @@
   padding: 12rpx 24rpx;
   border-radius: 999rpx;
   font-size: 26rpx;
-  color: #858d9c;
+  color: #7A8294;
 }
 
 .report-on {
@@ -146,7 +146,7 @@
   padding: 40rpx 0 56rpx;
   text-align: center;
   font-size: 28rpx;
-  color: #858d9c;
+  color: #7A8294;
 }
 
 @keyframes fade-in {

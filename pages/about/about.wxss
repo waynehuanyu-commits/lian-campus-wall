@@ -12,7 +12,7 @@
   font-size: 22rpx;
   letter-spacing: 4rpx;
   font-weight: 650;
-  color: rgba(47, 125, 255, 0.85);
+  color: rgba(31,102,229, 0.85);
 }
 
 .about-name {

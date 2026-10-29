@@ -37,7 +37,7 @@
 
 .qr-title {
   margin-top: 22rpx;
-  color: #121a2c;
+  color: #0E1830;
   font-size: 32rpx;
   font-weight: 700;
   line-height: 1.3;
@@ -45,7 +45,7 @@
 
 .qr-desc {
   margin-top: 6rpx;
-  color: #858d9c;
+  color: #7A8294;
   font-size: 24rpx;
   line-height: 1.5;
 }

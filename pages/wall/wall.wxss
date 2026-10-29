@@ -32,7 +32,7 @@
 }
 
 .status-item.active {
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 700;
 }
 
@@ -55,7 +55,7 @@
 }
 
 .status-done {
-  color: #1d4ed8;
+  color: #173FB5;
   background: #e8eefc;
 }
 
@@ -72,7 +72,7 @@
   height: 36rpx;
   margin: 0;
   padding: 0 0 0 16rpx;
-  border-left: 1rpx solid rgba(47, 125, 255, 0.2);
+  border-left: 1rpx solid rgba(31,102,229, 0.2);
   background: transparent;
   box-shadow: none;
 }
@@ -91,7 +91,7 @@
 }
 
 .sort-item.active {
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 700;
   background: transparent;
   box-shadow: none;
@@ -104,8 +104,8 @@
   padding: 26rpx 28rpx 20rpx;
   border-radius: 28rpx;
   background: linear-gradient(145deg, #f5f8ff 0%, #e3eeff 48%, #eef5ff 100%);
-  border: 1rpx solid rgba(47, 125, 255, 0.12);
-  box-shadow: 0 14rpx 34rpx rgba(47, 125, 255, 0.08);
+  border: 1rpx solid rgba(31,102,229, 0.12);
+  box-shadow: 0 14rpx 34rpx rgba(31,102,229, 0.08);
 }
 
 .hot-entry::before {
@@ -116,7 +116,7 @@
   width: 180rpx;
   height: 180rpx;
   border-radius: 50%;
-  background: rgba(47, 125, 255, 0.1);
+  background: rgba(31,102,229, 0.1);
   pointer-events: none;
 }
 
@@ -131,7 +131,7 @@
 
 .hot-entry-label {
   font-size: 20rpx;
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 750;
   letter-spacing: 2rpx;
 }
@@ -145,7 +145,7 @@
 
 .hot-entry-right {
   flex-shrink: 0;
-  color: #2f7dff;
+  color: #1F66E5;
   font-size: 24rpx;
   font-weight: 700;
 }
@@ -165,7 +165,7 @@
   color: #4a3f44;
   font-size: 24rpx;
   line-height: 1.4;
-  border-bottom: 1rpx solid rgba(47, 125, 255, 0.06);
+  border-bottom: 1rpx solid rgba(31,102,229, 0.06);
 }
 
 .hot-preview-item:last-child {
@@ -175,7 +175,7 @@
 .hot-preview-rank {
   width: 32rpx;
   flex-shrink: 0;
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -184,9 +184,9 @@
   flex-shrink: 0;
   padding: 2rpx 10rpx;
   border-radius: 8rpx;
-  background: rgba(47, 125, 255, 0.12);
+  background: rgba(31,102,229, 0.12);
   font-size: 20rpx;
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 650;
 }
 
@@ -255,7 +255,7 @@
 }
 
 .contact-avatar {
-  box-shadow: 0 0 0 3rpx rgba(47, 125, 255, 0.28);
+  box-shadow: 0 0 0 3rpx rgba(31,102,229, 0.28);
 }
 
 .contact-hint {

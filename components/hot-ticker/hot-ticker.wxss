@@ -36,7 +36,7 @@
 }
 
 .ticker-row-on {
-  background: rgba(10, 92, 255, 0.04);
+  background: rgba(8,75,216, 0.04);
 }
 
 /* 皇冠：三个尖角 + 底座，名次写在底座上 */

@@ -6,7 +6,7 @@
 
 .digest-count {
   font-size: 22rpx;
-  color: #2f7dff;
+  color: #1F66E5;
   font-weight: 600;
 }
 
@@ -39,7 +39,7 @@
 
 .go {
   margin-top: 16rpx;
-  color: #2f7dff;
+  color: #1F66E5;
   font-size: 24rpx;
   font-weight: 600;
 }

@@ -101,7 +101,7 @@
   justify-content: center;
   color: var(--brand);
   font-size: 48rpx;
-  border: 2rpx dashed rgba(10, 92, 255, 0.25);
+  border: 2rpx dashed rgba(8,75,216, 0.25);
 }
 
 .image-remove {

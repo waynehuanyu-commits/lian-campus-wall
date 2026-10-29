@@ -87,7 +87,7 @@
 
 .msg-entry.active {
   background: #fff;
-  border-color: rgba(10, 92, 255, 0.35);
+  border-color: rgba(8,75,216, 0.35);
   box-shadow: 0 10rpx 24rpx rgba(10, 42, 122, 0.08);
 }
 
@@ -124,7 +124,7 @@
 }
 
 .msg-row-on {
-  background: rgba(10, 92, 255, 0.04);
+  background: rgba(8,75,216, 0.04);
 }
 
 .msg-row-avatar {

@@ -99,8 +99,8 @@
 }
 
 .upload-add {
-  border: 2rpx dashed rgba(10, 92, 255, 0.25);
-  background: rgba(10, 92, 255, 0.03);
+  border: 2rpx dashed rgba(8,75,216, 0.25);
+  background: rgba(8,75,216, 0.03);
   color: var(--ink-3);
   font-size: 22rpx;
   gap: 10rpx;
@@ -201,8 +201,8 @@
 }
 
 .pub-alias-check.on {
-  background: #0A5CFF;
-  border-color: #0A5CFF;
+  background: #084BD8;
+  border-color: #084BD8;
 }
 
 .pub-alias-check.on::after {
@@ -269,7 +269,7 @@
   margin: 0;
   padding: 0;
   border-radius: 24rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  background: linear-gradient(145deg, #1C5FE0 0%, #0840B8 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
@@ -282,7 +282,7 @@
 }
 
 .pub-submit[disabled] {
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%) !important;
+  background: linear-gradient(145deg, #1C5FE0 0%, #0840B8 100%) !important;
   color: rgba(255, 255, 255, 0.75) !important;
   opacity: 0.7;
 }

@@ -1,15 +1,15 @@
 page {
   --paper: #f2f5fa;
   --surface: #ffffff;
-  --ink: #121a2c;
+  --ink: #0E1830;
   --ink-2: #3b4458;
-  --ink-3: #858d9c;
-  --ink-4: #b4bac5;
+  --ink-3: #7A8294;
+  --ink-4: #A9B0BE;
   --line: rgba(18, 26, 44, 0.07);
   --brand-deep: #0a2a7a;
-  --brand: #0a5cff;
+  --brand: #084BD8;
   --brand-soft: #e9efff;
-  --lime: #d4f01e;
+  --lime: #C7E31A;
   --lime-soft: #f3fbc4;
   /* 话题标签配色（.tone-*，见 utils/home-feed.js topicTone），各带浅底（-soft） */
   --amber-ink: #8A5300;
@@ -30,8 +30,8 @@ page {
      iOS 上会让评论框刚弹键盘就失焦收起 */
   background-color: var(--paper);
   background-image:
-    radial-gradient(640rpx 460rpx at 100% 0, rgba(10, 92, 255, 0.16) 0%, rgba(10, 92, 255, 0) 70%),
-    linear-gradient(180deg, #e6eeff 0, #eff3fa 520rpx, #f2f5fa 900rpx);
+    radial-gradient(640rpx 460rpx at 100% 0, rgba(8,75,216, 0.16) 0%, rgba(8,75,216, 0) 70%),
+    linear-gradient(180deg, #DCE6FB 0, #E9EEF8 520rpx, #f2f5fa 900rpx);
   background-repeat: no-repeat;
   background-size: 100% 900rpx;
   color: var(--ink);
@@ -176,7 +176,7 @@ page {
 .btn-primary {
   height: 88rpx;
   border-radius: 24rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  background: linear-gradient(145deg, #1C5FE0 0%, #0840B8 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
@@ -221,7 +221,7 @@ page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1rpx solid rgba(47, 125, 255, 0.22);
+  border: 1rpx solid rgba(31,102,229, 0.22);
   box-sizing: border-box;
 }
 
@@ -239,7 +239,7 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14rpx 30rpx rgba(10, 92, 255, 0.32);
+  box-shadow: 0 14rpx 30rpx rgba(8,75,216, 0.32);
   z-index: 20;
 }
 
@@ -820,7 +820,7 @@ button.share-pick {
   margin: 20rpx 24rpx 0;
   padding: 24rpx 28rpx 6rpx;
   border-radius: 24rpx;
-  background: linear-gradient(180deg, #e9f0ff 0%, rgba(255, 255, 255, 0.96) 56%);
+  background: linear-gradient(180deg, #E0E9FC 0%, rgba(255, 255, 255, 0.96) 56%);
   border: 1rpx solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 6rpx 20rpx rgba(10, 42, 122, 0.05);
   position: relative;
@@ -893,7 +893,7 @@ button.share-pick {
   width: 40rpx;
   flex-shrink: 0;
   text-align: center;
-  color: rgba(10, 92, 255, 0.45);
+  color: rgba(8,75,216, 0.45);
   font-size: 32rpx;
   font-weight: 800;
   font-style: italic;
@@ -910,7 +910,7 @@ button.share-pick {
 }
 
 .hot-line-rank.top3 {
-  color: rgba(10, 92, 255, 0.7);
+  color: rgba(8,75,216, 0.7);
 }
 
 .hot-line-title {
@@ -962,7 +962,7 @@ button.share-pick {
   height: 72rpx;
   border-radius: 18rpx;
   background: #fff;
-  box-shadow: 0 8rpx 18rpx rgba(47, 125, 255, 0.18);
+  box-shadow: 0 8rpx 18rpx rgba(31,102,229, 0.18);
 }
 
 .brand-name {
@@ -1341,7 +1341,7 @@ button.share-pick {
 }
 
 .upload-add {
-  border: 2rpx dashed rgba(47, 125, 255, 0.28);
+  border: 2rpx dashed rgba(31,102,229, 0.28);
   background: #f5f8fc;
   color: #5b7394;
   display: flex;
@@ -1439,7 +1439,7 @@ button.share-pick {
   min-width: 104rpx;
   height: 104rpx;
   border-radius: 34rpx;
-  background: linear-gradient(145deg, #2a74ff 0%, #0a4fe0 100%);
+  background: linear-gradient(145deg, #1C5FE0 0%, #0840B8 100%);
   box-shadow: 0 16rpx 32rpx rgba(10, 82, 230, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.25);
 }
 
